@@ -1,0 +1,285 @@
+--- a/sheng-ports/pogo/nanosic_platform.c
++++ b/sheng-ports/pogo/nanosic_platform.c
+@@ -371,19 +371,19 @@
+     }
+ }
+ 
+-static int nano_get_chg_real_type_locked(int* real_type)
++static int nano_get_chg_real_type_locked(int* real_type, struct battmngr_notify *data)
+ {
+ 	int type;
+ 
+-    if (!g_nodev || !g_battmngr_noti) {
+-        dbgprint(ERROR_LEVEL, "%s g_nodev or g_battmngr_noti is null\n", __func__);
+-        return -1;
++    if (!g_nodev || !data) {
++        dbgprint(ERROR_LEVEL, "%s g_nodev or data is null\n", __func__);
++        return -ENODEV;
+     }
+ 
+     if (gObject != DEV_KEYBOARD_OBJECT) {
+ 
+-        if (g_battmngr_noti->irq_msg.value) {
+-            g_battmngr_noti->pd_msg.pd_active = 1;
++        if (READ_ONCE(data->irq_msg.value)) {
++            WRITE_ONCE(data->pd_msg.pd_active, 1);
+             dbgprint(ERROR_LEVEL, "%s holder detect pd type. \n", __func__);
+             *real_type = POWER_SUPPLY_USB_TYPE_PD;
+         } else
+@@ -397,7 +397,7 @@
+ 	dbgprint(ERROR_LEVEL, "%s type=%d, old_type=%d \n", __func__, type, g_nodev->old_type);
+ 
+ 	if (g_nodev->pd_flag) {
+-        g_battmngr_noti->pd_msg.pd_active = 1;
++        WRITE_ONCE(data->pd_msg.pd_active, 1);
+ 		dbgprint(ERROR_LEVEL, "%s detect pd type. \n", __func__);
+ 		*real_type = POWER_SUPPLY_USB_TYPE_PD;
+ 		goto result;
+@@ -437,19 +437,19 @@
+ 	return 0;
+ }
+ 
+-static int nano_get_chg_usb_type_locked(int* usb_type)
++static int nano_get_chg_usb_type_locked(int* usb_type, struct battmngr_notify *data)
+ {
+ 	int type;
+ 
+-    if (!g_nodev || !g_battmngr_noti) {
+-        dbgprint(ERROR_LEVEL, "%s g_nodev or g_battmngr_noti is null\n", __func__);
+-        return -1;
++    if (!g_nodev || !data) {
++        dbgprint(ERROR_LEVEL, "%s g_nodev or data is null\n", __func__);
++        return -ENODEV;
+     }
+ 
+     if (gObject != DEV_KEYBOARD_OBJECT) {
+ 
+-        if (g_battmngr_noti->irq_msg.value) {
+-            g_battmngr_noti->pd_msg.pd_active = 1;
++        if (READ_ONCE(data->irq_msg.value)) {
++            WRITE_ONCE(data->pd_msg.pd_active, 1);
+             dbgprint(ERROR_LEVEL, "%s holder detect pd type. \n", __func__);
+             *usb_type = POWER_SUPPLY_USB_TYPE_PD;
+         } else
+@@ -463,7 +463,7 @@
+ 	dbgprint(ERROR_LEVEL, "%s type=%d, old_type=%d \n", __func__, type, g_nodev->old_type);
+ 
+ 	if (g_nodev->pd_flag) {
+-        g_battmngr_noti->pd_msg.pd_active = 1;
++        WRITE_ONCE(data->pd_msg.pd_active, 1);
+ 		dbgprint(ERROR_LEVEL, "%s detect pd type. \n", __func__);
+ 		*usb_type = POWER_SUPPLY_USB_TYPE_PD;
+ 		goto result;
+@@ -498,27 +498,27 @@
+ 	return 0;
+ }
+ 
+-static int nano_is_charge_online_locked(u8* online)
++static int nano_is_charge_online_locked(u8* online, struct battmngr_notify *data)
+ {
+     if (g_nodev) {
+         if (!g_nodev->usb_icl_votable)
+             g_nodev->usb_icl_votable = find_votable("ICL");
+ 
+-        if (!g_nodev->usb_icl_votable || !g_battmngr_noti)
++        if (!g_nodev->usb_icl_votable || !data)
+             return -ENODEV;
+ 
+         if (get_client_vote_locked(g_nodev->usb_icl_votable, USER_VOTER) == 0) {
+             *online = false;
+             return 1;
+         }
+-		 if (g_battmngr_noti)
+-            *online = g_battmngr_noti->irq_msg.value;
++		 if (data)
++            *online = READ_ONCE(data->irq_msg.value);
+         return 1;
+     } else {
+         dbgprint(ERROR_LEVEL,"%s g_nodev is null\n", __func__);
+     }
+ 
+-	return -1;
++	return -ENODEV;
+ }
+ 
+ static int nano_input_curr_limit_locked(int* curr_limit)
+@@ -559,7 +559,7 @@
+ 	return -1;
+ }
+ 
+-static void deal_report_event(const u8* buf)
++static void deal_report_event(const u8* buf, struct battmngr_notify *data)
+ {
+     static int last_online;
+ 
+@@ -573,54 +573,28 @@
+             g_nodev->dpdm = buf[25];
+             g_nodev->protocol_volt = (int)(buf[18] * 100);
+             g_nodev->protocol_curr = (int)(buf[19] * 50);
+-        } else if (g_battmngr_noti){
+-            g_nodev->online = g_battmngr_noti->irq_msg.value;
++        } else if (data){
++            g_nodev->online = READ_ONCE(data->irq_msg.value);
+         }
+ 
+         dbgprint(ERROR_LEVEL, "ENTER -1 last_online:%d, %d.\n", last_online, g_nodev->online);
+         // send notify
+-        if (last_online != g_nodev->online) {
++        if (data && last_online != g_nodev->online) {
+             dbgprint(ERROR_LEVEL, "Send report info.\n");
+-            //g_battmngr_noti->mcu_msg.msg_type = BATTMNGR_MSG_MCU_TYPE;
+-            battmngr_notifier_call_chain(BATTMNGR_EVENT_REPORT, g_battmngr_noti);
++            //data->mcu_msg.msg_type = BATTMNGR_MSG_MCU_TYPE;
++            battmngr_notifier_call_chain(BATTMNGR_EVENT_REPORT, data);
+         }
+         last_online = g_nodev->online;
+ 
+     }
+ }
+ 
+-static int nano_get_chg_real_type(int *real_type)
+-{
+-	int ret;
+-	if (!real_type)
+-		return -EINVAL;
+-	mutex_lock(&nano_api_lock);
+-	ret = g_nodev ? nano_get_chg_real_type_locked(real_type) : -ENODEV;
+-	mutex_unlock(&nano_api_lock);
+-	return ret;
+-}
+-
+-static int nano_get_chg_usb_type(int *usb_type)
+-{
+-	int ret;
+-	if (!usb_type)
+-		return -EINVAL;
+-	mutex_lock(&nano_api_lock);
+-	ret = g_nodev ? nano_get_chg_usb_type_locked(usb_type) : -ENODEV;
+-	mutex_unlock(&nano_api_lock);
+-	return ret;
+-}
+-
+-static int nano_is_charge_online(u8 *online)
+-{
+-	int ret;
+-	if (!online)
+-		return -EINVAL;
+-	mutex_lock(&nano_api_lock);
+-	ret = g_nodev ? nano_is_charge_online_locked(online) : -ENODEV;
+-	mutex_unlock(&nano_api_lock);
+-	return ret;
+-}
++#include "sheng_nano_notify_get.h"
++SHENG_NANO_NOTIFY_GETTER(nano_get_chg_real_type, int, nano_get_chg_real_type_locked)
++
++SHENG_NANO_NOTIFY_GETTER(nano_get_chg_usb_type, int, nano_get_chg_usb_type_locked)
++
++SHENG_NANO_NOTIFY_GETTER(nano_is_charge_online, u8, nano_is_charge_online_locked)
+ 
+ static int nano_input_curr_limit(int *curr_limit)
+ {
+@@ -796,7 +770,7 @@
+ 	return ret;
+ }
+ 
+-static void Nanosic_analyse_packet(struct work_struct *work)
++static void Nanosic_analyse_packet_state(struct work_struct *work, struct battmngr_notify *data)
+ {
+     struct nanochg *nodev = container_of(work, struct nanochg, analyse_rawdata_work.work);
+ 
+@@ -870,15 +844,15 @@
+ 
+             mutex_unlock(&rwlock);
+ 
+-            if (g_battmngr_noti && (gObject == DEV_ZHIJIA_OBJECT)) {
+-                mutex_lock(&g_battmngr_noti->notify_lock);
++            if (data && (gObject == DEV_ZHIJIA_OBJECT)) {
++                mutex_lock(&data->notify_lock);
+                 dbgprint(ERROR_LEVEL, "Send zhijia connect info.\n");
+ 
+-                g_battmngr_noti->mcu_msg.kb_attach = connected;
+-                g_battmngr_noti->mcu_msg.object_type = gObject;
+-                g_battmngr_noti->mcu_msg.msg_type = BATTMNGR_MSG_MCU_TYPE;
+-                battmngr_notifier_call_chain(BATTMNGR_EVENT_MCU, g_battmngr_noti);
+-                mutex_unlock(&g_battmngr_noti->notify_lock);
++                data->mcu_msg.kb_attach = connected;
++                data->mcu_msg.object_type = gObject;
++                data->mcu_msg.msg_type = BATTMNGR_MSG_MCU_TYPE;
++                battmngr_notifier_call_chain(BATTMNGR_EVENT_MCU, data);
++                mutex_unlock(&data->notify_lock);
+             } else {
+                 dbgprint(ERROR_LEVEL, "ADSP read cb is null\n");
+             }
+@@ -915,18 +889,18 @@
+             memcpy(reg_data, rawdata_buf, reg_len);
+ 
+             //rawdata_show("got read charge event", rawdata_buf, sizeof(rawdata_buf));
+-            if (g_battmngr_noti && (gObject == DEV_ZHIJIA_OBJECT)) {
+-                mutex_lock(&g_battmngr_noti->notify_lock);
++            if (data && (gObject == DEV_ZHIJIA_OBJECT)) {
++                mutex_lock(&data->notify_lock);
+                 dbgprint(ERROR_LEVEL, "Send charge info.\n");
+                 if (gObject == DEV_KEYBOARD_OBJECT)
+-                    assign_mcu_data(&g_battmngr_noti->mcu_msg.mcu_data, buf_tmp);
++                    assign_mcu_data(&data->mcu_msg.mcu_data, buf_tmp);
+                 else
+-                    assign_holder_mcu_data(&g_battmngr_noti->mcu_msg.mcu_data, buf_tmp);
+-                deal_report_event(buf_tmp);
+-                g_battmngr_noti->mcu_msg.object_type = gObject;
+-                g_battmngr_noti->mcu_msg.msg_type = BATTMNGR_MSG_MCU_TYPE;
+-                battmngr_notifier_call_chain(BATTMNGR_EVENT_MCU, g_battmngr_noti);
+-                mutex_unlock(&g_battmngr_noti->notify_lock);
++                    assign_holder_mcu_data(&data->mcu_msg.mcu_data, buf_tmp);
++                deal_report_event(buf_tmp, data);
++                data->mcu_msg.object_type = gObject;
++                data->mcu_msg.msg_type = BATTMNGR_MSG_MCU_TYPE;
++                battmngr_notifier_call_chain(BATTMNGR_EVENT_MCU, data);
++                mutex_unlock(&data->notify_lock);
+             } else {
+                 dbgprint(ERROR_LEVEL, "ADSP read cb is null\n");
+             }
+@@ -946,6 +920,18 @@
+ 
+ 
+     return;
++}
++
++static void Nanosic_analyse_packet(struct work_struct *work)
++{
++	struct battmngr_notify *data;
++	int cookie;
++
++	/* The worker's device lifetime is drained by remove. SRCU keeps its
++	 * actual manager alive even if a notification requests GLINK/nano. */
++	data = battmngr_notify_acquire(&cookie);
++	Nanosic_analyse_packet_state(work, data);
++	battmngr_notify_release(cookie);
+ }
+ 
+ 
+--- /dev/null
++++ b/sheng-ports/pogo/sheng_nano_notify_get.h
+@@ -0,0 +1,23 @@
++/* SPDX-License-Identifier: GPL-2.0-only */
++#ifndef SHENG_NANO_NOTIFY_GET_H
++#define SHENG_NANO_NOTIFY_GET_H
++/* nano_api_lock protects the device. SRCU protects the actual manager object;
++ * never take notify_lock here because a notifier can query nano_ops itself. */
++#define SHENG_NANO_NOTIFY_GETTER(name, type, callback) \
++static int name(type *out) \
++{ \
++	struct battmngr_notify *data; \
++	type value = 0; \
++	int ret, cookie; \
++	if (!out) \
++		return -EINVAL; \
++	data = battmngr_notify_acquire(&cookie); \
++	mutex_lock(&nano_api_lock); \
++	ret = g_nodev && data ? callback(&value, data) : -ENODEV; \
++	if (ret >= 0) \
++		*out = value; \
++	mutex_unlock(&nano_api_lock); \
++	battmngr_notify_release(cookie); \
++	return ret; \
++}
++#endif

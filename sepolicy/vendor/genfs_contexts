@@ -1,0 +1,53 @@
+# Camera
+genfscon sysfs "/csiphy_umd_paras/csiphy_umd_paras" u:object_r:sysfs_csiphy_umd_paras:s0
+
+# Fingerprint
+genfscon sysfs "/devices/platform/soc/soc:fingerprint_goodix/wakeup" u:object_r:sysfs_wakeup:s0
+
+# Perf
+genfscon proc "/perflock_records" u:object_r:vendor_proc_perflock_records:s0
+
+# Sensors
+genfscon sysfs /devices/virtual/touch/touch_dev/fod_longpress_gesture_enabled u:object_r:vendor_sysfs_sensors:s0
+genfscon sysfs /devices/virtual/touch/touch_dev/fod_press_status u:object_r:vendor_sysfs_sensors:s0
+genfscon sysfs /devices/virtual/touch/touch_dev/gesture_double_tap_enabled u:object_r:vendor_sysfs_sensors:s0
+genfscon sysfs /devices/virtual/touch/touch_dev/gesture_double_tap_state u:object_r:vendor_sysfs_sensors:s0
+genfscon sysfs /devices/virtual/touch/touch_dev/gesture_single_tap_enabled u:object_r:vendor_sysfs_sensors:s0
+genfscon sysfs /devices/virtual/touch/touch_dev/gesture_single_tap_state u:object_r:vendor_sysfs_sensors:s0
+
+# Touchscreen
+genfscon sysfs /devices/virtual/touch/touch_dev/bump_sample_rate u:object_r:vendor_sysfs_touch:s0
+genfscon sysfs /devices/virtual/touch/touch_dev u:object_r:vendor_sysfs_touch:s0
+genfscon proc /last_touch_events u:object_r:vendor_proc_sheng_touch:s0
+genfscon proc /nvt_fw_version u:object_r:vendor_proc_sheng_touch:s0
+genfscon sysfs /devices/platform/soc/ae00000.qcom,mdss_mdp/drm/card0/card0-DSI-1/dpms u:object_r:vendor_sysfs_sheng_touch_dpms:s0
+genfscon proc /xm_htc_gesture_switch u:object_r:vendor_proc_sheng_touch_gesture:s0
+
+# Wakeup
+# Label the observed sheng wakeup statistics, including both FPC instances.
+# Their parent device labels remain available to the hardware HALs.
+genfscon sysfs /devices/platform/soc/soc:fingerprint_fpc/wakeup u:object_r:sysfs_wakeup:s0
+# genfscon matches character prefixes: /wakeup also covers /wakeup_enable.
+# Preserve the HAL control label without granting writes to wakeup statistics.
+genfscon sysfs /devices/platform/soc/soc:fingerprint_fpc/wakeup_enable u:object_r:sysfs_fingerprint_sheng:s0
+genfscon sysfs /devices/platform/soc/soc:xm_battmngr/wakeup u:object_r:sysfs_wakeup:s0
+genfscon sysfs /devices/platform/soc/soc:xiaomi_wifi_gpio/wakeup u:object_r:sysfs_wakeup:s0
+genfscon sysfs /devices/platform/soc/8c0000.qcom,qupv3_2_geni_se/884000.i2c/i2c-5/5-004c/wakeup u:object_r:sysfs_wakeup:s0
+genfscon sysfs "/devices/platform/soc/ac0000.qcom,qupv3_1_geni_se/a90000.spi/spi_master/spi0/spi0.0/wakeup" u:object_r:sysfs_wakeup:s0
+genfscon sysfs "/devices/platform/soc/ac0000.qcom,qupv3_1_geni_se/a90000.spi/spi_master/spi1/spi1.0/wakeup" u:object_r:sysfs_wakeup:s0
+genfscon sysfs "/devices/platform/soc/c42d000.qcom,spmi/spmi-0/0-00/c42d000.qcom,spmi:qcom,pmk8550@0:pon_hlos@1300/c42d000.qcom,spmi:qcom,pmk8550@0:pon_hlos@1300:pwrkey-bark/wakeup" u:object_r:sysfs_wakeup:s0
+genfscon sysfs "/devices/platform/soc/c42d000.qcom,spmi/spmi-0/0-00/c42d000.qcom,spmi:qcom,pmk8550@0:pon_hlos@1300/c42d000.qcom,spmi:qcom,pmk8550@0:pon_hlos@1300:pwrkey-resin-bark/wakeup" u:object_r:sysfs_wakeup:s0
+
+# sheng board additions
+recovery_only(`
+genfscon sysfs /module/firmware_class/parameters/path u:object_r:vendor_sysfs_sheng_firmware_path:s0
+')
+genfscon sysfs /devices/platform/soc/soc:fingerprint_fpc u:object_r:sysfs_fingerprint_sheng:s0
+genfscon sysfs /devices/platform/soc/soc:xiaomi_fingerprint u:object_r:sysfs_fingerprint_sheng:s0
+
+# The keyboard driver creates these virtual HID devices without a parent.
+# The instance suffix changes with enumeration order.
+genfscon sysfs /devices/0006:15D9:00A1. u:object_r:vendor_sysfs_sheng_hid:s0
+genfscon sysfs /devices/0006:15D9:00A2. u:object_r:vendor_sysfs_sheng_hid:s0
+genfscon sysfs /devices/0006:15D9:00A3. u:object_r:vendor_sysfs_sheng_hid:s0
+genfscon sysfs /devices/0006:15D9:00A4. u:object_r:vendor_sysfs_sheng_hid:s0

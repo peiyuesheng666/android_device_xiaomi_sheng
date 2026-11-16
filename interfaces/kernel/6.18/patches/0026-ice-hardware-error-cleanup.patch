@@ -1,0 +1,104 @@
+--- a/soc/drivers/soc/qcom/ice.c
++++ b/soc/drivers/soc/qcom/ice.c
+@@ -425,9 +425,10 @@
+ 	cfg.capidx = QCOM_SCM_ICE_CIPHER_AES_256_XTS;
+ 	cfg.cfge = 0x80;
+ 
+-	/* Clear CFGE */
++	/* Clear CFGE before asking the real key manager to program this slot. */
+ 	qcom_ice_writel(ice, 0x0, QCOM_ICE_LUT_KEYS_CRYPTOCFG_R16 +
+ 				  QCOM_ICE_LUT_KEYS_CRYPTOCFG_OFFSET * slot);
++	wmb();
+ 
+ 	/*
+ 	 * The following logic for shmbridge will be taken care in SCM driver
+@@ -436,7 +437,7 @@
+ 	 */
+ 	err = qtee_shmbridge_allocate_shm(key->size, &shm);
+ 	if (err)
+-		return -ENOMEM;
++		return err;
+ 
+ 	memcpy(shm.vaddr, key->bytes, key->size);
+ 	qtee_shmbridge_flush_shm_buf(&shm);
+@@ -448,14 +449,18 @@
+ 		pr_err("%s:SCM call Error: 0x%x slot %d\n", __func__, err,
+ 		       slot);
+ 		k618_ice_flush();
+-		return err;
+-	}
+-
+-	/* Enable CFGE after programming key */
++		goto free_key;
++	}
++
++	/* Enable CFGE only after the real key-manager request succeeded. */
+ 	qcom_ice_writel(ice, cfg.regval, QCOM_ICE_LUT_KEYS_CRYPTOCFG_R16 +
+ 					 QCOM_ICE_LUT_KEYS_CRYPTOCFG_OFFSET * slot);
+-
++	wmb();
++
++free_key:
+ 	qtee_shmbridge_inv_shm_buf(&shm);
++	memzero_explicit(shm.vaddr, key->size);
++	qtee_shmbridge_flush_shm_buf(&shm);
+ 	qtee_shmbridge_free_shm(&shm);
+ 	return err;
+ }
+@@ -478,13 +483,17 @@
+ 		return -EINVAL;
+ 	}
+ 
+-	if (bkey->crypto_cfg.key_type == BLK_CRYPTO_KEY_TYPE_HW_WRAPPED) {
+-		if (!ice->use_hwkm)
+-			return -EINVAL;
+-		err = qcom_ice_program_wrapped_key(ice, bkey, data_unit_size,
+-						   slot);
+-	}
+-
++	/* This callback advertises wrapped keys only. Never report an unprogrammed
++	 * standard key as successful or silently substitute another crypto path. */
++	if (bkey->crypto_cfg.key_type != BLK_CRYPTO_KEY_TYPE_HW_WRAPPED)
++		return -EOPNOTSUPP;
++	if (!ice->use_hwkm)
++		return -EOPNOTSUPP;
++	if (bkey->size <= BLK_CRYPTO_SW_SECRET_SIZE ||
++	    bkey->size > sizeof(bkey->bytes) || slot < 0 || !data_unit_size)
++		return -EINVAL;
++
++	err = qcom_ice_program_wrapped_key(ice, bkey, data_unit_size, slot);
+ 	return err;
+ }
+ EXPORT_SYMBOL_GPL(qcom_ice_program_key_hwkm);
+@@ -567,9 +576,15 @@
+ 	 * in upstream. For now, handle it in the ICE driver downstream until
+ 	 * wrapped key upstream effort is complete.
+ 	 */
++	if (!ice->use_hwkm)
++		return -EOPNOTSUPP;
++	if (!wkey || !sw_secret || wkey_size <= BLK_CRYPTO_SW_SECRET_SIZE ||
++	    wkey_size > BLK_CRYPTO_MAX_HW_WRAPPED_KEY_SIZE)
++		return -EINVAL;
++
+ 	err = qtee_shmbridge_allocate_shm(wkey_size, &shm_key);
+ 	if (err)
+-		return -ENOMEM;
++		return err;
+ 
+ 	err = qtee_shmbridge_allocate_shm(BLK_CRYPTO_SW_SECRET_SIZE, &shm_secret);
+ 	if (err)
+@@ -593,8 +608,14 @@
+ 	qtee_shmbridge_inv_shm_buf(&shm_key);
+ 
+ free_secret:
++	qtee_shmbridge_inv_shm_buf(&shm_secret);
++	memzero_explicit(shm_secret.vaddr, BLK_CRYPTO_SW_SECRET_SIZE);
++	qtee_shmbridge_flush_shm_buf(&shm_secret);
+ 	qtee_shmbridge_free_shm(&shm_secret);
+ free_key:
++	qtee_shmbridge_inv_shm_buf(&shm_key);
++	memzero_explicit(shm_key.vaddr, wkey_size);
++	qtee_shmbridge_flush_shm_buf(&shm_key);
+ 	qtee_shmbridge_free_shm(&shm_key);
+ 	return err;
+ }

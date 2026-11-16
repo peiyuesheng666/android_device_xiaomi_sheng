@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!-- Retired ODM backend; the source-owned native Face declaration is in system_ext. -->
+<manifest version="1.0" type="device" />

@@ -1,0 +1,112 @@
+--- a/k618/sheng-ports/keyboard/sheng_nanosic.c
++++ b/k618/sheng-ports/keyboard/sheng_nanosic.c
+@@ -55,6 +55,8 @@
+ 	bool keyboard_attached;
+ 	bool connection_known;
+ 	int connection_state;
++	unsigned int firmware_generation, recovery_count;
++	unsigned long recovery_window;
+ 
+ 	/* Stock HAL owns authentication; kernel only transports real messages. */
+ 	struct miscdevice raw_misc;
+@@ -73,6 +75,7 @@
+ };
+ 
+ #include "sheng_nanosic_wake.h"
++#include "sheng_nanosic_recovery.h"
+ #include "sheng_nano_hid_requests.h"
+ #include "sheng_nanosic_bridge.h"
+ #include "sheng_nanosic_power.h"
+@@ -95,6 +98,7 @@
+ 	mutex_lock(&nano->io_lock);
+ 	ret = nano->removing ? -ENODEV : !nano->ready ? -EAGAIN :
+ 		sheng_nano_wake_locked(nano);
++	sheng_nano_recover_after_timeout_locked(nano, ret);
+ 	if (!ret)
+ 		ret = regmap_bulk_write(nano->regmap, 0x5c, buf, len);
+ 	mutex_unlock(&nano->io_lock);
+@@ -277,6 +281,7 @@
+ 					0x80, 0x38, 0x2E, 0x01 };
+ 
+ 	int ret = sheng_nano_wake_locked(nanosic);
++	sheng_nano_recover_after_timeout_locked(nanosic, ret);
+ 
+ 	if (ret)
+ 		return ret;
+@@ -757,6 +762,7 @@
+ 	if (!ret)
+ 		ret = nanosic_wn8030_load_fw(nano);
+ 	if (!ret) {
++		WRITE_ONCE(nano->firmware_generation, nano->firmware_generation + 1);
+ 		nano->suspended = false;
+ 		nano->ready = true;
+ 		/* Original HAL discovery/authentication restores feature state after boot. */
+@@ -969,6 +975,7 @@
+ 	}
+ 	/* Keep the IRQ disabled while polling, so the wake edge cannot be consumed. */
+ 	wake_ret = sheng_nano_wake_locked(nano);
++	sheng_nano_recover_after_timeout_locked(nano, wake_ret);
+ 	mutex_unlock(&nano->io_lock);
+ 	/* Deliver the first real packet; never discard it as a wake acknowledgement. */
+ 	enable_irq(nano->client->irq);
+--- a/k618/sheng-ports/keyboard/sheng_nanosic_bridge.h
++++ b/k618/sheng-ports/keyboard/sheng_nanosic_bridge.h
+@@ -141,6 +141,7 @@
+ 	if (mutex_lock_interruptible(&nano->io_lock))
+ 		return -ERESTARTSYS;
+ 	ret = sheng_nano_wake_locked(nano);
++	sheng_nano_recover_after_timeout_locked(nano, ret);
+ 	if (!ret)
+ 		ret = regmap_bulk_write(nano->regmap, 0x5c, message, sizeof(message));
+ 	mutex_unlock(&nano->io_lock);
+--- a/k618/sheng-ports/keyboard/sheng_nanosic_state.h
++++ b/k618/sheng-ports/keyboard/sheng_nanosic_state.h
+@@ -19,8 +19,20 @@
+ }
+ static DEVICE_ATTR_RO(connection);
+ 
++static ssize_t firmware_generation_show(struct device *dev,
++					struct device_attribute *attr, char *buf)
++{
++	struct miscdevice *misc = dev_get_drvdata(dev);
++	struct nanosic_wn8030 *nano =
++		container_of(misc, struct nanosic_wn8030, raw_misc);
++
++	return sysfs_emit(buf, "%u\n", READ_ONCE(nano->firmware_generation));
++}
++static DEVICE_ATTR_RO(firmware_generation);
++
+ static struct attribute *sheng_nano_state_attrs[] = {
+ 	&dev_attr_connection.attr,
++	&dev_attr_firmware_generation.attr,
+ 	NULL,
+ };
+ ATTRIBUTE_GROUPS(sheng_nano_state);
+--- /dev/null
++++ b/k618/sheng-ports/keyboard/sheng_nanosic_recovery.h
+@@ -0,0 +1,25 @@
++/* SPDX-License-Identifier: GPL-2.0-only */
++/* Match the shipping driver's timeout recovery, with a bounded reset rate. */
++static void sheng_nano_recover_after_timeout_locked(struct nanosic_wn8030 *nano, int error)
++{
++	lockdep_assert_held(&nano->io_lock);
++	if (error != -ETIMEDOUT || !nano->ready || nano->removing || nano->suspended)
++		return;
++	if (!nano->recovery_count || time_after(jiffies, nano->recovery_window + 60 * HZ)) {
++		nano->recovery_window = jiffies;
++		nano->recovery_count = 0;
++	}
++	if (nano->recovery_count >= 3)
++		return;
++	nano->recovery_count++;
++	nano->ready = false;
++	nano->fw_attempts = 0;
++	mutex_lock(&nano->conn_mutex);
++	nano->connection_known = false;
++	mutex_unlock(&nano->conn_mutex);
++	/* Never wait for a threaded IRQ while its I/O mutex is held. */
++	disable_irq_nosync(nano->client->irq);
++	mod_delayed_work(system_wq, &nano->fw_worker, 0);
++	dev_warn(nano->dev, "MCU wake timeout; restoring volatile firmware (attempt %u)\n",
++		 nano->recovery_count);
++}

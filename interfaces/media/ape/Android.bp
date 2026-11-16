@@ -1,0 +1,23 @@
+// SPDX-License-Identifier: Apache-2.0
+cc_library_shared {
+    name: "libshengapeextractor",
+    system_ext_specific: true,
+    compile_multilib: "64",
+    relative_install_path: "extractors",
+    srcs: ["ShengApeExtractor.cpp"],
+    header_libs: ["libmedia_headers", "libutils_headers"],
+    shared_libs: ["liblog", "libmediandk"],
+    cflags: ["-Wall", "-Wextra", "-Werror", "-fvisibility=hidden"],
+    version_script: "exports.map",
+    sanitize: {
+        misc_undefined: ["unsigned-integer-overflow", "signed-integer-overflow"],
+    },
+}
+
+cc_test_host {
+    name: "sheng_ape_parser_test",
+    srcs: ["tests/ApeFileTest.cpp"],
+    local_include_dirs: ["."],
+    gtest: false,
+    cflags: ["-Wall", "-Wextra", "-Werror"],
+}

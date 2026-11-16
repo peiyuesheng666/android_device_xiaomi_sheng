@@ -1,0 +1,5 @@
+service vendor.qti.light /vendor/bin/hw/vendor.qti.hardware.lights-service.sheng
+    class hal
+    user system
+    group system
+    shutdown critical

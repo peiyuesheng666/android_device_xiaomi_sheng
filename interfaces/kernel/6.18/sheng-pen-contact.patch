@@ -1,0 +1,27 @@
+--- a/sheng-ports/touch/p81/nt36532/nt36xxx.c
++++ b/sheng-ports/touch/p81/nt36532/nt36xxx.c
+@@ -2625,6 +2625,11 @@
+ //thp start 6.8
+ #if TOUCH_THP_SUPPORT
+ // #define POINT_DATA_LEN 65
++#include "sheng_pen_contact.h"
++static struct sheng_pen_contact sheng_pen_contact_state;
++static unsigned int sheng_pen_contact_hold_ms = 32;
++module_param(sheng_pen_contact_hold_ms, uint, 0600);
++MODULE_PARM_DESC(sheng_pen_contact_hold_ms, "N81A P81c contact-gap hold, 0 disables, maximum 32 ms");
+ uint16_t nvt_xm_htc_cal_checksum(uint16_t u16_message[], int data_len)
+ {
+ 	int i;
+@@ -3244,6 +3249,12 @@
+ 	/* copy data */
+ 	ktime_get_real_ts64(&time);
+ 	memcpy(tp_frame->tp_raw, frame_data_packet, ts->frame_len);
++	if (ts->cur_pen == PEN_P81C)
++		sheng_pen_filter_contact(&sheng_pen_contact_state,
++			(unsigned char *)tp_frame->tp_raw, ts->frame_len,
++			ktime_get_ns(), READ_ONCE(sheng_pen_contact_hold_ms));
++	else
++		memset(&sheng_pen_contact_state, 0, sizeof(sheng_pen_contact_state));
+ 	tp_frame->time_ns = timespec64_to_ns(&time);
+ 	tp_frame->fod_pressed = 0;
+ 	tp_frame->fod_trackingId = 0;

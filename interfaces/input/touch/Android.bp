@@ -1,0 +1,67 @@
+// SPDX-License-Identifier: Apache-2.0
+cc_library_static {
+    name: "libsheng_touch_control",
+    vendor_available: true,
+    product_available: true,
+    host_supported: true,
+    srcs: ["native/TouchControl.cpp", "native/TouchReportRate.cpp"],
+    export_include_dirs: ["native"],
+    cflags: ["-Wall", "-Wextra", "-Werror"],
+}
+
+cc_test_host {
+    name: "sheng_touch_control_test",
+    srcs: ["native/TouchControlTest.cpp"],
+    static_libs: ["libsheng_touch_control"],
+    gtest: false,
+    cflags: ["-Wall", "-Wextra", "-Werror"],
+}
+
+cc_library_shared {
+    name: "libsheng_touch_jni",
+    product_specific: true,
+    srcs: ["jni/ShengTouchNative.cpp"],
+    static_libs: ["libsheng_touch_control"],
+    header_libs: ["jni_headers"],
+    cflags: ["-Wall", "-Wextra", "-Werror"],
+}
+
+cc_binary {
+    name: "vendor.lineage.touch-service.sheng",
+    vendor: true,
+    relative_install_path: "hw",
+    srcs: ["hal/HighReportService.cpp"],
+    static_libs: ["libsheng_touch_control"],
+    shared_libs: ["libbase", "liblog", "libbinder_ndk", "vendor.lineage.touch-V1-ndk"],
+    init_rc: ["hal/vendor.lineage.touch-service.sheng.rc"],
+    vintf_fragments: ["hal/vendor.lineage.touch-service.sheng.xml"],
+    cflags: ["-Wall", "-Wextra", "-Werror"],
+}
+
+cc_binary {
+    name: "sheng-touchctl",
+    vendor: true,
+    srcs: ["native/TouchControlMain.cpp"],
+    static_libs: ["libsheng_touch_control"],
+    init_rc: ["init.sheng.touch.rc"],
+    cflags: ["-Wall", "-Wextra", "-Werror"],
+}
+
+android_app {
+    name: "ShengTouch",
+    product_specific: true,
+    privileged: true,
+    certificate: "platform",
+    platform_apis: true,
+    srcs: ["src/**/*.java"],
+    jni_libs: ["libsheng_touch_jni"],
+    use_embedded_native_libs: true,
+    required: ["privapp-permissions-com.xiaomi.sheng.touch.xml"],
+}
+
+prebuilt_etc {
+    name: "privapp-permissions-com.xiaomi.sheng.touch.xml",
+    product_specific: true,
+    sub_dir: "permissions",
+    src: "privapp-permissions-com.xiaomi.sheng.touch.xml",
+}

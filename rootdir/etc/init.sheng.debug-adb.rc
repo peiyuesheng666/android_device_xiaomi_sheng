@@ -1,0 +1,7 @@
+# SPDX-License-Identifier: Apache-2.0
+# Installed only in userdebug/eng bring-up builds. Keep normal RSA authorization.
+# usbd starts adbd at boot only for the exact persistent value "adb".
+# AdbService.systemReady() mirrors it into ADB_ENABLED; UsbDeviceManager owns
+# runtime function selection (including MTP). Do not race it through sys.usb.config.
+on property:ro.persistent_properties.ready=true
+    setprop persist.sys.usb.config adb

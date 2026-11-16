@@ -1,0 +1,1172 @@
+--- a/soc/drivers/power/supply/qti_battery_charger.c
++++ b/soc/drivers/power/supply/qti_battery_charger.c
+@@ -511,8 +511,12 @@
+ #include "sheng_pps_policy.h"
+ #include "sheng_qti_pogo_wire.h"
+ #include "sheng_qti_pogo.h"
++#include <linux/battmngr/platform_class.h>
++#include "sheng_qti_fg_math.h"
+ 
+ struct battery_chg_dev {
++	struct sheng_fg_state sheng_fg;
++	struct battmngr_device *sheng_qti_ops;
+ 	spinlock_t sheng_pogo_lock;
+ 	struct completion sheng_pogo_ack;
+ 	struct sheng_pogo_pending sheng_pogo;
+@@ -812,6 +816,7 @@
+ 
+ #include "sheng_keyboard_charger.h"
+ #include "sheng_keyboard_charger_api.h"
++#include "sheng_qti_fg_api.h"
+ 
+ static int read_property_id(struct battery_chg_dev *bcdev,
+ 			struct psy_state *pst, u32 prop_id)
+@@ -7065,6 +7070,18 @@
+ 	if (rc < 0)
+ 		goto error_thermal;
+ 
++	/* Publish the shipping qti_ops only after transport and thermal/panel
++	 * registration succeed, before starting recurring background work. */
++	if (bcdev->sheng_has_pen) {
++		bcdev->sheng_qti_ops = battmngr_device_register("qti_ops", dev,
++				bcdev, &qti_fg_ops, NULL);
++		if (IS_ERR(bcdev->sheng_qti_ops)) {
++			rc = PTR_ERR(bcdev->sheng_qti_ops);
++			bcdev->sheng_qti_ops = NULL;
++			goto error_thermal;
++		}
++	}
++
+ 	bcdev->wls_fw_update_time_ms = WLS_FW_UPDATE_TIME_MS;
+ 	battery_chg_add_debugfs(bcdev);
+ 	dev->type = &dev_type_xiaomi_uevent;
+@@ -7086,11 +7103,17 @@
+ 	if (bcdev->sheng_has_pen) {
+ 		mutex_lock(&sheng_keyboard_charger_lock);
+ 		sheng_keyboard_bcdev = bcdev;
++		g_bcdev = bcdev;
+ 		mutex_unlock(&sheng_keyboard_charger_lock);
+ 	}
+ 	dev_err(dev, "battery_chg probe done\n");	/* k618: the %d had no argument */
+ 	return 0;
+ error_thermal:
++	WRITE_ONCE(bcdev->initialized, false);
++	sheng_pogo_state_change(bcdev, PMIC_GLINK_STATE_DOWN);
++	complete_all(&bcdev->ack);
++	battmngr_device_unregister(bcdev->sheng_qti_ops);
++	bcdev->sheng_qti_ops = NULL;
+ 	cancel_delayed_work_sync(&bcdev->k618_panel_dw);
+ 	if (bcdev->notifier_cookie)
+ 		panel_event_notifier_unregister(bcdev->notifier_cookie);
+@@ -7101,6 +7124,7 @@
+ 	bcdev->thermal_message = NULL;
+ 	class_unregister(&bcdev->battery_class);
+ error:
++	WRITE_ONCE(bcdev->initialized, false);
+ 	sheng_pogo_state_change(bcdev, PMIC_GLINK_STATE_DOWN);
+ 	WRITE_ONCE(bcdev->sheng_pps_stopping, true);
+ 	cancel_work_sync(&bcdev->subsys_up_work);
+@@ -7109,6 +7133,13 @@
+ 	bcdev->initialized = false;
+ 	complete(&bcdev->ack);
+ 	pmic_glink_unregister_client(bcdev->client);
++	/* Unregister the callback producer before the final work drain. */
++	cancel_work_sync(&bcdev->subsys_up_work);
++	cancel_work_sync(&bcdev->battery_check_work);
++	cancel_work_sync(&bcdev->sheng_pen_work);
++	cancel_delayed_work_sync(&bcdev->xm_prop_change_work);
++	cancel_delayed_work_sync(&bcdev->charger_debug_info_print_work);
++	cancel_delayed_work_sync(&bcdev->batt_update_work);
+ 	cancel_work_sync(&bcdev->usb_type_work);
+ 	cancel_delayed_work_sync(&bcdev->sheng_pps_work);
+ 	unregister_reboot_notifier(&bcdev->reboot_notifier);
+@@ -7121,8 +7152,10 @@
+ 	struct battery_chg_dev *bcdev = platform_get_drvdata(pdev);
+ 	int rc;
+ 
+-	/* Abort any real request before waiting for the API's lifetime mutex. */
++	/* Abort requests before waiting for an in-flight API or class callback. */
++	WRITE_ONCE(bcdev->initialized, false);
+ 	sheng_pogo_state_change(bcdev, PMIC_GLINK_STATE_DOWN);
++	complete_all(&bcdev->ack);
+ 
+ 	WRITE_ONCE(bcdev->sheng_pps_stopping, true);
+ 	cancel_work_sync(&bcdev->subsys_up_work);
+@@ -7132,7 +7165,12 @@
+ 	mutex_lock(&sheng_keyboard_charger_lock);
+ 	if (sheng_keyboard_bcdev == bcdev)
+ 		sheng_keyboard_bcdev = NULL;
++	if (g_bcdev == bcdev)
++		g_bcdev = NULL;
+ 	mutex_unlock(&sheng_keyboard_charger_lock);
++	/* ops_lock drains callbacks after the owner mutex is released. */
++	battmngr_device_unregister(bcdev->sheng_qti_ops);
++	bcdev->sheng_qti_ops = NULL;
+ 	cancel_delayed_work_sync(&bcdev->k618_panel_dw);	/* k618 */
+ 	if (bcdev->notifier_cookie)
+ 		panel_event_notifier_unregister(bcdev->notifier_cookie);
+@@ -7154,6 +7192,10 @@
+ 	rc = pmic_glink_unregister_client(bcdev->client);
+ 	if (rc < 0)
+ 		pr_err("Error unregistering from pmic_glink, rc=%d\n", rc);
++	cancel_work_sync(&bcdev->subsys_up_work);
++	cancel_work_sync(&bcdev->battery_check_work);
++	cancel_delayed_work_sync(&bcdev->charger_debug_info_print_work);
++	cancel_delayed_work_sync(&bcdev->batt_update_work);
+ 	cancel_work_sync(&bcdev->usb_type_work);
+ 	cancel_delayed_work_sync(&bcdev->sheng_pps_work);
+ 	cancel_work_sync(&bcdev->sheng_pen_work);
+--- a/soc/drivers/power/supply/sheng_qti_pogo.h
++++ b/soc/drivers/power/supply/sheng_qti_pogo.h
+@@ -13,4 +13,8 @@
+ int qti_get_DCIN_STATE(void);
+ int write_voter_prop_id(u8 vote, u32 value);
+ int read_voter_property_id(u8 vote, u32 prop_id);
++struct battery_chg_dev;
++extern struct battery_chg_dev *g_bcdev;
++bool check_g_bcdev_ops(void);
++int qti_deal_report(void);
+ #endif
+--- a/soc/drivers/power/supply/sheng_qti_pogo_wire.h
++++ b/soc/drivers/power/supply/sheng_qti_pogo_wire.h
+@@ -26,6 +26,8 @@
+ #define SHENG_POGO_OWNER 32778
+ #define SHENG_POGO_GET 0x50
+ #define SHENG_POGO_SET 0x51
++#define SHENG_FG_BATTERY_GET 0x30
++#define SHENG_FG_BATTERY_SET 0x31
+ 
+ struct sheng_pogo_request {
+ 	u32 opcode, property;
+@@ -58,15 +60,19 @@
+ 		const struct sheng_pogo_request *request, u32 value)
+ {
+ 	size_t len;
++	bool write;
+ 
+ 	if (!out || !request || (request->opcode != SHENG_POGO_GET &&
+-				request->opcode != SHENG_POGO_SET))
++	    request->opcode != SHENG_POGO_SET && request->opcode != SHENG_FG_BATTERY_GET &&
++	    request->opcode != SHENG_FG_BATTERY_SET))
+ 		return -EINVAL;
+ 	len = request->voter ? 28 : 24;
+ 	if (capacity < len)
+ 		return -EMSGSIZE;
+-	if (request->voter && (request->property != SHENG_POGO_VOTER || request->vote > 2))
++	if (request->voter && (request->property != SHENG_POGO_VOTER || request->vote > 2 ||
++	    (request->opcode != SHENG_POGO_GET && request->opcode != SHENG_POGO_SET)))
+ 		return -EINVAL;
++	write = request->opcode == SHENG_POGO_SET || request->opcode == SHENG_FG_BATTERY_SET;
+ 	memset(out, 0, len);
+ 	sheng_pogo_put32(out, SHENG_POGO_OWNER);
+ 	sheng_pogo_put32(out + 4, 1);
+@@ -79,7 +85,7 @@
+ 		sheng_pogo_put32(out + 24, request->opcode == SHENG_POGO_SET ? 1 : 0);
+ 	} else {
+ 		sheng_pogo_put32(out + 16, request->property);
+-		sheng_pogo_put32(out + 20, request->opcode == SHENG_POGO_SET ? value : 0);
++		sheng_pogo_put32(out + 20, write ? value : 0);
+ 	}
+ 	return (int)len;
+ }
+--- /dev/null
++++ b/soc/drivers/power/supply/sheng_qti_fg_math.h
+@@ -0,0 +1,70 @@
++/* SPDX-License-Identifier: GPL-2.0-only */
++#ifndef SHENG_QTI_FG_MATH_H
++#define SHENG_QTI_FG_MATH_H
++#ifdef SHENG_QTI_FG_HOST_TEST
++#include <errno.h>
++#include <stdbool.h>
++#include <stdint.h>
++#include <limits.h>
++typedef uint32_t u32;
++typedef int32_t s32;
++typedef int64_t s64;
++#else
++#include <linux/errno.h>
++#include <linux/types.h>
++#include <linux/limits.h>
++#endif
++
++struct sheng_fg_state {
++	int previous;
++	bool full, pogo;
++};
++
++static inline int sheng_fg_raw_soc(s32 rm, s32 fcc, int *out)
++{
++	s64 result;
++	s32 denominator = fcc / 1000;
++
++	if (!out || rm < 0 || denominator <= 0)
++		return -ERANGE;
++	result = (s64)rm * 10 / denominator;
++	if (result > INT_MAX)
++		return -ERANGE;
++	*out = (int)result;
++	return 0;
++}
++
++/* This is the shipping binary's rule, not the older public source rule.
++ * On taper/termination -> disabled it requires SOC == 100, and excludes
++ * warm high-voltage termination. Its current threshold uses signed uA. */
++static inline int sheng_fg_charge_result(struct sheng_fg_state *state, int adc,
++		s32 temperature, u32 voltage_uv, u32 soc_x100, s32 current_ua,
++		int fake_soc, int *out)
++{
++	int status;
++	u32 soc = soc_x100 / 100;
++	bool full;
++
++	if (!state || !out || adc < 0 || adc > 8)
++		return -ERANGE;
++	full = state->full;
++	if (fake_soc >= 0 && fake_soc <= 100)
++		soc = fake_soc;
++	if (adc >= 1 && adc <= 5)
++		status = 1; /* POWER_SUPPLY_STATUS_CHARGING */
++	else if (adc == 0)
++		status = 4; /* POWER_SUPPLY_STATUS_FULL */
++	else if (adc == 6 || adc == 7)
++		status = 3; /* POWER_SUPPLY_STATUS_NOT_CHARGING */
++	else
++		status = 0; /* POWER_SUPPLY_STATUS_UNKNOWN */
++	if ((state->previous == 4 || state->previous == 5) && adc == 7)
++		full = !(temperature >= 4800 && voltage_uv / 1000 >= 4085) && soc == 100;
++	if (state->pogo && adc == 7)
++		status = current_ua > -200000 && full ? 4 : 1;
++	state->full = full;
++	state->previous = adc;
++	*out = status;
++	return adc;
++}
++#endif
+--- /dev/null
++++ b/soc/drivers/power/supply/sheng_qti_fg_api.h
+@@ -0,0 +1,205 @@
++/* SPDX-License-Identifier: GPL-2.0-only */
++/* Original qti_ops ABI; all inputs come from real matched GLINK requests. */
++struct battery_chg_dev *g_bcdev;
++EXPORT_SYMBOL(g_bcdev);
++
++bool check_g_bcdev_ops(void)
++{
++	bool ready;
++
++	mutex_lock(&sheng_keyboard_charger_lock);
++	ready = g_bcdev && g_bcdev == sheng_keyboard_bcdev &&
++		g_bcdev->sheng_qti_ops && READ_ONCE(g_bcdev->initialized);
++	mutex_unlock(&sheng_keyboard_charger_lock);
++	return ready;
++}
++EXPORT_SYMBOL(check_g_bcdev_ops);
++
++int qti_deal_report(void)
++{
++	struct battery_chg_dev *bcdev;
++	struct psy_state *usb;
++	int ret = -ENODEV;
++
++	mutex_lock(&sheng_keyboard_charger_lock);
++	bcdev = sheng_keyboard_bcdev;
++	if (bcdev && READ_ONCE(bcdev->initialized)) {
++		usb = &bcdev->psy_list[PSY_TYPE_USB];
++		schedule_work(&bcdev->usb_type_work);
++		if (usb->psy) {
++			power_supply_changed(usb->psy);
++			schedule_delayed_work(&bcdev->xm_prop_change_work, 0);
++		}
++		ret = NOTIFY_OK;
++	}
++	mutex_unlock(&sheng_keyboard_charger_lock);
++	return ret;
++}
++EXPORT_SYMBOL(qti_deal_report);
++
++static int sheng_fg_read_locked(struct battery_chg_dev *bcdev, u32 opcode,
++				u32 property, u32 *out)
++{
++	struct sheng_pogo_request request = { .opcode = opcode, .property = property };
++
++	return sheng_pogo_transfer(bcdev, &request, 0, out);
++}
++
++static int sheng_fg_get(u32 opcode, u32 property, unsigned int divisor,
++			bool signed_value, bool soc_override, int *out)
++{
++	struct battery_chg_dev *bcdev;
++	u32 raw;
++	int ret;
++
++	if (!out)
++		return -EINVAL;
++	mutex_lock(&sheng_keyboard_charger_lock);
++	bcdev = sheng_keyboard_bcdev;
++	ret = bcdev ? sheng_fg_read_locked(bcdev, opcode, property, &raw) : -ENODEV;
++	if (!ret) {
++		int value = signed_value ? (s32)raw / (int)divisor : raw / divisor;
++		/* Retain the pre-existing explicit debug SOC override; a real
++		 * successful battery request remains necessary even in that mode. */
++		int fake = READ_ONCE(bcdev->fake_soc);
++
++		if (soc_override && fake >= 0 && fake <= 100)
++			value = fake;
++		*out = value;
++	}
++	mutex_unlock(&sheng_keyboard_charger_lock);
++	return ret;
++}
++
++#define SHENG_FG_GETTER(name, opcode, property, divisor, sign, override) \
++static int name(int *out) \
++{ return sheng_fg_get(opcode, property, divisor, sign, override, out); }
++
++/* Individually verified property IDs from the actual shipping FG functions. */
++SHENG_FG_GETTER(sheng_fg_soc, SHENG_FG_BATTERY_GET, 4, 100, false, true)
++SHENG_FG_GETTER(sheng_fg_current, SHENG_FG_BATTERY_GET, 9, 1000, true, false)
++SHENG_FG_GETTER(sheng_fg_voltage, SHENG_FG_BATTERY_GET, 7, 1000, false, false)
++SHENG_FG_GETTER(sheng_fg_temperature, SHENG_POGO_GET, 226, 1, true, false)
++SHENG_FG_GETTER(sheng_fg1_current, SHENG_POGO_GET, 172, 1, true, false)
++SHENG_FG_GETTER(sheng_fg2_current, SHENG_POGO_GET, 173, 1, true, false)
++SHENG_FG_GETTER(sheng_fg1_voltage, SHENG_POGO_GET, 176, 1, true, false)
++SHENG_FG_GETTER(sheng_fg2_voltage, SHENG_POGO_GET, 177, 1, true, false)
++SHENG_FG_GETTER(sheng_fg1_fcc, SHENG_POGO_GET, 139, 1, true, false)
++SHENG_FG_GETTER(sheng_fg2_fcc, SHENG_POGO_GET, 167, 1, true, false)
++SHENG_FG_GETTER(sheng_fg1_rm, SHENG_POGO_GET, 138, 1, true, false)
++SHENG_FG_GETTER(sheng_fg2_rm, SHENG_POGO_GET, 166, 1, true, false)
++SHENG_FG_GETTER(sheng_fg1_soc, SHENG_POGO_GET, 183, 1, true, false)
++SHENG_FG_GETTER(sheng_fg2_soc, SHENG_POGO_GET, 184, 1, true, false)
++SHENG_FG_GETTER(sheng_fg1_fastcharge, SHENG_POGO_GET, 43, 1, true, false)
++SHENG_FG_GETTER(sheng_fg1_temperature, SHENG_POGO_GET, 174, 1, true, false)
++SHENG_FG_GETTER(sheng_fg2_temperature, SHENG_POGO_GET, 175, 1, true, false)
++SHENG_FG_GETTER(sheng_fg_authentic, SHENG_POGO_GET, 3, 1, true, false)
++SHENG_FG_GETTER(sheng_fg_chip_ok, SHENG_POGO_GET, 5, 1, true, false)
++#undef SHENG_FG_GETTER
++
++static int sheng_fg_raw(u32 rm_property, u32 fcc_property, int *out)
++{
++	struct battery_chg_dev *bcdev;
++	u32 rm, fcc, epoch;
++	int ret;
++
++	if (!out)
++		return -EINVAL;
++	mutex_lock(&sheng_keyboard_charger_lock);
++	bcdev = sheng_keyboard_bcdev;
++	if (!bcdev) {
++		ret = -ENODEV;
++		goto unlock;
++	}
++	epoch = READ_ONCE(bcdev->sheng_pogo.epoch);
++	ret = sheng_fg_read_locked(bcdev, SHENG_POGO_GET, rm_property, &rm);
++	if (!ret)
++		ret = sheng_fg_read_locked(bcdev, SHENG_POGO_GET, fcc_property, &fcc);
++	if (!ret && READ_ONCE(bcdev->sheng_pogo.epoch) != epoch)
++		ret = -ENOTCONN;
++	if (!ret)
++		ret = sheng_fg_raw_soc((s32)rm, (s32)fcc, out);
++unlock:
++	mutex_unlock(&sheng_keyboard_charger_lock);
++	return ret;
++}
++
++static int sheng_fg1_raw_soc(int *out)
++{ return sheng_fg_raw(138, 139, out); }
++static int sheng_fg2_raw_soc(int *out)
++{ return sheng_fg_raw(166, 167, out); }
++static int sheng_fg1_set_fastcharge(int value)
++{ return sheng_pogo_property(143, true, value, NULL); }
++static int sheng_fg2_set_fastcharge(int value)
++{ return sheng_pogo_property(143, true, value, NULL); }
++static int sheng_fg_suspend(bool suspend)
++{ return sheng_pogo_property(42, true, suspend, NULL); }
++static int sheng_fg_termination_current(int value)
++{ return sheng_pogo_property(227, true, value, NULL); }
++
++static int sheng_fg_charge_status(int *out)
++{
++	struct battery_chg_dev *bcdev;
++	struct sheng_fg_state next;
++	u32 adc, temperature = 0, voltage = 0, soc = 0, current_ua = 0, epoch;
++	int ret, value;
++
++	if (!out)
++		return -EINVAL;
++	mutex_lock(&sheng_keyboard_charger_lock);
++	bcdev = sheng_keyboard_bcdev;
++	if (!bcdev) {
++		ret = -ENODEV;
++		goto unlock;
++	}
++	next = bcdev->sheng_fg;
++	epoch = READ_ONCE(bcdev->sheng_pogo.epoch);
++	ret = sheng_fg_read_locked(bcdev, SHENG_POGO_GET, SHENG_POGO_ADC_STATUS, &adc);
++	if (ret)
++		goto unlock;
++	if ((next.previous == 4 || next.previous == 5) && adc == 7) {
++		ret = sheng_fg_read_locked(bcdev, SHENG_POGO_GET, 226, &temperature);
++		if (!ret)
++			ret = sheng_fg_read_locked(bcdev, SHENG_FG_BATTERY_GET, 7, &voltage);
++		if (!ret)
++			ret = sheng_fg_read_locked(bcdev, SHENG_FG_BATTERY_GET, 4, &soc);
++		if (ret)
++			goto unlock;
++	}
++	if (next.pogo && adc == 7) {
++		ret = sheng_fg_read_locked(bcdev, SHENG_FG_BATTERY_GET, 9, &current_ua);
++		if (ret)
++			goto unlock;
++	}
++	if (READ_ONCE(bcdev->sheng_pogo.epoch) != epoch) {
++		ret = -ENOTCONN;
++		goto unlock;
++	}
++	ret = sheng_fg_charge_result(&next, (s32)adc, (s32)temperature,
++			voltage, soc, (s32)current_ua, READ_ONCE(bcdev->fake_soc), &value);
++	if (ret >= 0) {
++		bcdev->sheng_fg = next;
++		*out = value;
++	}
++unlock:
++	mutex_unlock(&sheng_keyboard_charger_lock);
++	return ret;
++}
++
++static const struct battmngr_ops qti_fg_ops = {
++	.fg_soc = sheng_fg_soc, .fg_curr = sheng_fg_current,
++	.fg_volt = sheng_fg_voltage, .fg_temp = sheng_fg_temperature,
++	.charge_status = sheng_fg_charge_status,
++	.fg1_ibatt = sheng_fg1_current, .fg2_ibatt = sheng_fg2_current,
++	.fg1_volt = sheng_fg1_voltage, .fg2_volt = sheng_fg2_voltage,
++	.fg1_fcc = sheng_fg1_fcc, .fg2_fcc = sheng_fg2_fcc,
++	.fg1_rm = sheng_fg1_rm, .fg2_rm = sheng_fg2_rm,
++	.fg1_raw_soc = sheng_fg1_raw_soc, .fg2_raw_soc = sheng_fg2_raw_soc,
++	.fg1_soc = sheng_fg1_soc, .fg2_soc = sheng_fg2_soc,
++	.set_fg1_fastcharge = sheng_fg1_set_fastcharge,
++	.set_fg2_fastcharge = sheng_fg2_set_fastcharge,
++	.get_fg1_fastcharge = sheng_fg1_fastcharge, .get_fg2_fastcharge = NULL,
++	.fg1_temp = sheng_fg1_temperature, .fg2_temp = sheng_fg2_temperature,
++	.fg_suspend = sheng_fg_suspend, .set_term_cur = sheng_fg_termination_current,
++	.get_batt_auth = sheng_fg_authentic, .get_chip_ok = sheng_fg_chip_ok,
++};
+--- a/soc/Kbuild
++++ b/soc/Kbuild
+@@ -460,7 +460,7 @@
+ 
+ obj-m += qti_battery_charger.o
+ qti_battery_charger-y := drivers/power/supply/qti_battery_charger.o
+-CFLAGS_drivers/power/supply/qti_battery_charger.o += -I$(M)/drivers/power/supply -I$(M)/drivers/remoteproc -I$(M)/drivers/soc/qcom -I$(M)/drivers/rpmsg -I$(M)/kernel/trace -I$(M)/drivers/dma-buf/heaps -I$(M)/drivers/dma-buf/heaps/aizerofs -I$(M)/drivers/soc/qcom/mem_buf -I$(M)/include/linux -I$(M)/drivers/firmware/qcom -I$(M)/drivers/virt/gunyah -I$(M)/arch/arm64/gunyah -I$(M)/include/linux/gunyah
++CFLAGS_drivers/power/supply/qti_battery_charger.o += -I$(M)/drivers/power/supply -I$(M)/drivers/remoteproc -I$(M)/drivers/soc/qcom -I$(M)/drivers/rpmsg -I$(M)/kernel/trace -I$(M)/drivers/dma-buf/heaps -I$(M)/drivers/dma-buf/heaps/aizerofs -I$(M)/drivers/soc/qcom/mem_buf -I$(M)/include/linux -I$(M)/drivers/firmware/qcom -I$(M)/drivers/virt/gunyah -I$(M)/arch/arm64/gunyah -I$(M)/include/linux/gunyah -I$(M)/../sheng-ports/pogo/include
+ 
+ obj-m += pwm-qti-lpg.o
+ pwm-qti-lpg-y := drivers/pwm/pwm-qti-lpg.o
+--- a/sheng-ports/pogo/platform_class.c
++++ b/sheng-ports/pogo/platform_class.c
+@@ -33,458 +33,103 @@
+ {
+   	struct battmngr_device *chg_dev = to_battmngr_device(dev);
+ 
+-  	kfree(chg_dev);
+-}
+-
+-int battmngr_qtiops_get_fg_soc(struct battmngr_device *battmg_dev)
+-{
+-    int soc = 0, rc = 0;
+-  	if (battmg_dev != NULL && battmg_dev->ops != NULL &&
+-  	    battmg_dev->ops->fg_soc) {
+-  		rc = battmg_dev->ops->fg_soc(&soc);
+-        if (rc < 0) {
+-            class_err("%s: get qti ops is fail\n", __func__);
+-            return rc;
+-        }
+-        return soc;
+-    }
+-
+-  	return -EOPNOTSUPP;
+-}
++  	srcu_cleanup_notifier_head(&chg_dev->evt_nh);
++	kfree(chg_dev);
++}
++
++#include "sheng_battmngr_calls.h"
++
++SHENG_BATTMNGR_GETTER(battmngr_qtiops_get_fg_soc, int, fg_soc)
+ EXPORT_SYMBOL(battmngr_qtiops_get_fg_soc);
+ 
+-int battmngr_qtiops_get_fg_curr(struct battmngr_device *battmg_dev)
+-{
+-    int curr = 0, rc = 0;
+-  	if (battmg_dev != NULL && battmg_dev->ops != NULL &&
+-  	    battmg_dev->ops->fg_curr) {
+-  		rc = battmg_dev->ops->fg_curr(&curr);
+-        if (rc < 0) {
+-            class_err("%s: get qti ops is fail\n", __func__);
+-            return rc;
+-        }
+-        return curr;
+-    }
+-
+-  	return -EOPNOTSUPP;
+-}
++SHENG_BATTMNGR_GETTER(battmngr_qtiops_get_fg_curr, int, fg_curr)
+ EXPORT_SYMBOL(battmngr_qtiops_get_fg_curr);
+ 
+ 
+-int battmngr_qtiops_get_fg_volt(struct battmngr_device *battmg_dev)
+-{
+-    int value = 0, rc = 0;
+-  	if (battmg_dev != NULL && battmg_dev->ops != NULL &&
+-  	    battmg_dev->ops->fg_volt) {
+-  		rc = battmg_dev->ops->fg_volt(&value);
+-        if (rc < 0) {
+-            class_err("%s: get qti ops is fail\n", __func__);
+-            return rc;
+-        }
+-        return value;
+-    }
+-
+-  	return -EOPNOTSUPP;
+-}
++SHENG_BATTMNGR_GETTER(battmngr_qtiops_get_fg_volt, int, fg_volt)
+ EXPORT_SYMBOL(battmngr_qtiops_get_fg_volt);
+ 
+-int battmngr_qtiops_get_fg_temp(struct battmngr_device *battmg_dev)
+-{
+-    int value = 0, rc = 0;
+-  	if (battmg_dev != NULL && battmg_dev->ops != NULL &&
+-  	    battmg_dev->ops->fg_temp) {
+-  		rc = battmg_dev->ops->fg_temp(&value);
+-        if (rc < 0) {
+-            class_err("%s: get qti ops is fail\n", __func__);
+-            return rc;
+-        }
+-        return value;
+-    }
+-
+-  	return -EOPNOTSUPP;
+-}
++SHENG_BATTMNGR_GETTER(battmngr_qtiops_get_fg_temp, int, fg_temp)
+ EXPORT_SYMBOL(battmngr_qtiops_get_fg_temp);
+ 
+-int battmngr_qtiops_get_charge_status(struct battmngr_device *battmg_dev)
+-{
+-    int value = 0, rc = 0;
+-  	if (battmg_dev != NULL && battmg_dev->ops != NULL &&
+-  	    battmg_dev->ops->charge_status) {
+-  		rc = battmg_dev->ops->charge_status(&value);
+-        if (rc < 0) {
+-            class_err("%s: get qti ops is fail\n", __func__);
+-            return rc;
+-        }
+-        return value;
+-    }
+-
+-  	return -EOPNOTSUPP;
+-}
++SHENG_BATTMNGR_GETTER(battmngr_qtiops_get_charge_status, int, charge_status)
+ EXPORT_SYMBOL(battmngr_qtiops_get_charge_status);
+ 
+-int battmngr_qtiops_get_fg1_ibatt(struct battmngr_device *battmg_dev)
+-{
+-    int value = 0, rc = 0;
+-  	if (battmg_dev != NULL && battmg_dev->ops != NULL &&
+-  	    battmg_dev->ops->fg1_ibatt) {
+-  		rc = battmg_dev->ops->fg1_ibatt(&value);
+-        if (rc < 0) {
+-            class_err("%s: get qti ops is fail\n", __func__);
+-            return rc;
+-        }
+-        return value;
+-    }
+-
+-  	return -EOPNOTSUPP;
+-}
++SHENG_BATTMNGR_GETTER(battmngr_qtiops_get_fg1_ibatt, int, fg1_ibatt)
+ EXPORT_SYMBOL(battmngr_qtiops_get_fg1_ibatt);
+ 
+-int battmngr_qtiops_get_fg2_ibatt(struct battmngr_device *battmg_dev)
+-{
+-    int value = 0, rc = 0;
+-  	if (battmg_dev != NULL && battmg_dev->ops != NULL &&
+-  	    battmg_dev->ops->fg2_ibatt) {
+-  		rc = battmg_dev->ops->fg2_ibatt(&value);
+-        if (rc < 0) {
+-            class_err("%s: get qti ops is fail\n", __func__);
+-            return rc;
+-        }
+-        return value;
+-    }
+-
+-  	return -EOPNOTSUPP;
+-}
++SHENG_BATTMNGR_GETTER(battmngr_qtiops_get_fg2_ibatt, int, fg2_ibatt)
+ EXPORT_SYMBOL(battmngr_qtiops_get_fg2_ibatt);
+ 
+-int battmngr_qtiops_get_fg1_volt(struct battmngr_device *battmg_dev)
+-{
+-    int value = 0, rc = 0;
+-  	if (battmg_dev != NULL && battmg_dev->ops != NULL &&
+-  	    battmg_dev->ops->fg1_volt) {
+-  		rc = battmg_dev->ops->fg1_volt(&value);
+-        if (rc < 0) {
+-            class_err("%s: get qti ops is fail\n", __func__);
+-            return rc;
+-        }
+-        return value;
+-    }
+-
+-  	return -EOPNOTSUPP;
+-}
++SHENG_BATTMNGR_GETTER(battmngr_qtiops_get_fg1_volt, int, fg1_volt)
+ EXPORT_SYMBOL(battmngr_qtiops_get_fg1_volt);
+ 
+-int battmngr_qtiops_get_fg2_volt(struct battmngr_device *battmg_dev)
+-{
+-    int value = 0, rc = 0;
+-  	if (battmg_dev != NULL && battmg_dev->ops != NULL &&
+-  	    battmg_dev->ops->fg2_volt) {
+-  		rc = battmg_dev->ops->fg2_volt(&value);
+-        if (rc < 0) {
+-            class_err("%s: get qti ops is fail\n", __func__);
+-            return rc;
+-        }
+-        return value;
+-    }
+-
+-  	return -EOPNOTSUPP;
+-}
++SHENG_BATTMNGR_GETTER(battmngr_qtiops_get_fg2_volt, int, fg2_volt)
+ EXPORT_SYMBOL(battmngr_qtiops_get_fg2_volt);
+ 
+-int battmngr_qtiops_get_fg1_fcc(struct battmngr_device *battmg_dev)
+-{
+-    int value = 0, rc = 0;
+-  	if (battmg_dev != NULL && battmg_dev->ops != NULL &&
+-  	    battmg_dev->ops->fg1_fcc) {
+-  		rc = battmg_dev->ops->fg1_fcc(&value);
+-        if (rc < 0) {
+-            class_err("%s: get qti ops is fail\n", __func__);
+-            return rc;
+-        }
+-        return value;
+-    }
+-
+-  	return -EOPNOTSUPP;
+-}
++SHENG_BATTMNGR_GETTER(battmngr_qtiops_get_fg1_fcc, int, fg1_fcc)
+ EXPORT_SYMBOL(battmngr_qtiops_get_fg1_fcc);
+ 
+-int battmngr_qtiops_get_fg2_fcc(struct battmngr_device *battmg_dev)
+-{
+-    int value = 0, rc = 0;
+-  	if (battmg_dev != NULL && battmg_dev->ops != NULL &&
+-  	    battmg_dev->ops->fg2_fcc) {
+-  		rc = battmg_dev->ops->fg2_fcc(&value);
+-        if (rc < 0) {
+-            class_err("%s: get qti ops is fail\n", __func__);
+-            return rc;
+-        }
+-        return value;
+-    }
+-
+-  	return -EOPNOTSUPP;
+-}
++SHENG_BATTMNGR_GETTER(battmngr_qtiops_get_fg2_fcc, int, fg2_fcc)
+ EXPORT_SYMBOL(battmngr_qtiops_get_fg2_fcc);
+ 
+-int battmngr_qtiops_get_fg1_rm(struct battmngr_device *battmg_dev)
+-{
+-    int value = 0, rc = 0;
+-  	if (battmg_dev != NULL && battmg_dev->ops != NULL &&
+-  	    battmg_dev->ops->fg1_rm) {
+-  		rc = battmg_dev->ops->fg1_rm(&value);
+-        if (rc < 0) {
+-            class_err("%s: get qti ops is fail\n", __func__);
+-            return rc;
+-        }
+-        return value;
+-    }
+-
+-  	return -EOPNOTSUPP;
+-}
++SHENG_BATTMNGR_GETTER(battmngr_qtiops_get_fg1_rm, int, fg1_rm)
+ EXPORT_SYMBOL(battmngr_qtiops_get_fg1_rm);
+ 
+-int battmngr_qtiops_get_fg2_rm(struct battmngr_device *battmg_dev)
+-{
+-    int value = 0, rc = 0;
+-  	if (battmg_dev != NULL && battmg_dev->ops != NULL &&
+-  	    battmg_dev->ops->fg2_rm) {
+-  		rc = battmg_dev->ops->fg2_rm(&value);
+-        if (rc < 0) {
+-            class_err("%s: get qti ops is fail\n", __func__);
+-            return rc;
+-        }
+-        return value;
+-    }
+-
+-  	return -EOPNOTSUPP;
+-}
++SHENG_BATTMNGR_GETTER(battmngr_qtiops_get_fg2_rm, int, fg2_rm)
+ EXPORT_SYMBOL(battmngr_qtiops_get_fg2_rm);
+ 
+-int battmngr_qtiops_get_fg1_raw_soc(struct battmngr_device *battmg_dev)
+-{
+-    int value = 0, rc = 0;
+-  	if (battmg_dev != NULL && battmg_dev->ops != NULL &&
+-  	    battmg_dev->ops->fg1_raw_soc) {
+-  		rc = battmg_dev->ops->fg1_raw_soc(&value);
+-        if (rc < 0) {
+-            class_err("%s: get qti ops is fail\n", __func__);
+-            return rc;
+-        }
+-        return value;
+-    }
+-
+-  	return -EOPNOTSUPP;
+-}
++SHENG_BATTMNGR_GETTER(battmngr_qtiops_get_fg1_raw_soc, int, fg1_raw_soc)
+ EXPORT_SYMBOL(battmngr_qtiops_get_fg1_raw_soc);
+ 
+-int battmngr_qtiops_get_fg2_raw_soc(struct battmngr_device *battmg_dev)
+-{
+-    int value = 0, rc = 0;
+-  	if (battmg_dev != NULL && battmg_dev->ops != NULL &&
+-  	    battmg_dev->ops->fg2_raw_soc) {
+-  		rc = battmg_dev->ops->fg2_raw_soc(&value);
+-        if (rc < 0) {
+-            class_err("%s: get qti ops is fail\n", __func__);
+-            return rc;
+-        }
+-        return value;
+-    }
+-
+-  	return -EOPNOTSUPP;
+-}
++SHENG_BATTMNGR_GETTER(battmngr_qtiops_get_fg2_raw_soc, int, fg2_raw_soc)
+ EXPORT_SYMBOL(battmngr_qtiops_get_fg2_raw_soc);
+ 
+-int battmngr_qtiops_get_fg1_soc(struct battmngr_device *battmg_dev)
+-{
+-    int value = 0, rc = 0;
+-  	if (battmg_dev != NULL && battmg_dev->ops != NULL &&
+-  	    battmg_dev->ops->fg1_soc) {
+-  		rc = battmg_dev->ops->fg1_soc(&value);
+-        if (rc < 0) {
+-            class_err("%s: get qti ops is fail\n", __func__);
+-            return rc;
+-        }
+-        return value;
+-    }
+-
+-  	return -EOPNOTSUPP;
+-}
++SHENG_BATTMNGR_GETTER(battmngr_qtiops_get_fg1_soc, int, fg1_soc)
+ EXPORT_SYMBOL(battmngr_qtiops_get_fg1_soc);
+ 
+-int battmngr_qtiops_get_fg2_soc(struct battmngr_device *battmg_dev)
+-{
+-    int value = 0, rc = 0;
+-  	if (battmg_dev != NULL && battmg_dev->ops != NULL &&
+-  	    battmg_dev->ops->fg2_soc) {
+-  		rc = battmg_dev->ops->fg2_soc(&value);
+-        if (rc < 0) {
+-            class_err("%s: get qti ops is fail\n", __func__);
+-            return rc;
+-        }
+-        return value;
+-    }
+-
+-  	return -EOPNOTSUPP;
+-}
++SHENG_BATTMNGR_GETTER(battmngr_qtiops_get_fg2_soc, int, fg2_soc)
+ EXPORT_SYMBOL(battmngr_qtiops_get_fg2_soc);
+ 
+-int battmngr_qtiops_set_fg1_fastcharge(struct battmngr_device *battmg_dev, int value)
+-{
+-    int rc = 0;
+-  	if (battmg_dev != NULL && battmg_dev->ops != NULL &&
+-  	    battmg_dev->ops->set_fg1_fastcharge) {
+-  		rc = battmg_dev->ops->set_fg1_fastcharge(value);
+-        if (rc < 0) {
+-            class_err("%s: get qti ops is fail\n", __func__);
+-            return rc;
+-        }
+-        return value;
+-    }
+-
+-  	return -EOPNOTSUPP;
+-}
++SHENG_BATTMNGR_SETTER(battmngr_qtiops_set_fg1_fastcharge, set_fg1_fastcharge)
+ EXPORT_SYMBOL(battmngr_qtiops_set_fg1_fastcharge);
+ 
+-int battmngr_qtiops_set_fg2_fastcharge(struct battmngr_device *battmg_dev, int value)
+-{
+-    int rc = 0;
+-  	if (battmg_dev != NULL && battmg_dev->ops != NULL &&
+-  	    battmg_dev->ops->set_fg2_fastcharge) {
+-  		rc = battmg_dev->ops->set_fg2_fastcharge(value);
+-        if (rc < 0) {
+-            class_err("%s: get qti ops is fail\n", __func__);
+-            return rc;
+-        }
+-        return value;
+-    }
+-
+-  	return -EOPNOTSUPP;
+-}
++SHENG_BATTMNGR_SETTER(battmngr_qtiops_set_fg2_fastcharge, set_fg2_fastcharge)
+ EXPORT_SYMBOL(battmngr_qtiops_set_fg2_fastcharge);
+ 
+-int battmngr_qtiops_get_fg1_fastcharge(struct battmngr_device *battmg_dev)
+-{
+-    int value = 0, rc = 0;
+-  	if (battmg_dev != NULL && battmg_dev->ops != NULL &&
+-  	    battmg_dev->ops->get_fg1_fastcharge) {
+-  		rc = battmg_dev->ops->get_fg1_fastcharge(&value);
+-        if (rc < 0) {
+-            class_err("%s: get qti ops is fail\n", __func__);
+-            return rc;
+-        }
+-        return value;
+-    }
+-
+-  	return -EOPNOTSUPP;
+-}
++SHENG_BATTMNGR_GETTER(battmngr_qtiops_get_fg1_fastcharge, int, get_fg1_fastcharge)
+ EXPORT_SYMBOL(battmngr_qtiops_get_fg1_fastcharge);
+ 
+-int battmngr_qtiops_get_fg1_temp(struct battmngr_device *battmg_dev)
+-{
+-    int value = 0, rc = 0;
+-  	if (battmg_dev != NULL && battmg_dev->ops != NULL &&
+-  	    battmg_dev->ops->fg1_temp) {
+-  		rc = battmg_dev->ops->fg1_temp(&value);
+-        if (rc < 0) {
+-            class_err("%s: get qti ops is fail\n", __func__);
+-            return rc;
+-        }
+-        return value;
+-    }
+-
+-  	return -EOPNOTSUPP;
+-}
++SHENG_BATTMNGR_GETTER(battmngr_qtiops_get_fg1_temp, int, fg1_temp)
+ EXPORT_SYMBOL(battmngr_qtiops_get_fg1_temp);
+ 
+-int battmngr_qtiops_get_fg2_temp(struct battmngr_device *battmg_dev)
+-{
+-    int value = 0, rc = 0;
+-  	if (battmg_dev != NULL && battmg_dev->ops != NULL &&
+-  	    battmg_dev->ops->fg2_temp) {
+-  		rc = battmg_dev->ops->fg2_temp(&value);
+-        if (rc < 0) {
+-            class_err("%s: get qti ops is fail\n", __func__);
+-            return rc;
+-        }
+-        return value;
+-    }
+-
+-  	return -EOPNOTSUPP;
+-}
++SHENG_BATTMNGR_GETTER(battmngr_qtiops_get_fg2_temp, int, fg2_temp)
+ EXPORT_SYMBOL(battmngr_qtiops_get_fg2_temp);
+ 
+-int battmngr_qtiops_set_fg_suspend(struct battmngr_device *battmg_dev, int value)
+-{
+-    int rc = 0;
+-  	if (battmg_dev != NULL && battmg_dev->ops != NULL &&
+-  	    battmg_dev->ops->fg_suspend) {
+-  		rc = battmg_dev->ops->fg_suspend(value);
+-        if (rc < 0) {
+-            class_err("%s: get qti ops is fail\n", __func__);
+-            return rc;
+-        }
+-        return value;
+-    }
+-
+-  	return -EOPNOTSUPP;
+-}
++SHENG_BATTMNGR_SETTER(battmngr_qtiops_set_fg_suspend, fg_suspend)
+ EXPORT_SYMBOL(battmngr_qtiops_set_fg_suspend);
+ 
+-int battmngr_qtiops_set_term_cur(struct battmngr_device *battmg_dev, int value)
+-{
+-    int rc = 0;
+-
+-  	if (battmg_dev != NULL && battmg_dev->ops != NULL &&
+-  	    battmg_dev->ops->set_term_cur) {
+-  		rc = battmg_dev->ops->set_term_cur(value);
+-        if (rc < 0) {
+-            class_err("%s: get qti ops is fail\n", __func__);
+-            return rc;
+-        }
+-        return value;
+-    }
+-
+-  	return -EOPNOTSUPP;
+-}
++SHENG_BATTMNGR_SETTER(battmngr_qtiops_set_term_cur, set_term_cur)
+ EXPORT_SYMBOL(battmngr_qtiops_set_term_cur);
+ 
+-int battmngr_qtiops_get_batt_auth(struct battmngr_device *battmg_dev)
+-{
+-    int value = 0, rc = 0;
+-  	if (battmg_dev != NULL && battmg_dev->ops != NULL &&
+-  	    battmg_dev->ops->get_batt_auth) {
+-  		rc = battmg_dev->ops->get_batt_auth(&value);
+-        if (rc < 0) {
+-            class_err("%s: get qti ops is fail\n", __func__);
+-            return rc;
+-        }
+-        return value;
+-    }
+-
+-  	return -EOPNOTSUPP;
+-}
++SHENG_BATTMNGR_GETTER(battmngr_qtiops_get_batt_auth, int, get_batt_auth)
+ EXPORT_SYMBOL(battmngr_qtiops_get_batt_auth);
+ 
+-int battmngr_qtiops_get_chip_ok(struct battmngr_device *battmg_dev)
+-{
+-    int value = 0, rc = 0;
+-  	if (battmg_dev != NULL && battmg_dev->ops != NULL &&
+-  	    battmg_dev->ops->get_chip_ok) {
+-  		rc = battmg_dev->ops->get_chip_ok(&value);
+-        if (rc < 0) {
+-            class_err("%s: get qti ops is fail\n", __func__);
+-            return rc;
+-        }
+-        return value;
+-    }
+-
+-  	return -EOPNOTSUPP;
+-}
++SHENG_BATTMNGR_GETTER(battmngr_qtiops_get_chip_ok, int, get_chip_ok)
+ EXPORT_SYMBOL(battmngr_qtiops_get_chip_ok);
+ 
+ bool check_qti_ops(struct battmngr_device **battmg_dev)
+ {
+ 
+-	if (*battmg_dev)
+-		return true;
++	if (!battmg_dev)
++		return false;
++	if (*battmg_dev) {
++		bool ready;
++		mutex_lock(&(*battmg_dev)->ops_lock);
++		ready = (*battmg_dev)->ops != NULL;
++		mutex_unlock(&(*battmg_dev)->ops_lock);
++		return ready;
++	}
+ 
+ 	*battmg_dev = get_adapter_by_name("qti_ops");
+ 	if (!(*battmg_dev)) {
+@@ -497,90 +142,19 @@
+ }
+ EXPORT_SYMBOL(check_qti_ops);
+ 
+-int battmngr_noops_get_online(struct battmngr_device *battmg_dev)
+-{
+-    u8 value = 0;
+-    int rc = 0;
+-  	if (battmg_dev != NULL && battmg_dev->ops != NULL &&
+-  	    battmg_dev->ops->online) {
+-  		rc = battmg_dev->ops->online(&value);
+-        if (rc < 0) {
+-            class_err("%s: get nano ops online is fail\n", __func__);
+-            return rc;
+-        }
+-        return value;
+-    }
+-
+-  	return -EOPNOTSUPP;
+-}
++SHENG_BATTMNGR_GETTER(battmngr_noops_get_online, u8, online)
+ EXPORT_SYMBOL(battmngr_noops_get_online);
+ 
+-int battmngr_noops_get_real_type(struct battmngr_device *battmg_dev)
+-{
+-    int value = 0, rc = 0;
+-  	if (battmg_dev != NULL && battmg_dev->ops != NULL &&
+-  	    battmg_dev->ops->real_type) {
+-  		rc = battmg_dev->ops->real_type(&value);
+-        if (rc < 0) {
+-            class_err("%s: get nano ops real type is fail\n", __func__);
+-            return rc;
+-        }
+-        return value;
+-    }
+-
+-  	return -EOPNOTSUPP;
+-}
++SHENG_BATTMNGR_GETTER(battmngr_noops_get_real_type, int, real_type)
+ EXPORT_SYMBOL(battmngr_noops_get_real_type);
+ 
+-int battmngr_noops_get_usb_type(struct battmngr_device *battmg_dev)
+-{
+-    int value = 0, rc = 0;
+-  	if (battmg_dev != NULL && battmg_dev->ops != NULL &&
+-  	    battmg_dev->ops->usb_type) {
+-  		rc = battmg_dev->ops->usb_type(&value);
+-        if (rc < 0) {
+-            class_err("%s: get nano ops usb type is fail\n", __func__);
+-            return rc;
+-        }
+-        return value;
+-    }
+-
+-  	return -EOPNOTSUPP;
+-}
++SHENG_BATTMNGR_GETTER(battmngr_noops_get_usb_type, int, usb_type)
+ EXPORT_SYMBOL(battmngr_noops_get_usb_type);
+ 
+-int battmngr_noops_get_input_curr_limit(struct battmngr_device *battmg_dev)
+-{
+-    int value = 0, rc = 0;
+-  	if (battmg_dev != NULL && battmg_dev->ops != NULL &&
+-  	    battmg_dev->ops->input_curr_limit) {
+-  		rc = battmg_dev->ops->input_curr_limit(&value);
+-        if (rc < 0) {
+-            class_err("%s: get nano ops input curr limit is fail\n", __func__);
+-            return rc;
+-        }
+-        return value;
+-    }
+-
+-  	return -EOPNOTSUPP;
+-}
++SHENG_BATTMNGR_GETTER(battmngr_noops_get_input_curr_limit, int, input_curr_limit)
+ EXPORT_SYMBOL(battmngr_noops_get_input_curr_limit);
+ 
+-int battmngr_noops_get_power_max(struct battmngr_device *battmg_dev)
+-{
+-    int value = 0, rc = 0;
+-  	if (battmg_dev != NULL && battmg_dev->ops != NULL &&
+-  	    battmg_dev->ops->power_max) {
+-  		rc = battmg_dev->ops->power_max(&value);
+-        if (rc < 0) {
+-            class_err("%s: get nano ops input curr limit is fail\n", __func__);
+-            return rc;
+-        }
+-        return value;
+-    }
+-
+-  	return -EOPNOTSUPP;
+-}
++SHENG_BATTMNGR_GETTER(battmngr_noops_get_power_max, int, power_max)
+ EXPORT_SYMBOL(battmngr_noops_get_power_max);
+ 
+ struct battmngr_device* check_nano_ops(void)
+@@ -624,28 +198,36 @@
+ 	if (!battmg_dev)
+ 		return ERR_PTR(-ENOMEM);
+ 
++	if (IS_ERR_OR_NULL(battmngr_class)) {
++		kfree(battmg_dev);
++		return ERR_PTR(-EPROBE_DEFER);
++	}
+ 	mutex_init(&battmg_dev->ops_lock);
++	device_initialize(&battmg_dev->dev);
+ 	battmg_dev->dev.class = battmngr_class;
+ 	battmg_dev->dev.parent = parent;
+ 	battmg_dev->dev.release = battmngr_device_release;
+-	dev_set_name(&battmg_dev->dev, "%s", name);
+-	dev_set_drvdata(&battmg_dev->dev, devdata);
+ 	head = &battmg_dev->evt_nh;
+ 	srcu_init_notifier_head(head);
+-	/* Rename srcu's lock to avoid LockProve warning */
+ 	lockdep_init_map(&(&head->srcu)->dep_map, name, &key, 0);
++	rc = dev_set_name(&battmg_dev->dev, "%s", name);
++	if (rc) {
++		put_device(&battmg_dev->dev);
++		return ERR_PTR(rc);
++	}
++	dev_set_drvdata(&battmg_dev->dev, devdata);
++	battmg_dev->ops = ops;
+ 
+ 	/* Copy properties */
+ 	if (props) {
+ 		memcpy(&battmg_dev->props, props,
+ 		       sizeof(struct battmngr_properties));
+ 	}
+-	rc = device_register(&battmg_dev->dev);
++	rc = device_add(&battmg_dev->dev);
+ 	if (rc) {
+-		kfree(battmg_dev);
++		put_device(&battmg_dev->dev);
+ 		return ERR_PTR(rc);
+ 	}
+-	battmg_dev->ops = ops;
+     class_info("%s: is successful\n", __func__);
+ 	return battmg_dev;
+ }
+@@ -664,9 +246,7 @@
+ 	if (!adapter_dev)
+ 		return;
+ 
+-	mutex_lock(&adapter_dev->ops_lock);
+-	adapter_dev->ops = NULL;
+-	mutex_unlock(&adapter_dev->ops_lock);
++	sheng_battmngr_stop_ops(adapter_dev);
+ 	device_unregister(&adapter_dev->dev);
+ }
+ EXPORT_SYMBOL(battmngr_device_unregister);
+@@ -683,8 +263,8 @@
+ {
+ 	struct device *dev = NULL;
+ 
+-	if (!name)
+-		return (struct battmngr_device *)NULL;
++	if (!name || IS_ERR_OR_NULL(battmngr_class))
++		return NULL;
+ 	dev = class_find_device(battmngr_class, NULL, name,
+ 				battmngr_match_device_by_name);
+ 
+--- /dev/null
++++ b/sheng-ports/pogo/sheng_battmngr_calls.h
+@@ -0,0 +1,43 @@
++/* SPDX-License-Identifier: GPL-2.0-only */
++#ifndef SHENG_BATTMNGR_CALLS_H
++#define SHENG_BATTMNGR_CALLS_H
++/* Class lookup owns a device reference. Serialize callbacks with unregister:
++ * an old referenced object must never call a removed provider's code. */
++#define SHENG_BATTMNGR_GETTER(name, type, field) \
++int name(struct battmngr_device *dev) \
++{ \
++	type value = 0; \
++	int ret = -EOPNOTSUPP; \
++	if (!dev) \
++		return ret; \
++	mutex_lock(&dev->ops_lock); \
++	if (dev->ops && dev->ops->field) { \
++		ret = dev->ops->field(&value); \
++		if (ret >= 0) \
++			ret = value; \
++	} \
++	mutex_unlock(&dev->ops_lock); \
++	return ret; \
++}
++#define SHENG_BATTMNGR_SETTER(name, field) \
++int name(struct battmngr_device *dev, int value) \
++{ \
++	int ret = -EOPNOTSUPP; \
++	if (!dev) \
++		return ret; \
++	mutex_lock(&dev->ops_lock); \
++	if (dev->ops && dev->ops->field) { \
++		ret = dev->ops->field(value); \
++		if (ret >= 0) \
++			ret = value; \
++	} \
++	mutex_unlock(&dev->ops_lock); \
++	return ret; \
++}
++static inline void sheng_battmngr_stop_ops(struct battmngr_device *dev)
++{
++	mutex_lock(&dev->ops_lock);
++	dev->ops = NULL;
++	mutex_unlock(&dev->ops_lock);
++}
++#endif

@@ -1,0 +1,72 @@
+--- a/sheng-ports/keyboard/sheng_touchpad_edge.h
++++ b/sheng-ports/keyboard/sheng_touchpad_edge.h
+@@ -27,7 +27,7 @@
+ 	u32 point;
+ 	u32 state;
+ 	u8 report;
+-	u8 current[6];
++	u8 sample[6];
+ 	u8 first[6];
+ };
+ 
+@@ -95,7 +95,7 @@
+ 	for (i = 0; i < packet[20]; i++) {
+ 		const u8 *contact = packet + 2 + i * 6;
+ 		struct sheng_edge_slot *slot = &filter->slot[contact[1]];
+-		memcpy(slot->current, contact, sizeof(slot->current));
++		memcpy(slot->sample, contact, sizeof(slot->sample));
+ 		switch (slot->point) {
+ 		case 0: slot->point = contact[0] & 1; break;
+ 		case 1:
+@@ -124,10 +124,10 @@
+ 			if (slot->point != 1)
+ 				break;
+ initial_contact:
+-			if (packet[1] || !sheng_edge_at_border(filter, slot->current))
++			if (packet[1] || !sheng_edge_at_border(filter, slot->sample))
+ 				goto normal_contact;
+ 			slot->state = 3;
+-			memcpy(slot->first, slot->current, sizeof(slot->first));
++			memcpy(slot->first, slot->sample, sizeof(slot->first));
+ 			slot->frames++;
+ 			break;
+ 		case 2:
+@@ -149,7 +149,7 @@
+ 				slot->state = 4;
+ 				break;
+ 			}
+-			if (!sheng_edge_at_border(filter, slot->current) || gesture)
++			if (!sheng_edge_at_border(filter, slot->sample) || gesture)
+ 				goto normal_contact;
+ 			shielded_count = 0;
+ 			for (j = 0; j < SHENG_TOUCHPAD_SLOTS; j++)
+@@ -169,7 +169,7 @@
+ 				struct sheng_edge_slot *other = &filter->slot[shielded[j]];
+ 				if (other->state != 3)
+ 					continue;
+-				other->distance = sheng_edge_distance(other->first, other->current);
++				other->distance = sheng_edge_distance(other->first, other->sample);
+ 				if (other->distance <= threshold) {
+ 					gesture = 0;
+ 					break;
+@@ -193,7 +193,7 @@
+ 		struct sheng_edge_slot *slot = &filter->slot[i];
+ 		if (!slot->report)
+ 			continue;
+-		memcpy(output + 2 + 6 * count, slot->current, sizeof(slot->current));
++		memcpy(output + 2 + 6 * count, slot->sample, sizeof(slot->sample));
+ 		output[3 + 6 * count] = i;
+ 		slot->report = 0;
+ 		count++;
+--- a/sheng-ports/keyboard/sheng_touchpad_filter.c
++++ b/sheng-ports/keyboard/sheng_touchpad_filter.c
+@@ -6,6 +6,9 @@
+ #include <linux/of.h>
+ #include <linux/slab.h>
+ #include "sheng_touchpad_edge.h"
++
++int xiaomi_touchpad_edge_filter_param_init(struct device_node *node);
++int xiaomi_touchpad_edge_filter(u8 *packet);
+ 
+ static DEFINE_MUTEX(edge_lock);
+ static struct sheng_edge_filter edge;

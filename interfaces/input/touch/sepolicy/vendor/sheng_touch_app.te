@@ -1,0 +1,21 @@
+# SPDX-License-Identifier: Apache-2.0
+type vendor_sysfs_sheng_touch_dpms, fs_type, sysfs_type;
+type vendor_proc_sheng_touch_gesture, fs_type, proc_type;
+
+# The app can configure only the stock V2 command/selector; proc is read-only.
+allow sheng_touch_app touchfeature_device:chr_file { getattr open read write ioctl };
+allowxperm sheng_touch_app touchfeature_device:chr_file ioctl { 0x5400 0x5403 };
+allow sheng_touch_app vendor_sysfs_sheng_touch_dpms:file r_file_perms;
+allow sheng_touch_app vendor_proc_sheng_touch_gesture:file r_file_perms;
+
+# CLI diagnostics use a separate vendor domain, with the same narrow hardware API.
+type vendor_sheng_touchctl, domain;
+type vendor_sheng_touchctl_exec, exec_type, vendor_file_type, file_type;
+init_daemon_domain(vendor_sheng_touchctl)
+domain_auto_trans(shell, vendor_sheng_touchctl_exec, vendor_sheng_touchctl)
+allow vendor_sheng_touchctl touchfeature_device:chr_file { getattr open read write ioctl };
+allowxperm vendor_sheng_touchctl touchfeature_device:chr_file ioctl { 0x5400 0x5403 };
+allow vendor_sheng_touchctl vendor_sysfs_sheng_touch_dpms:file r_file_perms;
+allow vendor_sheng_touchctl vendor_proc_sheng_touch_gesture:file r_file_perms;
+allow vendor_sheng_touchctl sysfs:dir search;
+allow vendor_sheng_touchctl proc:dir search;

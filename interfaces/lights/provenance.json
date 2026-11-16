@@ -1,0 +1,12 @@
+{
+  "source": "https://github.com/xiaomi-pad-8-pro-development/android_device_xiaomi_piano",
+  "commit": "3f10fc25273b42d18d0bd533551a0a5c3dda0094",
+  "path": "aidl/lights",
+  "upstream_sha256": {
+    "Lights.cpp": "0b9d92e8f9d1cdf79f38c58715c8fd5401b8bc61013cc9f3c02170fb30273286",
+    "Lights.h": "b71a738ada50471584dbec3e739cd2e3bf82e1baaf23780e39b98bc332cb94da",
+    "main.cpp": "aa465a690187d0c944f1c9d8d8d55206f29adfaa75c5595c4e993a1d7c38dcb5"
+  },
+  "implementation": "Qualcomm RGB LED sysfs implementation; licenses retained in each source file",
+  "sheng_changes": "Retain sheng logical light IDs, add a persistent default-off output switch, serialize updates and report hardware failures."
+}

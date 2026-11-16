@@ -1,0 +1,73 @@
+--- a/soc/Kbuild
++++ b/soc/Kbuild
+@@ -716,7 +716,7 @@
+ 
+ obj-m += msm_performance.o
+ msm_performance-y := drivers/soc/qcom/msm_performance.o
+-CFLAGS_drivers/soc/qcom/msm_performance.o += -I$(M)/drivers/soc/qcom
++CFLAGS_drivers/soc/qcom/msm_performance.o += -I$(M)/drivers/soc/qcom -DCONFIG_SCHED_WALT_MODULE=1
+ 
+ obj-m += msm_show_epoch.o
+ msm_show_epoch-y := drivers/soc/qcom/msm_show_epoch.o
+@@ -1202,3 +1202,6 @@
+ # Original TSENS minidump provider, compiled with its real consumer.
+ obj-m += thermal_minidump.o
+ thermal_minidump-y := drivers/thermal/qcom/thermal_minidump.o
++
++# Build WALT and its msm_performance consumer in one real modpost dependency set.
++obj-m += kernel/sched/walt/
+--- a/soc/drivers/soc/qcom/msm_performance.c
++++ b/soc/drivers/soc/qcom/msm_performance.c
+@@ -816,15 +816,23 @@
+ 	static unsigned int tld, nrb, i;
+ 	static unsigned int top_ld[CLUSTER_MAX], curr_cp[CLUSTER_MAX];
+ 	static DECLARE_WORK(sysfs_notify_work, nr_notify_userspace);
+-	// struct core_ctl_notif_data *d = data;
+-	int cluster = 0;
+-
+-	// nrb += d->nr_big;
+-	// tld += d->coloc_load_pct;
+-	// for (cluster = 0; cluster < CLUSTER_MAX; cluster++) {
+-		// top_ld[cluster] += d->ta_util_pct[cluster];
+-		// curr_cp[cluster] += d->cur_cap_pct[cluster];
+-	// }
++	const struct core_ctl_notif_data *d = data;
++	static DEFINE_SPINLOCK(stats_lock);
++	unsigned long flags;
++	bool notify = false;
++	int cluster;
++
++	if (!d)
++		return NOTIFY_DONE;
++
++	spin_lock_irqsave(&stats_lock, flags);
++	nrb += d->nr_big;
++	tld += d->coloc_load_pct;
++	for (cluster = 0; cluster < CLUSTER_MAX; cluster++) {
++		top_ld[cluster] += d->ta_util_pct[cluster];
++		curr_cp[cluster] += d->cur_cap_pct[cluster];
++	}
++
+ 	i++;
+ 	if (i == POLL_INT) {
+ 		aggr_big_nr = ((nrb%POLL_INT) ? 1 : 0) + nrb/POLL_INT;
+@@ -838,8 +846,11 @@
+ 		tld = 0;
+ 		nrb = 0;
+ 		i = 0;
++		notify = true;
++	}
++	spin_unlock_irqrestore(&stats_lock, flags);
++	if (notify)
+ 		schedule_work(&sysfs_notify_work);
+-	}
+ 	return NOTIFY_OK;
+ }
+ 
+--- a/soc/kernel/sched/walt/Makefile
++++ b/soc/kernel/sched/walt/Makefile
+@@ -4,4 +4,3 @@
+ sched-walt-y := walt.o boost.o sched_avg.o walt_halt.o core_ctl.o trace.o input-boost.o sysctl.o cpufreq_walt.o fixup.o walt_lb.o walt_rt.o walt_cfs.o walt_tp.o walt_config.o voter.o walt_cpufreq_cycle_cntr_driver.o walt_gclk_cycle_counter_driver.o walt_cycles.o debugfs.o pipeline.o smart_freq.o walt_storage_lb.o mvp_locking.o
+ ccflags-y += -I$(srctree) -I$(src) -I$(src)/../../../include -I$(src)/../../../include/uapi
+ ccflags-y += -DCONFIG_SCHED_WALT_MODULE=1 -DCONFIG_QCOM_SOCINFO_MODULE=1 -DCONFIG_ARM_QCOM_CPUFREQ_HW_MODULE=1
+-KBUILD_EXTRA_SYMBOLS += $(src)/../../../Module.symvers

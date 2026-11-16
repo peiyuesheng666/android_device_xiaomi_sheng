@@ -1,0 +1,26 @@
+diff --git a/build/soong/Android.bp b/build/soong/Android.bp
+index 237f7aa..ed25f83 100644
+--- a/build/soong/Android.bp
++++ b/build/soong/Android.bp
+@@ -48,12 +48,20 @@ lineage_generator {
+     dep_root: "$(TARGET_KERNEL_SOURCE)",
+     dep_files: [
+         "Makefile",
++        "Kbuild",
++        "Kconfig",
+         "include/**/*",
+         "arch/$(KERNEL_ARCH)/include/**/*",
++        "scripts/**/*",
+         "techpack/audio/include/**/*",
+     ],
+ 
+-    tool_files: [":clean_headers.sh"],
++    tool_files: [
++        ":clean_headers.sh",
++        ":bionic_kernel_clean_header_tools",
++        ":py-clang-srcs",
++        ":libclang",
++    ],
+ }
+ 
+ lineage_generator {

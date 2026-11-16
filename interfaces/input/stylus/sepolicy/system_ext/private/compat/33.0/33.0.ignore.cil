@@ -1,0 +1,4 @@
+;; The board stylus app has no counterpart in the older system_ext policy.
+(type new_objects)
+(typeattribute new_objects)
+(typeattributeset new_objects (new_objects sheng_stylus_app))

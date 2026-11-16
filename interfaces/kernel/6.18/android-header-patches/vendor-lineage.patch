@@ -1,0 +1,175 @@
+diff --git a/build/soong/Android.bp b/build/soong/Android.bp
+index 237f7aa..2d944c3 100644
+--- a/build/soong/Android.bp
++++ b/build/soong/Android.bp
+@@ -48,12 +48,22 @@ lineage_generator {
+     dep_root: "$(TARGET_KERNEL_SOURCE)",
+     dep_files: [
+         "Makefile",
++        "Kbuild",
++        "Kconfig",
+         "include/**/*",
++        "arch/$(KERNEL_ARCH)/Makefile",
+         "arch/$(KERNEL_ARCH)/include/**/*",
++        "arch/$(KERNEL_ARCH)/tools/**/*",
++        "scripts/**/*",
+         "techpack/audio/include/**/*",
+     ],
+ 
+-    tool_files: [":clean_headers.sh"],
++    tool_files: [
++        ":clean_headers.sh",
++        ":bionic_kernel_clean_header_tools",
++        ":py-clang-srcs",
++        ":libclang",
++    ],
+ }
+ 
+ lineage_generator {
+diff --git a/build/soong/generator/generator.go b/build/soong/generator/generator.go
+index c70ef5f..c743058 100644
+--- a/build/soong/generator/generator.go
++++ b/build/soong/generator/generator.go
+@@ -221,6 +221,61 @@ func (g *Module) GenerateAndroidBuildActions(ctx android.ModuleContext) {
+ 		}
+ 	}
+ 
++	// Out-of-tree BSP headers are not exported by modern kernel headers_install.
++	// Declare every input, then use that kernel's normal UAPI preprocessing.
++	additionalHeaders := map[string]android.Path{}
++	additionalOrder := []string{}
++	lineageVars := ctx.Config().VendorConfig("lineageVarsPlugin")
++	if ctx.ModuleName() == "generated_kernel_includes" {
++		excludedInputs := map[string]bool{}
++		for _, path := range strings.Fields(ctx.Config().VendorConfig("lineageKernelHeaders").String("excluded_uapi_files")) {
++			excludedInputs[path] = false
++		}
++		for _, root := range strings.Fields(ctx.Config().VendorConfig("lineageKernelHeaders").String("additional_uapi_dirs")) {
++			if filepath.IsAbs(root) || filepath.Clean(root) != root || strings.HasPrefix(root, "../") {
++				ctx.ModuleErrorf("invalid supplemental UAPI root %q", root)
++				return
++			}
++			paths, err := ctx.GlobWithDeps(filepath.Join(root, "**/*.h"), nil)
++			if err != nil || len(paths) == 0 {
++				ctx.ModuleErrorf("supplemental UAPI root %q has no headers: %v", root, err)
++				return
++			}
++			for _, path := range paths {
++				if _, excluded := excludedInputs[path]; excluded {
++					excludedInputs[path] = true
++					continue
++				}
++				relative, err := filepath.Rel(root, path)
++				if err != nil {
++					ctx.ModuleErrorf("invalid supplemental UAPI header %q: %v", path, err)
++					return
++				}
++				// Supplemental BSP interfaces must never replace the selected kernel's UAPI.
++				// ExistentPathForSource also tracks additions/removals for graph regeneration.
++				coreHeader := android.ExistentPathForSource(ctx,
++					lineageVars.String("TARGET_KERNEL_SOURCE"), "include/uapi", relative)
++				if coreHeader.Valid() {
++					continue
++				}
++				if previous, exists := additionalHeaders[relative]; exists {
++					ctx.ModuleErrorf("duplicate supplemental UAPI destination %q: %s and %s", relative, previous, path)
++					return
++				}
++				input := android.PathForSourceRelaxed(ctx, path)
++				additionalHeaders[relative] = input
++				additionalOrder = append(additionalOrder, relative)
++				g.inputDeps = append(g.inputDeps, input)
++			}
++		}
++		for path, matched := range excludedInputs {
++			if !matched {
++				ctx.ModuleErrorf("supplemental UAPI exclusion does not match an input: %s", path)
++				return
++			}
++		}
++	}
++
+ 	cmd := lineageExpandVariables(ctx, String(g.properties.Cmd))
+ 
+ 	rawCommand, err := android.Expand(cmd, func(name string) (string, error) {
+@@ -236,7 +291,7 @@ func (g *Module) GenerateAndroidBuildActions(ctx android.ModuleContext) {
+ 				return tools[toolFiles[0].Rel()].String(), nil
+ 			}
+ 		case "genDir":
+-			return android.PathForModuleGen(ctx).String(), nil
++			return "${PWD}/generated", nil
+ 		default:
+ 			if strings.HasPrefix(name, "location ") {
+ 				label := strings.TrimSpace(strings.TrimPrefix(name, "location "))
+@@ -260,21 +315,40 @@ func (g *Module) GenerateAndroidBuildActions(ctx android.ModuleContext) {
+ 
+ 	genDir := android.PathForModuleGen(ctx)
+ 	manifestPath := android.PathForModuleOut(ctx, "generator.sbox.textproto")
++	sandboxOut := android.PathForModuleOut(ctx, "sandbox")
++	archive := android.PathForModuleOut(ctx, "sandbox", "generated.tar")
+ 
+-	// Use a RuleBuilder to create a rule that runs the command inside an sbox sandbox.
+-	rule := android.NewRuleBuilder(pctx, ctx).Sbox(genDir, manifestPath)
+-
++	// Export the entire generated tree through a declared sandbox output.
++	// A dummy stamp alone drops all headers when sbox removes its working tree.
++	rule := android.NewRuleBuilder(pctx, ctx).Sbox(sandboxOut, manifestPath)
++	rule.Command().Text("mkdir -p __SBOX_SANDBOX_DIR__/generated")
+ 	rule.Command().
+ 		Text(rawCommand).
+-		ImplicitOutput(dummyDep).
+ 		Implicits(g.inputDeps).
+ 		Implicits(g.implicitDeps)
++	for _, relative := range additionalOrder {
++		output := "__SBOX_SANDBOX_DIR__/generated/usr/include/" + relative
++		rule.Command().Text("mkdir -p").Text(filepath.Dir(output))
++		rule.Command().Text("objtree=__SBOX_SANDBOX_DIR__/generated sh").
++			Input(android.PathForSourceRelaxed(ctx, filepath.Join(lineageVars.String("TARGET_KERNEL_SOURCE"), "scripts/headers_install.sh"))).
++			Input(additionalHeaders[relative]).Text(output)
++	}
+ 
+-	rule.Command().Text("touch").Output(dummyDep)
++	rule.Command().Text("tar -cf").Output(archive).
++		Text("-C __SBOX_SANDBOX_DIR__/generated .")
++	rule.Build("generator", "generate")
+ 
+-	g.outputDeps = append(g.outputDeps, dummyDep)
++	// Publish headers only after generation and cleaning both succeed.
++	// Replacing this private directory also removes headers deleted upstream.
++	unpack := android.NewRuleBuilder(pctx, ctx)
++	unpack.Command().Text("rm -rf").Text(genDir.String())
++	unpack.Command().Text("mkdir -p").Text(genDir.String())
++	unpack.Command().Text("tar -xf").Input(archive).
++		Text("-C").Text(genDir.String())
++	unpack.Command().Text("touch").Output(dummyDep)
++	unpack.Build("generator_unpack", "publish generated files")
+ 
+-	rule.Build("generator", "generate")
++	g.outputDeps = append(g.outputDeps, dummyDep)
+ }
+ 
+ func NewGenerator() *Module {
+diff --git a/tools/clean_headers.sh b/tools/clean_headers.sh
+index 3a12160..00c1d28 100755
+--- a/tools/clean_headers.sh
++++ b/tools/clean_headers.sh
+@@ -3,7 +3,16 @@ set -eu
+ 
+ export ANDROID_BUILD_TOP="$PWD"
+ 
++# Resolve once so the cleaner never interprets a build output as an input header.
++header_root=$(realpath -e -- "$1")
++for header in asm/signal.h asm-generic/signal.h linux/eventpoll.h; do
++    if [[ ! -s "$header_root/usr/include/$header" ]]; then
++        echo "Missing generated kernel header: $header_root/usr/include/$header" >&2
++        exit 1
++    fi
++done
++
+ ./bionic/libc/kernel/tools/clean_header.py -u \
+-    "$1/usr/include/asm/signal.h" \
+-    "$1/usr/include/asm-generic/signal.h" \
+-    "$1/usr/include/linux/eventpoll.h"
++    "$header_root/usr/include/asm/signal.h" \
++    "$header_root/usr/include/asm-generic/signal.h" \
++    "$header_root/usr/include/linux/eventpoll.h"

@@ -1,0 +1,36 @@
+--- a/buildmodules.sh
++++ b/buildmodules.sh
+@@ -22,9 +22,14 @@
+ run gki-modules "${make_cmd[@]}" modules
+ "$PYTHON" "$PROJECT_ROOT/tools/module-btf.py" extract --kernel "$output/vmlinux" --output "$output/kernel-module-base.btf"
+ awk -F '\t' '$3 == "vmlinux"' "$output/Module.symvers" | sort > "$output/kernel-symbols.before"
+-run soc "${make_cmd[@]}" "M=$soc" modules
++# QTI's original qti_ops depend on the canonical battery-manager provider.
++# A real single-module Kbuild target emits its own complete Module.symvers.
++pogo=$K618/sheng-ports/pogo
++run tablet-utils-first "${make_cmd[@]}" "M=$pogo" "SOC=$soc" xm_utils.ko
++early_utils_symbols=$pogo/Module.symvers
++run soc "${make_cmd[@]}" "M=$soc" modules "KBUILD_EXTRA_SYMBOLS=$early_utils_symbols"
+ run walt "${make_cmd[@]}" "M=$soc/kernel/sched/walt" modules "KBUILD_EXTRA_SYMBOLS=$soc/Module.symvers"
+-symbols=("$soc/Module.symvers")
++symbols=("$soc/Module.symvers" "$early_utils_symbols")
+ legacy=$K618/vendor/xiaomi/adsprpc-515
+ rpc_flags=("SOC=$soc" CONFIG_ARCH_KALAMA=y
+   "NOSTDINC_FLAGS=-nostdinc -I$soc/include -I$soc/include/uapi"
+@@ -77,8 +82,14 @@
+ done < <(jq -c '.modules[]' "$plan")
+ for group in pogo cs35l43 touch fingerprint hall keyboard ps5169; do
+   stage=$K618/sheng-ports/$group
+-  run "tablet-$group" "${make_cmd[@]}" "M=$stage" modules "SOC=$soc" "KBUILD_EXTRA_SYMBOLS=${symbols[*]}"
+-  symbols+=("$stage/Module.symvers")
++  # Do not import a module's own exports through KBUILD_EXTRA_SYMBOLS. Pogo
++  # regenerates this same file with both utils and the original consumers.
++  extra_symbols=()
++  for path in "${symbols[@]}"; do
++    [ "$path" = "$stage/Module.symvers" ] || extra_symbols+=("$path")
++  done
++  run "tablet-$group" "${make_cmd[@]}" "M=$stage" modules "SOC=$soc" "KBUILD_EXTRA_SYMBOLS=${extra_symbols[*]}"
++  symbols=("${extra_symbols[@]}" "$stage/Module.symvers")
+ done
+ run loader "${make_cmd[@]}" "M=$K618/mark" modules
+ mapping=$PROJECT_ROOT/profiles/module-sources.json

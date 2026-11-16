@@ -1,0 +1,68 @@
+--- a/k618/soc/net/wireless/core.h
++++ b/k618/soc/net/wireless/core.h
+@@ -578,17 +578,6 @@
+  */
+ #define CFG80211_DEV_WARN_ON(cond)	({bool __r = (cond); __r; })
+ #endif
+-
+-static inline struct wiphy_work *wdev_to_pmsr_wk(struct wireless_dev *wdev)
+-{
+-	return (struct wiphy_work *)&wdev->pmsr_free_wk;
+-}
+-
+-static inline struct wireless_dev *pmsr_wk_to_wdev(struct wiphy_work *work)
+-{
+-	return container_of((struct work_struct *)work,
+-			    struct wireless_dev, pmsr_free_wk);
+-}
+ 
+ void cfg80211_release_pmsr(struct wireless_dev *wdev, u32 portid);
+ void cfg80211_pmsr_wdev_down(struct wireless_dev *wdev);
+--- a/k618/soc/net/wireless/core.c
++++ b/k618/soc/net/wireless/core.c
+@@ -1577,14 +1577,12 @@
+ 
+ void cfg80211_init_wdev(struct wireless_dev *wdev)
+ {
+-	BUILD_BUG_ON(sizeof(struct wiphy_work) > sizeof(struct work_struct));
+-
+ 	INIT_LIST_HEAD(&wdev->event_list);
+ 	spin_lock_init(&wdev->event_lock);
+ 	INIT_LIST_HEAD(&wdev->mgmt_registrations);
+ 	INIT_LIST_HEAD(&wdev->pmsr_list);
+ 	spin_lock_init(&wdev->pmsr_lock);
+-	wiphy_work_init(wdev_to_pmsr_wk(wdev), cfg80211_pmsr_free_wk);
++	wiphy_work_init(&wdev->pmsr_free_wk, cfg80211_pmsr_free_wk);
+ 
+ #ifdef CONFIG_CFG80211_WEXT
+ 	wdev->wext.default_key = -1;
+--- a/k618/soc/net/wireless/pmsr.c
++++ b/k618/soc/net/wireless/pmsr.c
+@@ -809,7 +809,8 @@
+ 
+ void cfg80211_pmsr_free_wk(struct wiphy *wiphy, struct wiphy_work *work)
+ {
+-	struct wireless_dev *wdev = pmsr_wk_to_wdev(work);
++	struct wireless_dev *wdev = container_of(work, struct wireless_dev,
++						 pmsr_free_wk);
+ 
+ 	cfg80211_pmsr_process_abort(wdev);
+ }
+@@ -826,7 +827,7 @@
+ 	}
+ 	spin_unlock_bh(&wdev->pmsr_lock);
+ 
+-	wiphy_work_cancel(wdev->wiphy, wdev_to_pmsr_wk(wdev));
++	wiphy_work_cancel(wdev->wiphy, &wdev->pmsr_free_wk);
+ 	if (found)
+ 		cfg80211_pmsr_process_abort(wdev);
+ 
+@@ -841,7 +842,7 @@
+ 	list_for_each_entry(req, &wdev->pmsr_list, list) {
+ 		if (req->nl_portid == portid) {
+ 			req->nl_portid = 0;
+-			wiphy_work_queue(wdev->wiphy, wdev_to_pmsr_wk(wdev));
++			wiphy_work_queue(wdev->wiphy, &wdev->pmsr_free_wk);
+ 		}
+ 	}
+ 	spin_unlock_bh(&wdev->pmsr_lock);

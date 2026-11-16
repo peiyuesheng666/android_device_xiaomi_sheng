@@ -1,0 +1,21 @@
+{
+  "source": "Original sheng firmware partition dump",
+  "sha256": {
+    "product/app/MiDevAuthService/MiDevAuthService.apk": "e06972fad8d9d2c5173c0b8ed136f582f93dc9a30a5a0c1f3a6c387f04f4a64c",
+    "odm/bin/hw/vendor.xiaomi.hardware.keyboardnanoapp@1.0-service": "d6ee2628057bd50186393e53831fb03c0171933bbbf2f936d2a5bd39cf38df1e",
+    "vendor/lib64/vendor.xiaomi.hardware.keyboardnanoapp@1.0.so": "698618574b6673bdde3155779255b2ed8e050b5055ac53a430627fbd65b3a58f",
+    "odm/etc/init/vendor.xiaomi.hardware.keyboardnanoapp@1.0-service.rc": "9d828054062b1ed7a19544780b7eb76ecdeb6067a9b6bdd7756839f5f8fdab3c",
+    "odm/etc/vintf/manifest/vendor.xiaomi.hardware.keyboardnanoapp@1.0_manifest.xml": "e4518b6db7ad741fd0495912e4c029484b3c0cea81d3e0598c71f301e67fa793",
+    "odm/bin/midevauthd": "9c80b8d83597f5429ef6cc170712c3213b952edba77350eaf85bbf4b79f13199",
+    "odm/lib64/libmidevauth.so": "e1a23bc47c10658746038c696e3db4607a69176902496db73f9dd0ef437a09b3",
+    "odm/lib64/vendor.xiaomi.hardware.midevauth@1.0.so": "6512d9b4cbcfcb0afb30388088bd56f79392f4ac61a2f06d2aa6832e3687e8bd",
+    "odm/etc/init/vendor.xiaomi.hardware.midevauth@1.0-service.rc": "045c4f5e21969b07cef42c20a69cfe4d90ac25e3136ea49062207fdbd67e7b8c",
+    "odm/etc/vintf/manifest/manifest_vendor.xiaomi.hardware.midevauth.xml": "384e2506343d44332e62436df2a079258d106b352f3f3354d4fa0544b6f09143",
+    "odm/bin/mtd@1.3": "3a08d463ba61f505288fcdab7880167fe76357d59a4cfb1de6ef00e07120bc2f",
+    "odm/lib64/libmt@1.3.so": "2d1247466e5827f567d928189c4769d8cf1dc53e993f38acc72be3cbafa0922c"
+  },
+  "signer_certificate_sha256": "c9009d01ebf9f5d0302bc71b2fe9aa9a47a432bba17308a3111b75d7b2149025",
+  "apk_policy": "PRESIGNED, preprocessed; original APK and authentication decisions unchanged",
+  "scope": "Signer plus exact package name; no global OEM signer privilege grant",
+  "mtd_interfaces": "Use existing hardware/xiaomi 1.0\u20131.3 HIDL libraries in vendor/lib64"
+}

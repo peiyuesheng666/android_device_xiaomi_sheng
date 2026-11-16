@@ -1,0 +1,266 @@
+--- a/xiaomi/xiaomi_touch_core.c
++++ b/xiaomi/xiaomi_touch_core.c
+@@ -79,7 +79,6 @@
+ 	netlink_cfg.groups = 0;
+ 	netlink_cfg.flags = 0;
+ 	netlink_cfg.input = nl_data_ready;
+-	netlink_cfg.cb_mutex = NULL;
+ 	nl_sk = netlink_kernel_create(&init_net, NETLINK_TEST, &netlink_cfg);
+ 
+ 	if (!nl_sk) {
+@@ -184,6 +183,9 @@
+ 	xiaomi_touch_data_t *xiaomi_touch_data = get_xiaomi_touch_data(touch_id);
+ 
+ 	common_data_t *common_data = NULL;
++
++	if (length < 0 || length > CMD_DATA_BUF_SIZE || (length && !data))
++		return;
+ 
+ 	if (!xiaomi_touch_data)
+ 		return;
+@@ -991,7 +993,7 @@
+ 	return 0;
+ }
+ 
+-static int xiaomi_touch_remove(struct platform_device *pdev)
++static void xiaomi_touch_remove(struct platform_device *pdev)
+ {
+ 	LOG_INFO("enter");
+ 	xiaomi_touch_evdev_remove();
+@@ -1004,7 +1006,6 @@
+ 	knock_node_release();
+ #endif
+ 	LOG_INFO("over");
+-	return 0;
+ }
+ 
+ #if defined(TOUCH_PLATFORM_XRING)
+--- a/xiaomi/xiaomi_touch_mode.c
++++ b/xiaomi/xiaomi_touch_mode.c
+@@ -653,6 +653,11 @@
+ 			LOG_ERROR("copy cmd from user failed, return! value %d", copy_size);
+ 			mutex_unlock(&ioctl_operation_mutex);
+ 			return -1;
++		}
++
++		if (common_data.data_len > CMD_DATA_BUF_SIZE) {
++			mutex_unlock(&ioctl_operation_mutex);
++			return -EINVAL;
+ 		}
+ 
+ 		if (client_private_data->touch_id != common_data.touch_id) {
+--- a/xiaomi/xiaomi_touch_operations.c
++++ b/xiaomi/xiaomi_touch_operations.c
+@@ -18,6 +18,8 @@
+ static int xiaomi_touch_dev_open(struct inode *inode, struct file *file)
+ {
+ 	private_data_t *client_private_data = kzalloc_retry(sizeof(private_data_t), 3);
++	static_assert(sizeof(common_data_t) == 520);
++	static_assert(sizeof(hardware_param_t) == 214);
+ 	if (!client_private_data) {
+ 		LOG_ERROR("alloc private memory failed!");
+ 		return -1;
+@@ -321,7 +323,7 @@
+ 	.unlocked_ioctl = xiaomi_touch_dev_ioctl,
+ 	.compat_ioctl = xiaomi_touch_dev_ioctl,
+ 	.release = xiaomi_touch_dev_release,
+-	.llseek = no_llseek,
++	.llseek = NULL,
+ };
+ 
+ static struct miscdevice misc_dev = {
+--- a/xiaomi/xiaomi_touch_type_common.h
++++ b/xiaomi/xiaomi_touch_type_common.h
+@@ -3,7 +3,7 @@
+ 
+ #include <linux/types.h>
+ 
+-#define CMD_DATA_BUF_SIZE	256
++#define CMD_DATA_BUF_SIZE	128
+ #define FOD_VALUE_LEN 5
+ /*
+ typedef uint32_t u32;
+--- a/p81/nt36532/nt36xxx.c
++++ b/p81/nt36532/nt36xxx.c
+@@ -68,7 +68,23 @@
+ 
+ extern int pen_charge_state_notifier_register_client(struct notifier_block *nb);
+ extern int pen_charge_state_notifier_unregister_client(struct notifier_block *nb);
+-extern ssize_t mi_dsi_panel_lockdown_info_read(unsigned char *plockdowninfo);
++/* N81A's bootloader publishes these bytes in SMEM item 500 (MiCode parser). */
++#include <linux/soc/qcom/smem.h>
++static ssize_t mi_dsi_panel_lockdown_info_read(unsigned char *info)
++{
++	size_t size;
++	const void *data;
++
++	if (!info)
++		return -EINVAL;
++	data = qcom_smem_get(QCOM_SMEM_HOST_ANY, 500, &size);
++	if (IS_ERR(data))
++		return PTR_ERR(data);
++	if (size < 8)
++		return -EINVAL;
++	memcpy(info, data, 8);
++	return info[0];
++}
+ static int32_t nvt_ts_suspend(struct device *dev);
+ static int32_t nvt_ts_resume(struct device *dev);
+ static int32_t nvt_ts_resume_suspend(bool is_resume, u8 gesture_type);
+@@ -2236,12 +2252,8 @@
+ 	ts->pen_support = of_property_read_bool(np, "novatek,pen-support");
+ 	NVT_LOG("novatek,pen-support=%d\n", ts->pen_support);
+ 
+-	ts->lcd_id_gpio = of_get_named_gpio(np, "novatek,lcd_id-gpio", 0);
+-	NVT_LOG("novatek,lcd_id-gpio=%d\n", ts->lcd_id_gpio);
+-	gpio_direction_input(ts->lcd_id_gpio);
+-	/* read id pin value, 0 is CSOT, 1 is BOE */
+-	ts->lcd_id_value = gpio_get_value(ts->lcd_id_gpio);
+-	NVT_LOG("lcd_id_value = %d, this panel is %s", ts->lcd_id_value, ts->lcd_id_value ? "BOE" : "CSOT");
++	/* sheng N81A CSOT, verified by panel-id above. */
++	ts->lcd_id_value = 0;
+ 
+ 	ret = of_property_read_u32(np, "novatek,spi-rd-fast-addr", &SPI_RD_FAST_ADDR);
+ 	if (ret) {
+@@ -3071,8 +3083,8 @@
+ }
+ #endif //NVT_PARSE_DATA_ENABLE
+ 
+-#define XM_HTC_DEFAULT_FINGER_PACKET_LEN   0x04C3
+-#define XM_HTC_DEFAULT_STYLUS_PACKET_LEN   0x050D
++#define XM_HTC_DEFAULT_FINGER_PACKET_LEN   0x04BB
++#define XM_HTC_DEFAULT_STYLUS_PACKET_LEN   0x0505
+ 
+ static irqreturn_t nvt_ts_work_func_irq_handler(int irq, void *data)
+ {
+@@ -4717,10 +4729,33 @@
+ 	/*set priority to 99*/
+ 	struct sched_param par = { .sched_priority = MAX_RT_PRIO -1 };
+ 
+-	NVT_LOG("start\n");
++	struct device_node *panel;
++	u64 panel_id;
++	int panel_index;
++	bool sheng_panel = false;
++
++	/* Stock sheng lists a generic panel before its two N81A variants. */
++	for (panel_index = 0; ; panel_index++) {
++		panel = of_parse_phandle(client->dev.of_node, "panel", panel_index);
++		if (!panel)
++			break;
++		panel_id = 0;
++		if (of_device_is_available(panel) &&
++		    !of_property_read_u64(panel, "mi,panel-id", &panel_id) &&
++		    panel_id == 0x4e38316150360200ULL)
++			sheng_panel = true;
++		of_node_put(panel);
++		if (sheng_panel)
++			break;
++	}
++	if (!sheng_panel) {
++		dev_err(&client->dev, "no supported sheng N81A in panel list\n");
++		return -ENODEV;
++	}
++	NVT_LOG("start sheng N81A panel index=%d\n", panel_index);
+ 
+ 	/*set spi controller rt thread priority to 99*/
+-	if(client->controller) {
++	if (client->controller && client->controller->kworker) {
+ 		ret = sched_setscheduler_nocheck(client->controller->kworker->task, SCHED_FIFO, &par);
+ 		if(ret < 0) {
+ 			NVT_ERR("Failed to improve SPI thread prio\n");
+@@ -4776,7 +4811,7 @@
+ 	spi_set_drvdata(client, ts);
+ 
+ 	//---prepare for spi parameter---
+-	if (ts->client->master->flags & SPI_MASTER_HALF_DUPLEX) {
++	if (ts->client->controller->flags & SPI_CONTROLLER_HALF_DUPLEX) {
+ 		NVT_ERR("Full duplex not supported by master\n");
+ 		ret = -EIO;
+ 		goto err_ckeck_full_duplex;
+@@ -5919,5 +5954,5 @@
+ MODULE_DESCRIPTION("Novatek Touchscreen Driver");
+ MODULE_LICENSE("GPL");
+ #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0)
+-MODULE_IMPORT_NS(VFS_internal_I_am_really_a_filesystem_and_am_NOT_a_driver);
+-#endif
++MODULE_IMPORT_NS("VFS_internal_I_am_really_a_filesystem_and_am_NOT_a_driver");
++#endif
+--- a/p81/nt36532/nt36xxx.h
++++ b/p81/nt36532/nt36xxx.h
+@@ -138,10 +138,10 @@
+ #define NVT_M80P_PEN_NAME "NVTCapacitivePenM80p"
+ #define NVT_P81C_PEN_NAME "NVTCapacitivePenP81c"
+ //---Touch info.---3200*2136
+-#define TOUCH_MAX_WIDTH 2136
+-#define TOUCH_MAX_HEIGHT 3200
+-#define PEN_MAX_WIDTH 2136
+-#define PEN_MAX_HEIGHT 3200
++#define TOUCH_MAX_WIDTH 2032
++#define TOUCH_MAX_HEIGHT 3048
++#define PEN_MAX_WIDTH 2032
++#define PEN_MAX_HEIGHT 3048
+ #define TOUCH_RX_NUM 40
+ #define TOUCH_TX_NUM 60
+ #define TOUCH_MAX_FINGER_NUM 10
+@@ -151,7 +151,7 @@
+ #endif
+ #define TOUCH_FORCE_NUM 1
+ //thp start 6.8
+-#define SUPER_RESOLUTION_FACOTR 100
++#define SUPER_RESOLUTION_FACOTR 10
+ //thp end 6.8
+ 
+ //---for Pen---
+@@ -176,16 +176,16 @@
+ #endif
+ #define BOOT_UPDATE_FIRMWARE 1
+ #define BOOT_UPDATE_FIRMWARE_NAME		  "novatek_ts_fw.bin"
+-#define BOOT_UPDATE_FIRMWARE_NAME_CSOT    "novatek_nt36532_piano_fw_csot.bin"
+-#define BOOT_UPDATE_FIRMWARE_NAME_BOE      "novatek_nt36532_piano_fw_boe.bin"
++#define BOOT_UPDATE_FIRMWARE_NAME_CSOT    "novatek_nt36532_n81a_fw_csot.bin"
++#define BOOT_UPDATE_FIRMWARE_NAME_BOE      "sheng-unsupported-panel.bin"
+ #define MP_UPDATE_FIRMWARE_NAME			  "novatek_ts_mp.bin"
+-#define MP_UPDATE_FIRMWARE_NAME_CSOT      "novatek_nt36532_piano_mp_csot.bin"
+-#define MP_UPDATE_FIRMWARE_NAME_BOE        "novatek_nt36532_piano_mp_boe.bin"
++#define MP_UPDATE_FIRMWARE_NAME_CSOT      "novatek_nt36532_n81a_mp_csot.bin"
++#define MP_UPDATE_FIRMWARE_NAME_BOE        "sheng-unsupported-panel-mp.bin"
+ #define NVT36532_DRIVER_VERSION	"nvt_version_2025.08.28-001"
+ 
+ //thp start 6.8
+-#define BOOT_UPDATE_CONFIG_NAME_CSOT  "piano_nova_csot_thp_config.ini"
+-#define BOOT_UPDATE_CONFIG_NAME_BOE    "piano_nova_boe_thp_config.ini"
++#define BOOT_UPDATE_CONFIG_NAME_CSOT  "n81a_nova_thp_config.ini"
++#define BOOT_UPDATE_CONFIG_NAME_BOE    "sheng-unsupported-panel.ini"
+ //thp end 6.8
+ 
+ #define TOUCH_ID 0
+--- a/p81/nt36532/nt36xxx_fw_update.c
++++ b/p81/nt36532/nt36xxx_fw_update.c
+@@ -959,10 +959,24 @@
+ *******************************************************/
+ void Boot_Update_Firmware(struct work_struct *work)
+ {
++	static unsigned int unavailable_retries;
++	int ret;
++
+ 	mutex_lock(&ts->lock);
+-	nvt_update_firmware(BOOT_UPDATE_FIRMWARE_NAME);
+-	if (ts->pen_support)
++	ret = nvt_update_firmware(BOOT_UPDATE_FIRMWARE_NAME);
++	if (!ret && ts->pen_support)
+ 		update_pen_status(true);
+ 	mutex_unlock(&ts->lock);
++	/* sheng loads this module before /vendor firmware paths are mounted.
++	 * Retry missing files asynchronously; never relax any firmware checks.
++	 * Existing remove/shutdown cancels this same delayed_work object.
++	 */
++	if (ret == -ENOENT && unavailable_retries++ < 60) {
++		NVT_LOG("boot firmware unavailable; retry %u in 1s\n", unavailable_retries);
++		queue_delayed_work(system_wq, &ts->nvt_fwu_work, msecs_to_jiffies(1000));
++	} else {
++		NVT_LOG("boot firmware completed ret=%d retries=%u\n", ret, unavailable_retries);
++		unavailable_retries = 0;
++	}
+ }
+ #endif /* BOOT_UPDATE_FIRMWARE */

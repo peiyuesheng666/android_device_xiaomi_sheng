@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<resources>
+    <!-- Preserve the user's existing Night Light control and scheduler.
+         LiveDisplay retains RGB/reading control; actual ambient adaptation
+         uses the independent standard DWB front-CCT path. -->
+    <bool name="config_nightDisplayAvailable">true</bool>
+</resources>

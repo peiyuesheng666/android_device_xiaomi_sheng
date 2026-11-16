@@ -1,0 +1,13 @@
+# SPDX-License-Identifier: Apache-2.0
+# Use the same processor, launch script and corner mapping accepted in r59.
+on init
+    setprop ro.minui.default_touch_rotation ROTATION_RIGHT
+
+on boot
+    start sheng-recovery-touch
+
+service sheng-recovery-touch /system/bin/sh /system/bin/sheng-recovery-touch
+    user root
+    group root system input uhid
+    disabled
+    seclabel u:r:recovery:s0

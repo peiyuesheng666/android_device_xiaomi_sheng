@@ -1,0 +1,4 @@
+# Pogo keyboard's cached connection snapshot.
+genfscon sysfs /devices/virtual/nanodev/nanodev0/_version176x u:object_r:sysfs_sheng_keyboard_state:s0
+genfscon sysfs /devices/platform/soc/8c0000.qcom,qupv3_2_geni_se/884000.i2c/i2c-5/5-004c/misc/nanodev0/connection u:object_r:sysfs_sheng_keyboard_state:s0
+genfscon sysfs /devices/platform/soc/8c0000.qcom,qupv3_2_geni_se/884000.i2c/i2c-5/5-004c/misc/nanodev0/firmware_generation u:object_r:sysfs_sheng_keyboard_state:s0

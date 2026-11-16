@@ -1,0 +1,7 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="org.lineageos.overlay.sheng.attention">
+    <application android:hasCode="false" />
+    <!-- Product overlays take precedence over ODM regardless of ODM priority. -->
+    <overlay android:isStatic="true" android:priority="900"
+        android:targetPackage="android" android:targetName="XiaomiFrameworkResOverlay" />
+</manifest>

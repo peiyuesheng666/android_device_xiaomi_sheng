@@ -1,0 +1,444 @@
+--- /dev/null
++++ b/sheng-ports/keyboard/sheng_touchpad_edge.h
+@@ -0,0 +1,205 @@
++/* SPDX-License-Identifier: GPL-2.0-only */
++/* Reconstructed stock sheng filter; differential tests execute the stock ELF. */
++#ifndef SHENG_TOUCHPAD_EDGE_H
++#define SHENG_TOUCHPAD_EDGE_H
++#ifdef SHENG_TOUCHPAD_HOST_TEST
++#include <errno.h>
++#include <stddef.h>
++#include <stdint.h>
++#include <string.h>
++typedef uint8_t u8;
++typedef uint32_t u32;
++typedef uint64_t u64;
++typedef int64_t s64;
++#else
++#include <linux/errno.h>
++#include <linux/string.h>
++#include <linux/types.h>
++#endif
++
++#define SHENG_TOUCHPAD_REPORT_SIZE 21
++#define SHENG_TOUCHPAD_PARAMETERS 14
++#define SHENG_TOUCHPAD_SLOTS 3
++
++struct sheng_edge_slot {
++	u32 frames;
++	u64 distance;
++	u32 point;
++	u32 state;
++	u8 report;
++	u8 current[6];
++	u8 first[6];
++};
++
++struct sheng_edge_filter {
++	u32 param[SHENG_TOUCHPAD_PARAMETERS];
++	struct sheng_edge_slot slot[SHENG_TOUCHPAD_SLOTS];
++};
++
++static inline u32 sheng_edge_u16(const u8 *p)
++{
++	return p[0] | ((u32)p[1] << 8);
++}
++
++static inline u64 sheng_edge_distance(const u8 *a, const u8 *b)
++{
++	s64 x = (s64)sheng_edge_u16(a + 2) - sheng_edge_u16(b + 2);
++	s64 y = (s64)sheng_edge_u16(a + 4) - sheng_edge_u16(b + 4);
++	return x * x + y * y;
++}
++
++static inline int sheng_edge_in_range(u32 value, u32 min, u32 max)
++{
++	return value >= min && value <= max;
++}
++
++static inline int sheng_edge_at_border(const struct sheng_edge_filter *filter,
++				     const u8 *contact)
++{
++	const u32 *p = filter->param;
++	u32 x = sheng_edge_u16(contact + 2), y = sheng_edge_u16(contact + 4);
++	return sheng_edge_in_range(x, p[0], p[1]) ||
++		sheng_edge_in_range(x, p[2], p[3]) ||
++		sheng_edge_in_range(y, p[4], p[5]) ||
++		sheng_edge_in_range(y, p[6], p[7]);
++}
++
++static inline void sheng_edge_release(struct sheng_edge_slot *slot)
++{
++	slot->frames = 0;
++	slot->distance = 0;
++	memset(slot->first, 0, sizeof(slot->first));
++	slot->state = 1;
++}
++
++/* Returns the number of contacts to deliver, exactly as the shipping driver. */
++static inline int sheng_touchpad_edge(struct sheng_edge_filter *filter,
++				    u8 *packet, size_t len)
++{
++	u8 output[SHENG_TOUCHPAD_REPORT_SIZE] = { 0x19 };
++	unsigned int i, j, count = 0, gesture = 0;
++	unsigned int shielded[SHENG_TOUCHPAD_SLOTS], shielded_count;
++	u32 threshold;
++	if (!filter || !packet || len != SHENG_TOUCHPAD_REPORT_SIZE ||
++	    packet[0] != 0x19 || packet[20] > SHENG_TOUCHPAD_SLOTS)
++		return -EINVAL;
++	/* Reject malformed IDs and duplicate slots before mutating any state. */
++	for (i = 0; i < packet[20]; i++) {
++		if (packet[3 + i * 6] >= SHENG_TOUCHPAD_SLOTS)
++			return -EINVAL;
++		for (j = 0; j < i; j++)
++			if (packet[3 + i * 6] == packet[3 + j * 6])
++				return -EINVAL;
++	}
++	output[1] = packet[1];
++	for (i = 0; i < packet[20]; i++) {
++		const u8 *contact = packet + 2 + i * 6;
++		struct sheng_edge_slot *slot = &filter->slot[contact[1]];
++		memcpy(slot->current, contact, sizeof(slot->current));
++		switch (slot->point) {
++		case 0: slot->point = contact[0] & 1; break;
++		case 1:
++		case 2: slot->point = contact[0] & 1 ? 2 : 3; break;
++		case 3:
++			slot->point = contact[0] & 1 ? 1 : 3;
++			if (!(contact[0] & 1) && !sheng_edge_u16(contact + 2) &&
++			    !sheng_edge_u16(contact + 4))
++				slot->point = 0;
++			break;
++		}
++	}
++	for (i = 0; i < SHENG_TOUCHPAD_SLOTS; i++) {
++		struct sheng_edge_slot *slot = &filter->slot[i];
++		switch (slot->state) {
++		case 0:
++			if (slot->point != 1)
++				break;
++			goto initial_contact;
++		case 1:
++			if (slot->point == 0) {
++				slot->state = 0;
++				slot->report = 1;
++				break;
++			}
++			if (slot->point != 1)
++				break;
++initial_contact:
++			if (packet[1] || !sheng_edge_at_border(filter, slot->current))
++				goto normal_contact;
++			slot->state = 3;
++			memcpy(slot->first, slot->current, sizeof(slot->first));
++			slot->frames++;
++			break;
++		case 2:
++			if (slot->point == 3)
++				sheng_edge_release(slot);
++			slot->report = 1;
++			break;
++		case 3:
++			if (packet[1])
++				goto normal_contact;
++			if (slot->point == 3) {
++				sheng_edge_release(slot);
++				break;
++			}
++			if (slot->point != 2)
++				break;
++			slot->frames++;
++			if (slot->frames >= filter->param[8]) {
++				slot->state = 4;
++				break;
++			}
++			if (!sheng_edge_at_border(filter, slot->current) || gesture)
++				goto normal_contact;
++			shielded_count = 0;
++			for (j = 0; j < SHENG_TOUCHPAD_SLOTS; j++)
++				if (filter->slot[j].state == 2 || filter->slot[j].state == 3)
++					shielded[shielded_count++] = j;
++			threshold = 0;
++			switch (shielded_count) {
++			case 1: gesture = 1; threshold = filter->param[9]; break;
++			case 2:
++				gesture = sheng_edge_distance(packet + 2 + 6 * shielded[0],
++					packet + 2 + 6 * shielded[1]) < filter->param[13] ? 2 : 3;
++				threshold = filter->param[gesture == 2 ? 10 : 11];
++				break;
++			case 3: gesture = 4; threshold = filter->param[12]; break;
++			}
++			for (j = 0; j < shielded_count; j++) {
++				struct sheng_edge_slot *other = &filter->slot[shielded[j]];
++				if (other->state != 3)
++					continue;
++				other->distance = sheng_edge_distance(other->first, other->current);
++				if (other->distance <= threshold) {
++					gesture = 0;
++					break;
++				}
++			}
++			if (!gesture)
++				break;
++normal_contact:
++			slot->state = 2;
++			slot->report = 1;
++			break;
++		case 4:
++			if (packet[1])
++				goto normal_contact;
++			if (slot->point == 3)
++				sheng_edge_release(slot);
++			break;
++		}
++	}
++	for (i = 0; i < SHENG_TOUCHPAD_SLOTS; i++) {
++		struct sheng_edge_slot *slot = &filter->slot[i];
++		if (!slot->report)
++			continue;
++		memcpy(output + 2 + 6 * count, slot->current, sizeof(slot->current));
++		output[3 + 6 * count] = i;
++		slot->report = 0;
++		count++;
++	}
++	output[20] = count;
++	memcpy(packet, output, sizeof(output));
++	return count;
++}
++#endif
+--- /dev/null
++++ b/sheng-ports/keyboard/sheng_touchpad_filter.c
+@@ -0,0 +1,186 @@
++// SPDX-License-Identifier: GPL-2.0-only
++/* Stock sheng touchpad filter and parameter ABI for the original MCU reports. */
++#include <linux/device.h>
++#include <linux/module.h>
++#include <linux/mutex.h>
++#include <linux/of.h>
++#include <linux/slab.h>
++#include "sheng_touchpad_edge.h"
++
++static DEFINE_MUTEX(edge_lock);
++static struct sheng_edge_filter edge;
++static bool configured, enabled;
++static struct class *keyboard_class;
++static struct device *touchpad_device;
++
++/* Exact order of param_list in stock xiaomi_keyboard_driver.ko. */
++static const char * const param_names[SHENG_TOUCHPAD_PARAMETERS] = {
++	"touchpad,edge-area-left-min", "touchpad,edge-area-left-max",
++	"touchpad,edge-area-right-min", "touchpad,edge-area-right-max",
++	"touchpad,edge-area-top-min", "touchpad,edge-area-top-max",
++	"touchpad,edge-area-bottom-min", "touchpad,edge-area-bottom-max",
++	"touchpad,shield-frame-count-limit", "touchpad,one-swipe-dis-limit",
++	"touchpad,two-swipe-dis-limit", "touchpad,two-pinch-dis-limit",
++	"touchpad,three-swipe-dis-limit", "touchpad,two-fingers-gesture-dis",
++};
++
++int xiaomi_touchpad_edge_filter_param_init(struct device_node *node)
++{
++	u32 values[SHENG_TOUCHPAD_PARAMETERS];
++	unsigned int i;
++	int ret;
++	if (!node)
++		return -EINVAL;
++	for (i = 0; i < ARRAY_SIZE(values); i++) {
++		ret = of_property_read_u32(node, param_names[i], &values[i]);
++		if (ret)
++			return ret;
++	}
++	mutex_lock(&edge_lock);
++	memcpy(edge.param, values, sizeof(values));
++	memset(edge.slot, 0, sizeof(edge.slot));
++	configured = true;
++	enabled = true;
++	mutex_unlock(&edge_lock);
++	return 0;
++}
++EXPORT_SYMBOL(xiaomi_touchpad_edge_filter_param_init);
++
++int xiaomi_touchpad_edge_filter(u8 *packet)
++{
++	int ret;
++	mutex_lock(&edge_lock);
++	if (!configured)
++		ret = -ENODATA;
++	else if (!enabled)
++		/* Shipping caller forwards the unfiltered frame when disabled. */
++		ret = -EINVAL;
++	else {
++		ret = sheng_touchpad_edge(&edge, packet, SHENG_TOUCHPAD_REPORT_SIZE);
++		if (ret == -EINVAL)
++			ret = -EPROTO;
++	}
++	mutex_unlock(&edge_lock);
++	return ret;
++}
++EXPORT_SYMBOL(xiaomi_touchpad_edge_filter);
++
++static ssize_t edge_filter_enable_show(struct device *dev,
++		struct device_attribute *attr, char *buf)
++{
++	ssize_t ret;
++	mutex_lock(&edge_lock);
++	ret = configured ? sysfs_emit(buf, "%u\n", enabled) : -ENODATA;
++	mutex_unlock(&edge_lock);
++	return ret;
++}
++
++static ssize_t edge_filter_enable_store(struct device *dev,
++		struct device_attribute *attr, const char *buf, size_t count)
++{
++	bool value;
++	if (sysfs_streq(buf, "1"))
++		value = true;
++	else if (sysfs_streq(buf, "0"))
++		value = false;
++	else
++		return -EINVAL;
++	mutex_lock(&edge_lock);
++	if (!configured) {
++		mutex_unlock(&edge_lock);
++		return -ENODATA;
++	}
++	enabled = value;
++	mutex_unlock(&edge_lock);
++	return count;
++}
++static DEVICE_ATTR_RW(edge_filter_enable);
++
++static ssize_t edge_filter_param_show(struct device *dev,
++		struct device_attribute *attr, char *buf)
++{
++	size_t len = 0;
++	unsigned int i;
++	mutex_lock(&edge_lock);
++	if (!configured) {
++		mutex_unlock(&edge_lock);
++		return -ENODATA;
++	}
++	for (i = 0; i < ARRAY_SIZE(param_names); i++)
++		len += sysfs_emit_at(buf, len, "%s: %u\n", param_names[i], edge.param[i]);
++	for (i = 0; i < ARRAY_SIZE(param_names); i++)
++		len += sysfs_emit_at(buf, len, "%u ", edge.param[i]);
++	len += sysfs_emit_at(buf, len, "\n");
++	mutex_unlock(&edge_lock);
++	return len;
++}
++
++static ssize_t edge_filter_param_store(struct device *dev,
++		struct device_attribute *attr, const char *buf, size_t count)
++{
++	u32 values[SHENG_TOUCHPAD_PARAMETERS];
++	char *copy, *cursor, *token;
++	unsigned int n = 0;
++	int ret = 0;
++	copy = kstrndup(buf, count, GFP_KERNEL);
++	if (!copy)
++		return -ENOMEM;
++	cursor = copy;
++	while ((token = strsep(&cursor, " \t\n"))) {
++		if (!*token)
++			continue;
++		if (n >= ARRAY_SIZE(values)) {
++			ret = -E2BIG;
++			break;
++		}
++		ret = kstrtou32(token, 10, &values[n]);
++		if (ret)
++			break;
++		n++;
++	}
++	if (!ret && n != ARRAY_SIZE(values))
++		ret = -EINVAL;
++	if (!ret) {
++		mutex_lock(&edge_lock);
++		if (!configured)
++			ret = -ENODATA;
++		else
++			memcpy(edge.param, values, sizeof(values));
++		mutex_unlock(&edge_lock);
++	}
++	kfree(copy);
++	return ret ? ret : count;
++}
++static DEVICE_ATTR_RW(edge_filter_param);
++
++static struct attribute *touchpad_attrs[] = {
++	&dev_attr_edge_filter_enable.attr,
++	&dev_attr_edge_filter_param.attr,
++	NULL,
++};
++ATTRIBUTE_GROUPS(touchpad);
++
++static int __init sheng_touchpad_filter_init(void)
++{
++	keyboard_class = class_create("keyboard");
++	if (IS_ERR(keyboard_class))
++		return PTR_ERR(keyboard_class);
++	touchpad_device = device_create_with_groups(keyboard_class, NULL, 0, NULL,
++					    touchpad_groups, "touchpad");
++	if (IS_ERR(touchpad_device)) {
++		int ret = PTR_ERR(touchpad_device);
++		class_destroy(keyboard_class);
++		return ret;
++	}
++	return 0;
++}
++
++static void __exit sheng_touchpad_filter_exit(void)
++{
++	device_unregister(touchpad_device);
++	class_destroy(keyboard_class);
++}
++module_init(sheng_touchpad_filter_init);
++module_exit(sheng_touchpad_filter_exit);
++MODULE_LICENSE("GPL");
++MODULE_DESCRIPTION("Original sheng touchpad edge filter and parameter control");
+--- a/sheng-ports/keyboard/Kbuild
++++ b/sheng-ports/keyboard/Kbuild
+@@ -1,3 +1,5 @@
+ # SPDX-License-Identifier: GPL-2.0-only
+ obj-m += nanosic_driver.o
+ nanosic_driver-y := sheng_nanosic.o
++obj-m += xiaomi_keyboard_driver.o
++xiaomi_keyboard_driver-y := sheng_touchpad_filter.o
+--- a/sheng-ports/keyboard/sheng_nanosic.c
++++ b/sheng-ports/keyboard/sheng_nanosic.c
+@@ -75,6 +75,8 @@
+ #include "sheng_nanosic_bridge.h"
+ #include "sheng_nanosic_power.h"
+ #include "sheng_nanosic_connection.h"
++extern int xiaomi_touchpad_edge_filter_param_init(struct device_node *node);
++extern int xiaomi_touchpad_edge_filter(u8 *packet);
+ extern int Nanosic_vendor_raw_data_inject(void *buf, size_t len);
+ extern int Nanosic_charge_i2c_write_callback_register(int (*cb)(void *, size_t));
+ extern int Nanosic_charge_i2c_write_callback_unregister(void);
+@@ -445,9 +447,14 @@
+ 			hid_input_report(nano->hid_consumer, HID_INPUT_REPORT, p, len, 0);
+ 		else if (*p == 0x02 && nano->hid_mouse)
+ 			hid_input_report(nano->hid_mouse, HID_INPUT_REPORT, p, len, 0);
+-		else if (*p == 0x19 && nano->hid_touchpad)
+-			hid_input_report(nano->hid_touchpad, HID_INPUT_REPORT, p, len, 0);
+-		else if (*p >= 0x22) {
++		else if (*p == 0x19 && nano->hid_touchpad) {
++			int filtered = xiaomi_touchpad_edge_filter(p);
++			/* Stock -EINVAL means the user explicitly disabled the filter. */
++			if (filtered > 0 || filtered == -EINVAL)
++				hid_input_report(nano->hid_touchpad, HID_INPUT_REPORT, p, len, 0);
++			else if (filtered < 0)
++				dev_warn_ratelimited(nano->dev, "Touchpad frame rejected: %d\n", filtered);
++		} else if (*p >= 0x22) {
+ 			int charge_ret = Nanosic_vendor_raw_data_inject((void *)p, len);
+ 			if (charge_ret && charge_ret != -EOPNOTSUPP)
+ 				dev_warn_ratelimited(nano->dev, "Charge MCU packet rejected: %d\n", charge_ret);
+@@ -781,6 +788,9 @@
+ 	mutex_init(&nano->conn_mutex);
+ 	mutex_init(&nano->clients_lock);
+ 	INIT_LIST_HEAD(&nano->clients);
++	ret = xiaomi_touchpad_edge_filter_param_init(dev->of_node);
++	if (ret)
++		goto free;
+ 	INIT_DELAYED_WORK(&nano->fw_worker, sheng_nano_firmware_worker);
+ 	INIT_DELAYED_WORK(&nano->plugin_worker, sheng_nano_plugin_worker);
+ 	nano->plugin_requested = -1;

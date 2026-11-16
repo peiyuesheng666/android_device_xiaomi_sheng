@@ -1,0 +1,57 @@
+{
+  "pal": {
+    "upstream": "hardware/qcom-caf/sm8550/audio/pal",
+    "revision": "c4949689ac552ce13edc13265ff16c0735994e00",
+    "patch_sha256": "58b49d024bf2fa320eb6e2d4396c6e3f5cd6e2cdbfb6f221b12b32deb2454154"
+  },
+  "sensors": {
+    "upstream": "hardware/xiaomi",
+    "revision": "c3de4412ad6317b820c8cef7c5e80b7cceb4acda",
+    "patch_sha256": "9000a43d1ad27b3e26b51746dbb3f0df40e9fa79e52e8f181ce10b7e956037fc"
+  },
+  "display": {
+    "upstream": "hardware/qcom-caf/sm8550/display",
+    "revision": "d679d895cd1e35d088b67bfd19d9141c76da5207",
+    "patch_sha256": "81ea03de6d583cc795809cdf7fdb38cc9a65605c55664ab66eb5fbe390f5c545"
+  },
+  "display_dal": {
+    "upstream": "hardware/qcom-caf/sm8550/display",
+    "revision": "d679d895cd1e35d088b67bfd19d9141c76da5207",
+    "source_directory": "sdm/libs/dal",
+    "device_directory": "interfaces/display/dal",
+    "header_source": "libdrmutils/drm_interface.h",
+    "stock_dal_sha256": "bf509c5f550abfa3e5bd981d4d6a1a1322057c4e8e76b55f394e6ac43b755263",
+    "stock_submode_size_lp64": 48,
+    "stock_submode_pixel_clock_offset": 40,
+    "changes": ["DRMSubModeInfo LP64 layout", "PopulateDisplayAttributes pixel clock"]
+  },
+  "display_core": {
+    "upstream": "hardware/qcom-caf/sm8550/display",
+    "revision": "d679d895cd1e35d088b67bfd19d9141c76da5207",
+    "source_directory": "sdm/libs/core",
+    "device_directory": "interfaces/display/core",
+    "changes": ["owned stock PPHWAttributes ABI view with native-layout restoration at CreateColorInterface", "device module identity and preferred installation", "explicit state cleanup loops for current libc++ nodiscard compatibility"],
+    "hardware_status": "r14 raw borrowed-view implementation failed; owned-container follow-up pending",
+    "source_hw_resource_bytes_lp64": 616,
+    "stock_hw_resource_bytes_lp64": 608,
+    "source_pp_version_offset_lp64": 1360,
+    "stock_pp_version_offset_lp64": 1352
+  },
+  "display_sde_drm": {
+    "upstream": "hardware/qcom-caf/sm8550/display",
+    "revision": "d679d895cd1e35d088b67bfd19d9141c76da5207",
+    "source_directory": "sde-drm",
+    "device_directory": "interfaces/display/sde-drm",
+    "changes": ["pixel_clk_khz mode property", "exact submode prefix matching"]
+  },
+  "gsl": {
+    "upstream": "hardware/qcom-caf/sm8550/audio/graphservices",
+    "revision": "1d2e82222dbc35b9b2cff966281cd2b7a26d081a",
+    "patch_sha256": "2e70f2a6183d4f616c8dd56c08d75b0d43652cffa802f313cba93d22a88f74cb"
+  },
+  "kernel_uapi": {
+    "upstream": "kernel/xiaomi/sm8550-modules",
+    "revision": "92a9fde479d3262da080cfd28bab0775b0da500a",
+    "patch_sha256": "e64050216ec87bddef7b37a7c8c9d596f215d2620d8e161bcf9c9bad48e1465e"
+  }
+}

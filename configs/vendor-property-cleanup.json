@@ -1,0 +1,9 @@
+{
+  "audio.sys.noisy.broadcast.delay": "600",
+  "audio.sys.offload.pstimeout.secs": "3",
+  "bluetooth.profile.bap.unicast.server.enabled": "true",
+  "bluetooth.profile.tbs.server.enabled": "true",
+  "bluetooth.profile.vc.server.enabled": "true",
+  "persist.vendor.bt.a2dp_offload_cap": "sbc-aptx-aptxtws-aptxhd-aac-ldac-lhdc",
+  "ro.mediaserver.64b.enable": "true"
+}

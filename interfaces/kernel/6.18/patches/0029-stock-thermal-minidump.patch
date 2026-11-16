@@ -1,0 +1,350 @@
+--- a/soc/drivers/thermal/qcom/tsens.c
++++ b/soc/drivers/thermal/qcom/tsens.c
+@@ -20,6 +20,7 @@
+ #include <linux/slab.h>
+ #include <linux/suspend.h>
+ #include <linux/thermal.h>
++#include <linux/thermal_minidump.h>
+ #include "drivers/thermal/thermal_hwmon.h"
+ #include "tsens.h"
+ #include "thermal_zone_internal.h"
+@@ -1166,7 +1167,14 @@
+ 	struct tsens_sensor *s = thermal_zone_device_priv(tz);
+ 	struct tsens_priv *priv = s->priv;
+ 
+-	return priv->ops->get_temp(s, temp);
++	int ret = priv->ops->get_temp(s, temp);
++
++	/* Record only genuine successful readings; retain the hardware result. */
++	if (!ret && priv->tsens_md)
++		thermal_minidump_update_data(priv->tsens_md,
++			(char *)thermal_zone_device_type(tz), temp);
++
++	return ret;
+ }
+ 
+ static int  __maybe_unused tsens_suspend(struct device *dev)
+@@ -1436,6 +1444,15 @@
+ 	return ret;
+ }
+ 
++static void tsens_minidump_release(void *data)
++{
++	struct tsens_priv *priv = data;
++
++	/* Registered before zones and IRQs: devres stops readers first. */
++	thermal_minidump_unregister(priv->tsens_md);
++	priv->tsens_md = NULL;
++}
++
+ static int tsens_probe(struct platform_device *pdev)
+ {
+ 	int ret, i;
+@@ -1503,6 +1520,15 @@
+ 		if (ret < 0)
+ 			return dev_err_probe(dev, ret, "%s: calibration failed\n",
+ 					     __func__);
++	}
++
++	priv->tsens_md = thermal_minidump_register(np ? np->name : dev_name(dev));
++	if (priv->tsens_md) {
++		ret = devm_add_action_or_reset(dev, tsens_minidump_release, priv);
++		if (ret)
++			return ret;
++	} else {
++		dev_warn(dev, "Thermal minidump region registration failed\n");
+ 	}
+ 
+ 	ret = tsens_register(priv);
+--- a/soc/drivers/thermal/qcom/tsens.h
++++ b/soc/drivers/thermal/qcom/tsens.h
+@@ -635,6 +635,8 @@
+  * @ipc_log1: pointer for second ipc log context id
+  * @sensor: list of sensors attached to this device
+  */
++struct minidump_data;
++
+ struct tsens_priv {
+ 	struct device			*dev;
+ 	u32				num_sensors;
+@@ -657,6 +659,8 @@
+ 	struct dentry			*debug;
+ 	void				*ipc_log;
+ 	void				*ipc_log1;
++
++	struct minidump_data		*tsens_md;
+ 
+ 	struct tsens_sensor		sensor[] __counted_by(num_sensors);
+ };
+--- /dev/null
++++ b/soc/drivers/thermal/qcom/thermal_minidump.c
+@@ -0,0 +1,123 @@
++// SPDX-License-Identifier: GPL-2.0-only
++/*
++ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
++ */
++
++#include <linux/module.h>
++#include <linux/slab.h>
++#include <linux/string.h>
++#include <linux/thermal_minidump.h>
++
++/**
++ * thermal_minidump_update_data - function to update thermal minidump data
++ *
++ * @md  :	The pointer of minidump data
++ * @type:	sensor type to stored
++ * @temp:	temperature to stored
++ *
++ * This function gives the ability for driver save temperature
++ * data into miniudmps
++ *
++ * Return:
++ *		zero on success.
++ *		Negative error number on failures.
++ */
++int thermal_minidump_update_data(struct minidump_data *md,
++	char *type, int *temp)
++{
++	int ret;
++	unsigned long flags;
++
++	if (!md || !type || !temp)
++		return -EINVAL;
++
++	spin_lock_irqsave(&md->update_md_lock, flags);
++
++	if (md->md_count >= MD_NUM)
++		md->md_count = 0;
++
++	strscpy(md->type[md->md_count].sensor_type, type,
++		THERMAL_NAME_LENGTH);
++	md->temp[md->md_count] = *temp;
++	md->md_count++;
++
++	ret = msm_minidump_update_region(md->region, &md->md_entry);
++
++	spin_unlock_irqrestore(&md->update_md_lock, flags);
++
++	if (ret < 0)
++		pr_err("Failed to update data to minidump, ret:%d\n", ret);
++
++	return ret;
++}
++EXPORT_SYMBOL(thermal_minidump_update_data);
++
++/**
++ * thermal_minidump_register - function to register thermal data region
++ * into minidump
++ *
++ * @name:	The pointer of driver devicetree full name
++ *
++ * This function gives the ability for driver register an entry in
++ * Minidump table
++ *
++ * Return:
++ *		md: The pointer of minidump data.
++ *		NULL : thermal minidump register fail.
++ */
++struct minidump_data *thermal_minidump_register(const char *name)
++{
++	struct minidump_data *md;
++
++	if (!name || !*name)
++		return NULL;
++
++	md = kzalloc(sizeof(*md), GFP_KERNEL);
++	if (!md)
++		return NULL;
++
++	spin_lock_init(&md->update_md_lock);
++	strscpy(md->md_entry.name, name, sizeof(md->md_entry.name));
++	md->md_entry.virt_addr = (uintptr_t)md;
++	md->md_entry.phys_addr = virt_to_phys(md);
++	md->md_entry.size = sizeof(*md);
++	md->region = msm_minidump_add_region(&md->md_entry);
++	if (md->region < 0) {
++		kfree(md);
++		md = NULL;
++		pr_err("Failed to add %s into minidump\n", name);
++		goto exit;
++	}
++
++exit:
++	return md;
++}
++EXPORT_SYMBOL(thermal_minidump_register);
++
++/**
++ * thermal_minidump_unregister - function to unregister thermal data region
++ * in minidump
++ *
++ * @md  :	The pointer of minidump data
++ *
++ * This function gives the ability for driver unregister an entry in
++ * Minidump table
++ */
++void thermal_minidump_unregister(struct minidump_data *md)
++{
++	if (md) {
++		int ret = msm_minidump_remove_region(&md->md_entry);
++
++		/* A failed remove may leave firmware pointing at this allocation. */
++		if (ret) {
++			pr_err("Thermal minidump %s removal failed: %d; retaining registered memory\n",
++			       md->md_entry.name, ret);
++			return;
++		}
++		kfree(md);
++	}
++}
++EXPORT_SYMBOL(thermal_minidump_unregister);
++
++MODULE_DESCRIPTION("Qualcomm Technologies Inc. Thermal minidump driver");
++MODULE_LICENSE("GPL");
+--- /dev/null
++++ b/soc/include/linux/thermal_minidump.h
+@@ -0,0 +1,48 @@
++/* SPDX-License-Identifier: GPL-2.0-only */
++/*
++ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
++ */
++
++#ifndef __QCOM_THERMAL_MINIDUMP_H__
++#define __QCOM_THERMAL_MINIDUMP_H__
++
++#include <linux/kernel.h>
++#include <linux/thermal.h>
++#include <linux/types.h>
++#include <linux/spinlock.h>
++#include <soc/qcom/minidump.h>
++
++/* The amount of thermal data stored in the minidump  */
++#define MD_NUM		50
++
++struct sensor_type {
++	char sensor_type[THERMAL_NAME_LENGTH];
++};
++
++/**
++ * struct minidump_data - Thermal data stored in minidump
++ * @type: The type of sensor, this data must be the second item
++ *        of the structure, otherwise the parsing will fail
++ * @temp: The temp of sensor, this data must be the second item
++ *        of the structure, otherwise the parsing will fail
++ * @md_count: flag for minidump data store count, this data must
++ *            be the third item of the structure, otherwise the
++ *            parsing will fail
++ * @md_entry: Minidump table entry
++ * @region: region number, entry position in minidump tables
++ */
++struct minidump_data {
++	struct sensor_type type[MD_NUM];
++	int temp[MD_NUM];
++	u32 md_count;
++
++	struct md_region md_entry;
++	int region;
++
++	spinlock_t update_md_lock;
++};
++int thermal_minidump_update_data(struct minidump_data *md,
++		char *type, int *temp);
++struct minidump_data *thermal_minidump_register(const char *name);
++void thermal_minidump_unregister(struct minidump_data *md);
++#endif
+--- a/soc/drivers/iio/adc/qcom-spmi-adc5-gen3.c
++++ b/soc/drivers/iio/adc/qcom-spmi-adc5-gen3.c
+@@ -20,6 +20,7 @@
+ #include <linux/platform_device.h>
+ #include <linux/regmap.h>
+ #include <linux/thermal.h>
++#include <linux/thermal_minidump.h>
+ #include <linux/slab.h>
+ #include <linux/suspend.h>
+ #include <linux/iio/iio.h>
+@@ -278,6 +279,7 @@
+ 	struct work_struct		tm_err_handler_work;
+ 	u8				*conv_err;
+ 	spinlock_t			tm_lock;
++	struct minidump_data		*adc_md;
+ };
+ 
+ static int adc5_read(struct adc5_chip *adc, unsigned int sdam_index, u16 offset, u8 *data, int len)
+@@ -942,7 +944,7 @@
+ };
+ 
+ /* Used by thermal clients to read ADC channel temperature */
+-int adc_tm_gen3_get_temp(struct thermal_zone_device *tz, int *temp)
++static int adc_tm_gen3_get_temp(struct thermal_zone_device *tz, int *temp)
+ {
+ 	int ret;
+ 	struct adc5_channel_prop *prop = thermal_zone_device_priv(tz);
+@@ -965,9 +967,15 @@
+ 	if (ret < 0)
+ 		return ret;
+ 
+-	return qcom_adc5_hw_scale(prop->scale_fn_type,
++	ret = qcom_adc5_hw_scale(prop->scale_fn_type,
+ 		prop->prescale, prop->data,
+ 		adc_code_volt, temp);
++
++	if (!ret && adc->adc_md)
++		thermal_minidump_update_data(adc->adc_md,
++			(char *)thermal_zone_device_type(tz), temp);
++
++	return ret;
+ }
+ 
+ static int adc_tm5_gen3_configure(struct adc5_channel_prop *prop)
+@@ -1242,7 +1250,7 @@
+ }
+ 
+ /* Used to notify non-thermal clients of threshold crossing */
+-void notify_adc_tm_fn(struct work_struct *work)
++static void notify_adc_tm_fn(struct work_struct *work)
+ {
+ 	struct adc5_channel_prop *prop = container_of(work,
+ 		struct adc5_channel_prop, work);
+@@ -1884,6 +1892,15 @@
+ 	return 0;
+ }
+ 
++static void adc5_minidump_release(void *data)
++{
++	struct adc5_chip *adc = data;
++
++	/* Devres stops the IIO device, thermal zones and IRQs before this. */
++	thermal_minidump_unregister(adc->adc_md);
++	adc->adc_md = NULL;
++}
++
+ static int adc5_gen3_probe(struct platform_device *pdev)
+ {
+ 	struct device_node *node = pdev->dev.of_node;
+@@ -1957,6 +1974,15 @@
+ 	if (ret < 0) {
+ 		pr_err("adc get dt data failed\n");
+ 		goto fail;
++	}
++
++	adc->adc_md = thermal_minidump_register("adc5_gen3");
++	if (adc->adc_md) {
++		ret = devm_add_action_or_reset(dev, adc5_minidump_release, adc);
++		if (ret)
++			goto fail;
++	} else {
++		dev_warn(dev, "Thermal minidump region registration failed\n");
+ 	}
+ 
+ 	for (i = 0; i < adc->num_sdams; i++) {
+--- a/soc/Kbuild
++++ b/soc/Kbuild
+@@ -1198,3 +1198,7 @@
+ # Real shipping hardware identity, including bootloader module parameters.
+ obj-m += hwid.o
+ hwid-y := drivers/misc/hwid/hwid.o
++
++# Original TSENS minidump provider, compiled with its real consumer.
++obj-m += thermal_minidump.o
++thermal_minidump-y := drivers/thermal/qcom/thermal_minidump.o

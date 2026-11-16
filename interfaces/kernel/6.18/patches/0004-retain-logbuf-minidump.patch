@@ -1,0 +1,12 @@
+--- a/soc/Kbuild
++++ b/soc/Kbuild
+@@ -2,6 +2,9 @@
+ # Android retains the configured GMU frequency reporting governor.
+ obj-m += governor_msm_adreno_ro.o
+ governor_msm_adreno_ro-y := drivers/devfreq/governor_msm_adreno_ro.o
++# Preserve the active sheng printk/minidump DT provider.
++obj-m += qcom_logbuf_vh.o
++qcom_logbuf_vh-y := drivers/soc/qcom/qcom_logbuf_vendor_hooks.o
+ ccflags-y += -include $(M)/gen/autoconf_vendor.h
+ # the vendor's headers before the kernel's own (as Kleaf's DDK has them): where both have a
+ # header of the same name, the vendor code was written against the vendor's

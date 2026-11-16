@@ -1,0 +1,26 @@
+--- a/RemoteTransitionHandler.java
++++ b/RemoteTransitionHandler.java
+@@ -262,6 +262,23 @@
+ 
+         final IRemoteTransition remote = remoteTransition.getRemoteTransition();
+         if (remote == null) return;
++
++        final java.util.ArrayList<org.lineageos.sheng.transition.EmbeddedLaunchPolicy.Change>
++                shengChanges = new java.util.ArrayList<>();
++        for (TransitionInfo.Change c : info.getChanges()) {
++            shengChanges.add(new org.lineageos.sheng.transition.EmbeddedLaunchPolicy.Change(
++                    c.getMode(), c.hasFlags(TransitionInfo.FLAG_IN_TASK_WITH_EMBEDDED_ACTIVITY),
++                    c.getStartAbsBounds().equals(c.getEndAbsBounds())
++                            && c.getStartDisplayId() == c.getEndDisplayId()));
++        }
++        if (org.lineageos.sheng.transition.EmbeddedLaunchPolicy.shouldWait(
++                android.os.Build.DEVICE, remoteTransition.getDebugName(), info.getType(),
++                android.view.WindowManager.TRANSIT_OPEN, android.view.WindowManager.TRANSIT_CHANGE,
++                shengChanges)) {
++            Log.i(TAG, "sheng: Queue embedded transition #" + info.getDebugId()
++                    + " until Quickstep launch completes");
++            return;
++        }
+ 
+         ProtoLog.v(ShellProtoLogGroup.WM_SHELL_TRANSITIONS,
+                 "   Requesting merge (#%d) into remote: %s", info.getDebugId(), remoteTransition);

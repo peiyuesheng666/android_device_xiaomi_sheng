@@ -1,0 +1,8 @@
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<resources>
+    <string-array name="face_acquired_vendor">
+        <item>请靠近镜头，保持正脸清晰完整并位于画面中央。</item>
+        <item>请轻微向右侧转头。</item>
+        <item>请轻微向左侧转头。</item>
+    </string-array>
+</resources>

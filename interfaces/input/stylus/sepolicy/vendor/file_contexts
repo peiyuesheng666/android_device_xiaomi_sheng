@@ -1,0 +1,2 @@
+/vendor/bin/hw/vendor\.lineage\.sheng\.stylus-service u:object_r:vendor_sheng_stylus_exec:s0
+/dev/sheng-stylus(/.*)? u:object_r:vendor_sheng_stylus_runtime_file:s0

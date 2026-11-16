@@ -1,0 +1,88 @@
+// SPDX-License-Identifier: Apache-2.0
+package {
+    default_applicable_licenses: ["sheng_face_lab_license"],
+}
+
+filegroup {
+    name: "sheng-native-face-match-source",
+    srcs: ["src/org/lineageos/sheng/facelab/MatchSession.java"],
+    visibility: ["//device/xiaomi/sheng/interfaces/biometrics/systemface/native:__pkg__"],
+}
+
+// Model and native dependency terms remain attached to the imported payload.
+// The complete third-party notices are also delivered inside the APK.
+license {
+    name: "sheng_face_engine_license",
+    visibility: [":__pkg__"],
+    license_kinds: ["SPDX-license-identifier-Apache-2.0", "SPDX-license-identifier-MIT",
+                    "SPDX-license-identifier-BSD-2-Clause", "SPDX-license-identifier-BSD-3-Clause"],
+    license_text: ["cache/engine/assets/licenses/*"],
+}
+
+// prepare_sheng_face_engine.py verifies and stages this pinned, unmodified AAR.
+android_library_import {
+    name: "sheng-face-opencv",
+    licenses: ["sheng_face_engine_license"],
+    aars: ["cache/engine/opencv-4.13.0.aar"],
+    extract_jni: true,
+    sdk_version: "current",
+    min_sdk_version: "30",
+}
+
+android_app {
+    name: "ShengFaceUnlock",
+    licenses: ["sheng_face_lab_license", "sheng_face_engine_license"],
+    manifest: "native/AndroidManifest.xml",
+    srcs: [":sheng-native-face-engine-sources", "native/runtime/**/*.java"],
+    resource_dirs: ["res"],
+    asset_dirs: ["cache/engine/assets"],
+    static_libs: ["sheng-face-opencv", "ShengNativeFaceProtocol"],
+    certificate: "platform",
+    platform_apis: true,
+    privileged: true,
+    product_specific: true,
+    // Modern sheng variant. The separate legacy artifact has an API 1 entry
+    // and no unsupported ARM64 runtime or privileged lock-screen service.
+    min_sdk_version: "30",
+    compile_multilib: "64",
+    use_embedded_native_libs: true,
+    optimize: { enabled: false },
+    required: ["privapp-permissions-org.lineageos.sheng.faceunlock.xml", "sheng-face",
+               "ShengNativeFaceBootstrap", "sheng-face-native-fragment"],
+}
+
+android_app {
+    name: "ShengFaceUnlockLegacy",
+    product_specific: true,
+    manifest: "legacy/AndroidManifest.xml",
+    srcs: ["compat/src/**/*.java"],
+    resource_dirs: [],
+    certificate: "platform",
+    sdk_version: "current",
+    min_sdk_version: "1",
+    optimize: { enabled: false },
+    // Development/release compatibility artifact; not a second product install.
+    installable: false,
+    // Non-installed app targets otherwise omit executable bytecode in Soong.
+    compile_dex: true,
+}
+
+prebuilt_etc {
+    name: "privapp-permissions-org.lineageos.sheng.faceunlock.xml",
+    src: "privapp-permissions.xml",
+    sub_dir: "permissions",
+    product_specific: true,
+}
+
+// Process residual OTA retirement markers through the normal VINTF rule.
+vintf_fragment {
+    name: "sheng-face-retired-fragment",
+    src: "retired/face-default.xml",
+    device_specific: true,
+}
+
+vintf_fragment {
+    name: "sheng-miface-retired-fragment",
+    src: "retired/manifest_vendor.xiaomi.hardware.miface.xml",
+    device_specific: true,
+}

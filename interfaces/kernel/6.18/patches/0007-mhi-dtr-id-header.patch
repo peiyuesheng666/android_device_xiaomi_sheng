@@ -1,0 +1,10 @@
+--- a/soc/drivers/bus/mhi/devices/mhi_dtr.c
++++ b/soc/drivers/bus/mhi/devices/mhi_dtr.c
+@@ -8,6 +8,7 @@
+ #include <linux/list.h>
+ #include <linux/mhi.h>
+ #include <linux/mhi_misc.h>
++#include <linux/mod_devicetable.h>
+ #include <linux/module.h>
+ #include <linux/of_device.h>
+ #include <linux/slab.h>

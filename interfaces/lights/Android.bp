@@ -1,0 +1,21 @@
+// SPDX-License-Identifier: Apache-2.0
+cc_binary {
+    name: "vendor.qti.hardware.lights-service.sheng",
+    relative_install_path: "hw",
+    vendor: true,
+    srcs: ["Lights.cpp", "main.cpp"],
+    init_rc: ["vendor.qti.hardware.lights-service.sheng.rc"],
+    vintf_fragments: ["vendor.qti.hardware.lights-service.sheng.xml"],
+    shared_libs: ["libbase", "liblog", "libhardware", "libbinder_ndk", "android.hardware.light-V2-ndk"],
+    cflags: ["-Wall", "-Wextra", "-Werror"],
+}
+
+android_app {
+    name: "ShengIndicatorSettings",
+    srcs: ["settings/src/**/*.java"],
+    manifest: "settings/AndroidManifest.xml",
+    resource_dirs: ["settings/res"],
+    certificate: "platform",
+    platform_apis: true,
+    product_specific: true,
+}

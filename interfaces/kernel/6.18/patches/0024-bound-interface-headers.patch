@@ -1,0 +1,11 @@
+--- a/sheng-ports/pogo/Kbuild
++++ b/sheng-ports/pogo/Kbuild
+@@ -11,7 +11,7 @@
+ xm_battmngr_init-y := init/xm_battmngr_init.o
+ virtual_fg-y := extSOC/virtual_fg.o
+ 
+-ccflags-y += -DCONFIG_NTAG5_I2C=1
++ccflags-y += -DCONFIG_NTAG5_I2C=1 -I$(SOC)/include
+ obj-m += ntag5_i2c.o qcom_ipc_lite.o
+ ntag5_i2c-y := ntag/ntag_i2c_drv.o ntag/ntag_common.o
+ qcom_ipc_lite-y := ipc/qcom_ipc_lite.o

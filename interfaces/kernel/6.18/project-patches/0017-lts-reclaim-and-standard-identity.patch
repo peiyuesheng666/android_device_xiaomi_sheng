@@ -1,0 +1,66 @@
+--- a/scripts/android_lts_contract.py
++++ b/scripts/android_lts_contract.py
+@@ -11,11 +11,20 @@
+     assert hashlib.sha256(path.read_bytes()).hexdigest()==EXPECTED_RECEIPT_SHA256
+     receipt=json.loads(path.read_text())
+     assert hashlib.sha256((project/receipt['patch']).read_bytes()).hexdigest()==receipt['patch_sha256']
+-    for name,item in receipt['files'].items():
++    adaptation=project/'provenance/android-lts-adaptation.json'
++    assert hashlib.sha256(adaptation.read_bytes()).hexdigest()=='6dd9f522677c0399b03d847ab82f61bdadc77e28169e1bda753497fa4d40193d'
++    delta=json.loads(adaptation.read_text())
++    assert delta['base_contract_sha256']==EXPECTED_RECEIPT_SHA256
++    assert hashlib.sha256((project/delta['patch']).read_bytes()).hexdigest()==delta['patch_sha256']
++    expected=dict(receipt['files'])
++    for name,item in delta['files'].items():
++        assert expected[name]['after']==item['before']
++        expected[name]=item
++    for name,item in expected.items():
+         path=root/name
+         got=hashlib.sha256(path.read_bytes()).hexdigest() if path.is_file() else None
+         assert got==item['after'], 'Incomplete or modified Android LTS source: '+name
+-    return receipt['files']
++    return expected
+ def android_lts_matches(name, got):
+     item=validated_files().get(name)
+     return item is not None and item['after']==got
+--- a/sheng_defconfig
++++ b/sheng_defconfig
+@@ -43,7 +43,7 @@
+ # CONFIG_COMPILE_TEST is not set
+ CONFIG_WERROR=y
+ # CONFIG_UAPI_HEADER_TEST is not set
+-CONFIG_LOCALVERSION="-peiyuesheng-sheng-kernel"
++CONFIG_LOCALVERSION="-android17-0-peiyuesheng-sheng-kernel"
+ # CONFIG_LOCALVERSION_AUTO is not set
+ CONFIG_BUILD_SALT=""
+ CONFIG_DEFAULT_INIT=""
+--- /dev/null
++++ b/provenance/android-lts-adaptation.json
+@@ -0,0 +1,13 @@
++{
++  "schema": 1,
++  "base_contract_sha256": "79221866a128924c43534e85fdd6f32f4e8c552bb45ba3d692a6fc3f287e6c00",
++  "patch": "patches/android-lts-kcompressd.patch",
++  "patch_sha256": "5a0b0af23a6ac33fa58006e17e4b62c8fd9946134155eae30299cd32ea5fce08",
++  "files": {
++    "k618/ws/common/mm/vmscan.c": {
++      "before": "177842ffba406e38132b84f14d71348382f5722de5a989ecbb02f7fb4e80f111",
++      "after": "48d68c22a70ffeb3b5d6b6deddd4c959fda5a64d847385eaa7f434bf9b6fe474"
++    }
++  },
++  "reason": "The downstream kcompressd second reclaim pass must use the new do_rotate=true argument, matching upstream shrink_inactive_list reclaim semantics for eligible clean unreferenced folios."
++}
+--- /dev/null
++++ b/patches/android-lts-kcompressd.patch
+@@ -0,0 +1,11 @@
++--- a/k618/ws/common/mm/vmscan.c
+++++ b/k618/ws/common/mm/vmscan.c
++@@ -2484,7 +2484,7 @@
++ 	nr = shrink_folio_list(written, lruvec_pgdat(lruvec), sc, &stat, false,
++ 			       lruvec_memcg(lruvec));
++ 	spin_lock_irq(&lruvec->lru_lock);
++-	move_folios_to_lru(lruvec, written);
+++	move_folios_to_lru(lruvec, written, true);
++ 	if (!cgroup_reclaim(sc))
++ 		__count_vm_events(PGSTEAL_KSWAPD, nr);
++ 	count_memcg_events(lruvec_memcg(lruvec), PGSTEAL_KSWAPD, nr);

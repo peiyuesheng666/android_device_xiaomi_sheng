@@ -1,0 +1,19 @@
+--- a/k618/soc/drivers/iommu/arm/arm-smmu/arm-smmu.c
++++ b/k618/soc/drivers/iommu/arm/arm-smmu/arm-smmu.c
+@@ -2301,8 +2301,15 @@
+ 		return 0;
+ 
+ 	ret = ops->unmap_pages(ops, iova, pgsize, pgcount, gather);
+-	if (ret)
++	if (ret) {
++		/*
++		 * Qualcomm page tables defer invalidation through private state.
++		 * Also populate the core gather: iommu_iotlb_sync() may skip
++		 * an empty gather, leaving stale translations on IOVA reuse.
++		 */
++		iommu_iotlb_gather_add_range(gather, iova, ret);
+ 		trace_unmap_pages(smmu_domain, iova, pgsize, pgcount);
++	}
+ 
+ 	return ret;
+ }

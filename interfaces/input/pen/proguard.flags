@@ -1,0 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Keep the method called by the API 1 bootstrap without a modern API reference.
+-keep class org.lineageos.sheng.pen.PenSettingsActivity {
+    public static boolean supported(android.content.Context);
+}

@@ -1,0 +1,48 @@
+[
+  {
+    "project": "bionic",
+    "base_commit": "5d705964bdc742639dd256871119209f1c65d688",
+    "patch": "01-kernel-header-tools.patch",
+    "files": [
+      {
+        "path": "libc/Android.bp",
+        "before_sha256": "12bef6c4a8da7159e6e03e542e0067093101712e35f212aef04f897ab8f3effb",
+        "after_sha256": "7cc7cdefb4fce841edb810cb3d5d7e81a465b8df9dc4383077ae5a863a0ce487"
+      }
+    ]
+  },
+  {
+    "project": "vendor/lineage",
+    "base_commit": "2904d731d438cf6aa12f9ee39670ad0d0907c96a",
+    "patch": "02-kernel-header-generator.patch",
+    "files": [
+      {
+        "path": "build/soong/Android.bp",
+        "before_sha256": "180aec0e0cc94b580acb2c3486f8088bf5ec48e88f59a9b4148827d0a305df33",
+        "after_sha256": "4321b081fe6c9d1d6883e56646170c64698c876acda2c6708a7fbbcc271bbb42"
+      },
+      {
+        "path": "build/soong/generator/generator.go",
+        "before_sha256": "dd555ca10de79ebccf31785d133c4b4d7ec68f54b968361e190becf3fc0fb448",
+        "after_sha256": "28f842bff06d16e7fe20ac918d2438f2966e000f32c1aef46138abe180b74775"
+      },
+      {
+        "path": "tools/clean_headers.sh",
+        "before_sha256": "94759ae3cd882e99f7651f881fa43b5a7b8503e709e279aa852c3e1178db04cc",
+        "after_sha256": "36fee40e7f90838a9fa5e7cc9178389f080135691f8277b6766bd4df08298df8"
+      }
+    ]
+  },
+  {
+    "project": "frameworks/base",
+    "base_commit": "f376ff5c61fa9d137d8afa304e89c2d715497bf5",
+    "patch": "03-embedded-launch-transition.patch",
+    "files": [
+      {
+        "path": "libs/WindowManager/Shell/src/com/android/wm/shell/transition/RemoteTransitionHandler.java",
+        "before_sha256": "bbcc1e78e0e2228060f6b24a0b11c623b676bb8b3628a9b01a05065e7a3ecf58",
+        "after_sha256": "2fa655846ce8a47b9b237ef1ba8afbaefa92b0758cdd892cfbd4dc15aea39055"
+      }
+    ]
+  }
+]

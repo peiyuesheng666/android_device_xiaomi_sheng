@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<permissions>
+    <!-- PixelOS's product Clock requests these signature|privileged permissions.
+         Keep its allowlist in the same partition as the APK. -->
+    <privapp-permissions package="com.android.deskclock">
+        <permission name="android.permission.CONTROL_DISPLAY_COLOR_TRANSFORMS" />
+        <permission name="android.permission.QUERY_USERS" />
+        <permission name="android.permission.START_FOREGROUND_SERVICES_FROM_BACKGROUND" />
+    </privapp-permissions>
+</permissions>

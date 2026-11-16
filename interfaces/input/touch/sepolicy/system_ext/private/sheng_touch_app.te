@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: Apache-2.0
+typeattribute sheng_touch_app coredomain, mlstrustedsubject;
+app_domain(sheng_touch_app)
+binder_service(sheng_touch_app)
+binder_use(sheng_touch_app)
+binder_call(sheng_touch_app, system_server)
+allow sheng_touch_app { app_api_service system_api_service }:service_manager find;
+type sheng_touch_app_data_file, file_type, data_file_type, core_data_file_type, app_data_file_type;
+allow sheng_touch_app sheng_touch_app_data_file:dir create_dir_perms;
+allow sheng_touch_app sheng_touch_app_data_file:{ file lnk_file } create_file_perms;

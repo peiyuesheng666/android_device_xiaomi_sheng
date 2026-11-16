@@ -1,0 +1,5399 @@
+--- /dev/null
++++ b/sheng-ports/pogo/battmngr/step-chg-jeita.c
+@@ -0,0 +1,507 @@
++// SPDX-License-Identifier: GPL-2.0-only
++/*
++ * Copyright (c) 2017-2020 The Linux Foundation. All rights reserved.
++ */
++#include <linux/battmngr/qti_use_pogo.h>
++#include <linux/battmngr/xm_charger_core.h>
++#include <../extSOC/inc/virtual_fg.h>
++#include <linux/battmngr/battmngr_notifier.h>
++//static int log_level = 2;
++#define stepchg_err(fmt, ...)							\
++do {										\
++	if (log_level >= 0)							\
++		printk(KERN_ERR "[stepchg_jeita] " fmt, ##__VA_ARGS__);	\
++} while (0)
++
++#define stepchg_info(fmt, ...)							\
++do {										\
++	if (log_level >= 1)							\
++		printk(KERN_ERR "[stepchg_jeita] " fmt, ##__VA_ARGS__);	\
++} while (0)
++
++#define stepchg_dbg(fmt, ...)							\
++do {										\
++	if (log_level >= 2)							\
++		printk(KERN_ERR "[stepchg_jeita] " fmt, ##__VA_ARGS__);	\
++} while (0)
++
++#define GET_CONFIG_DELAY_MS		2000
++#define STEP_CHG_DELAY_3S			3000
++static bool is_batt_available(struct chg_jeita_info *chip)
++{
++	if (!chip->batt_psy)
++		chip->batt_psy = power_supply_get_by_name("battery");
++
++	if (!chip->batt_psy)
++		return false;
++
++	return true;
++}
++
++static bool is_usb_available(struct chg_jeita_info *chip)
++{
++	if (!chip->usb_psy)
++		chip->usb_psy = power_supply_get_by_name("usb");
++
++	if (!chip->usb_psy)
++		return false;
++
++	return true;
++}
++
++static int read_range_data_from_node(struct device_node *node,
++		const char *prop_str, struct jeita_range_data *ranges,
++		int max_threshold, u32 max_value)
++{
++	int rc = 0, i, length, per_tuple_length, tuples;
++
++	if (!node || !prop_str || !ranges) {
++		charger_err("%s: Invalid parameters passed\n", __func__);
++		return -EINVAL;
++	}
++
++	rc = of_property_count_elems_of_size(node, prop_str, sizeof(u32));
++	if (rc < 0) {
++		charger_err("%s: Count %s failed, rc=%d\n",
++			__func__, prop_str, rc);
++		return rc;
++	}
++
++	length = rc;
++	per_tuple_length = sizeof(struct jeita_range_data) / sizeof(u32);
++	if (length % per_tuple_length) {
++		charger_err("%s: %s length (%d) should be multiple of %d\n",
++			__func__, prop_str, length, per_tuple_length);
++		return -EINVAL;
++	}
++	tuples = length / per_tuple_length;
++
++	if (tuples > MAX_JEITA_ENTRIES) {
++		charger_err("%s: too many entries(%d), only %d allowed\n",
++			__func__, tuples, MAX_JEITA_ENTRIES);
++		return -EINVAL;
++	}
++
++	rc = of_property_read_u32_array(node, prop_str,
++			(u32 *)ranges, length);
++	if (rc) {
++		charger_err("%s: Read %s failed, rc=%d\n", __func__, prop_str, rc);
++		return rc;
++	}
++
++	for (i = 0; i < tuples; i++) {
++		if (ranges[i].low_threshold >
++				ranges[i].high_threshold) {
++			charger_err("%s: %s thresholds should be in ascendant ranges\n",
++					__func__, prop_str);
++			rc = -EINVAL;
++			goto clean;
++		}
++
++		if (i != 0) {
++			if (ranges[i - 1].high_threshold >
++					ranges[i].low_threshold) {
++				charger_err("%s: %s thresholds should be in ascendant ranges\n",
++						__func__, prop_str);
++				rc = -EINVAL;
++				goto clean;
++			}
++		}
++
++		if (ranges[i].low_threshold > max_threshold)
++			ranges[i].low_threshold = max_threshold;
++		if (ranges[i].high_threshold > max_threshold)
++			ranges[i].high_threshold = max_threshold;
++		if (ranges[i].value > max_value)
++			ranges[i].value = max_value;
++	}
++
++	return rc;
++clean:
++	memset(ranges, 0, tuples * sizeof(struct jeita_range_data));
++	return rc;
++}
++
++static int get_jeita_config_from_dt(struct chg_jeita_info *info)
++{
++	struct device_node *node = info->dev->of_node;
++	int hysteresis[2] = {0};
++	int rc, i;
++	struct {
++		const char *name;
++		int *val;
++	} chg_data[] = {
++		{"xm,charger-jeita-fv-max-mv", &info->max_fv_uv},
++		{"xm,charger-jeita-fcc-max-ma", &info->max_fcc_ma},
++		{"xm,charger-jeita-too-hot", &info->jeita_hot_th},
++		{"xm,charger-jeita-too-cold", &info->jeita_cold_th},
++	};
++
++	for (i = 0;i < ARRAY_SIZE(chg_data);i++) {
++		rc = of_property_read_u32(node, chg_data[i].name, chg_data[i].val);
++		if (rc < 0) {
++			charger_err("%s: not find property %s\n", chg_data[i].name, __func__);
++			return rc;
++		} else {
++			charger_err("%s: %d\n", chg_data[i].name, *chg_data[i].val);
++		}
++	}
++
++	rc = read_range_data_from_node(node,
++			"xm,charger-jeita-fcc-ranges",
++			info->jeita_fcc_cfg->ranges,
++			BATT_HOT_DECIDEGREE_MAX, info->max_fcc_ma);
++	if (rc < 0) {
++		charger_err("%s: xm,charger-jeita-fcc-ranges reading failed, rc=%d\n",
++				__func__, rc);
++		return rc;
++	}
++	for (i = 0; i < MAX_JEITA_ENTRIES; i++)
++		charger_err("%s: jeita-fcc-cfg: %ddecidegree ~ %ddecidegre, %dmA\n",
++			__func__, info->jeita_fcc_cfg->ranges[i].low_threshold,
++			info->jeita_fcc_cfg->ranges[i].high_threshold,
++			info->jeita_fcc_cfg->ranges[i].value);
++
++	rc = read_range_data_from_node(node,
++			"xm,charger-jeita-fv-ranges",
++			info->jeita_fv_cfg->ranges,
++			BATT_HOT_DECIDEGREE_MAX, info->max_fv_uv);
++	if (rc < 0) {
++		charger_err("%s: xm,charger-jeita-fv-ranges reading failed, rc=%d\n",
++				__func__, rc);
++		return rc;
++	}
++	for (i = 0; i < MAX_JEITA_ENTRIES; i++)
++		charger_err("%s: jeita-fv-cfg: %ddecidegree ~ %ddecidegre, %dmV\n",
++			__func__, info->jeita_fv_cfg->ranges[i].low_threshold,
++			info->jeita_fv_cfg->ranges[i].high_threshold,
++			info->jeita_fv_cfg->ranges[i].value);
++
++	rc = of_property_read_u32_array(node,
++			"xm,charger-jeita-hysteresis", hysteresis, 2);
++	if (rc < 0) {
++		charger_err("xm,charger-jeita-hysteresis reading failed, rc=%d\n", rc);
++		return rc;
++	}
++	info->jeita_fcc_cfg->param.rise_hys = hysteresis[0];
++	info->jeita_fcc_cfg->param.fall_hys = hysteresis[1];
++	info->jeita_fv_cfg->param.rise_hys = hysteresis[0];
++	info->jeita_fv_cfg->param.fall_hys = hysteresis[1];
++	charger_err("%s: jeita-hys: rise_hys=%u, fall_hys=%u\n",
++		__func__, hysteresis[0], hysteresis[1]);
++
++	return rc;
++}
++
++static int jeita_get_val(struct jeita_range_data *range, int rise_hys, int fall_hys,
++		int current_index, int threshold, int *new_index, int *val)
++{
++	int i;
++
++	*new_index = -EINVAL;
++
++	/*
++	 * If the threshold is lesser than the minimum allowed range,
++	 * return -ENODATA.
++	 */
++	if (threshold < range[0].low_threshold)
++		return -ENODATA;
++
++	/* First try to find the matching index without hysteresis */
++	for (i = 0; i < MAX_JEITA_ENTRIES; i++) {
++		if (!range[i].high_threshold && !range[i].low_threshold) {
++			/* First invalid table entry; exit loop */
++			break;
++		}
++
++		if (jeita_is_between(range[i].low_threshold,
++			range[i].high_threshold, threshold)) {
++			*new_index = i;
++			*val = range[i].value;
++			break;
++		}
++	}
++
++	/*
++	 * If nothing was found, the threshold exceeds the max range for sure
++	 * as the other case where it is lesser than the min range is handled
++	 * at the very beginning of this function. Therefore, clip it to the
++	 * max allowed range value, which is the one corresponding to the last
++	 * valid entry in the battery profile data array.
++	 */
++	if (*new_index == -EINVAL) {
++		if (i == 0) {
++			/* Battery profile data array is completely invalid */
++			return -ENODATA;
++		}
++
++		*new_index = (i - 1);
++		*val = range[*new_index].value;
++	}
++
++	/*
++	 * If we don't have a current_index return this
++	 * newfound value. There is no hysterisis from out of range
++	 * to in range transition
++	 */
++	if (current_index == -EINVAL)
++		return 0;
++
++	/*
++	 * Check for hysteresis if it in the neighbourhood
++	 * of our current index.
++	 */
++	if (*new_index == current_index + 1) {
++		if (threshold <
++			(range[*new_index].low_threshold + rise_hys)) {
++			/*
++			 * Stay in the current index, threshold is not higher
++			 * by hysteresis amount
++			 */
++			 if (*new_index < 5) {
++				*new_index = current_index;
++				*val = range[current_index].value;
++			 }
++		}
++	} else if (*new_index == current_index - 1) {
++		if (threshold >
++			range[*new_index].high_threshold - fall_hys) {
++			/*
++			 * stay in the current index, threshold is not lower
++			 * by hysteresis amount
++			 */
++			 if (*new_index >= 4) {
++				*new_index = current_index;
++				*val = range[current_index].value;
++			 }
++		}
++	}
++	return 0;
++}
++
++#define JEITA_SUSPEND_HYST_UV		50000
++#define JEITA_SUSPEND_HYST_UV_WARM 	120000
++static int handle_jeita(struct chg_jeita_info *chip)
++{
++	union power_supply_propval pval = {0, };
++	int rc = 0, fcc_ua = 0, fv_uv = 0, batt_temp = 0, volt_now = 0;
++
++	stepchg_err("%s: enter\n", __func__);
++
++	rc = power_supply_get_property(chip->batt_psy, POWER_SUPPLY_PROP_TEMP, &pval);
++	if (rc < 0) {
++		stepchg_err("%s: Get battery temp failed, rc=%d\n",
++				__func__, rc);
++		return rc;
++	}
++	batt_temp = pval.intval;
++
++	//jeita too hot or cold, disable chg
++	if(chip->jeita_hot_th >= 0 && chip->jeita_cold_th <= 0) {
++		if ((batt_temp >= chip->jeita_hot_th || batt_temp <= chip->jeita_cold_th) && !chip->hot_cold_dis_chg) {
++			stepchg_err("sw-jeita: temp is :%d, stop charing\n", batt_temp);
++			chip->hot_cold_dis_chg = true;
++			battmngr_qtiops_set_fg_suspend(g_xm_charger->battmg_dev, true);
++		} else if((batt_temp < chip->jeita_hot_th && batt_temp > chip->jeita_cold_th) && chip->hot_cold_dis_chg) {
++			stepchg_err("sw-jeita: temp is :%d, start charing\n", batt_temp);
++			chip->hot_cold_dis_chg = false;
++			battmngr_qtiops_set_fg_suspend(g_xm_charger->battmg_dev, false);
++		}
++	}
++
++	rc = jeita_get_val(chip->jeita_fcc_cfg->ranges,
++			chip->jeita_fcc_cfg->param.rise_hys,
++			chip->jeita_fcc_cfg->param.fall_hys,
++			chip->jeita_fcc_index,
++			batt_temp,
++			&chip->jeita_fcc_index,
++			&fcc_ua);
++	if (rc < 0)
++		fcc_ua = 0;
++
++	if (!chip->fcc_votable)
++		chip->fcc_votable = find_votable("FCC");
++	if (!chip->fcc_votable)
++		/* changing FCC is a must */
++		return -EINVAL;
++
++	vote(chip->fcc_votable, JEITA_VOTER, fcc_ua ? true : false, fcc_ua);
++
++	rc = jeita_get_val(chip->jeita_fv_cfg->ranges,
++			chip->jeita_fv_cfg->param.rise_hys,
++			chip->jeita_fv_cfg->param.fall_hys,
++			chip->jeita_fv_index,
++			batt_temp,
++			&chip->jeita_fv_index,
++			&fv_uv);
++	if (rc < 0)
++		fv_uv = 0;
++
++	stepchg_err("temp:%d, new jeita index:%d, new jeita FCC:%d, new jeita FV:%d\n",
++					batt_temp, chip->jeita_fcc_index, fcc_ua, fv_uv);
++
++	chip->fv_votable = find_votable("FV");
++	if (!chip->fv_votable)
++		goto out;
++
++	if (!chip->usb_icl_votable)
++		chip->usb_icl_votable = find_votable("ICL");
++
++	if (!chip->usb_icl_votable)
++		goto set_jeita_fv;
++
++	rc = power_supply_get_property(chip->batt_psy, POWER_SUPPLY_PROP_VOLTAGE_NOW,
++			&pval);
++	if (rc < 0) {
++		stepchg_err("%s: Get battery voltage failed, rc=%d\n",
++				__func__, rc);
++		return rc;
++	}
++	volt_now = pval.intval;
++
++	/*
++	 * If JEITA float voltage is same as max-vfloat of battery then
++	 * skip any further VBAT specific checks.
++	 */
++	rc = power_supply_get_property(chip->batt_psy,
++				POWER_SUPPLY_PROP_VOLTAGE_MAX, &pval);
++	if (rc || (pval.intval == fv_uv)) {
++		vote(chip->usb_icl_votable, JEITA_VOTER, false, 0);
++		goto set_jeita_fv;
++	}
++
++	/*
++	 * Suspend USB input path if battery voltage is above
++	 * JEITA VFLOAT threshold.
++	 */
++	if (chip->jeita_arb_en && fv_uv > 0) {
++		rc = power_supply_get_property(chip->batt_psy,
++				POWER_SUPPLY_PROP_VOLTAGE_NOW, &pval);
++		if (!rc && (pval.intval > fv_uv))
++			vote(chip->usb_icl_votable, JEITA_VOTER, true, 0);
++		else if (pval.intval < (fv_uv - JEITA_SUSPEND_HYST_UV))
++			vote(chip->usb_icl_votable, JEITA_VOTER, false, 0);
++	}
++
++set_jeita_fv:
++	vote(chip->fv_votable, JEITA_VOTER, fv_uv ? true : false, fv_uv);
++
++out:
++	return 0;
++}
++
++static void status_change_work(struct work_struct *work)
++{
++	struct chg_jeita_info *chip = container_of(work,
++			struct chg_jeita_info, status_change_work.work);
++	int rc = 0;
++	union power_supply_propval prop = {0, };
++
++	stepchg_err("%s: work\n", __func__);
++
++	if (!is_batt_available(chip))
++		return;
++
++	if (!is_usb_available(chip))
++		return;
++
++	/* skip elapsed_us debounce for handling battery temperature */
++	rc = handle_jeita(chip);
++	if (rc < 0)
++		stepchg_err("%s: Couldn't handle sw jeita rc = %d\n", __func__, rc);
++
++	/* Remove stale votes on USB removal */
++	if (is_usb_available(chip)) {
++		prop.intval = 0;
++		power_supply_get_property(chip->usb_psy,
++				POWER_SUPPLY_PROP_PRESENT, &prop);
++		if (!prop.intval) {
++			if (chip->usb_icl_votable)
++				vote(chip->usb_icl_votable, JEITA_VOTER,
++						false, 0);
++		}
++	}
++	rc = xm_charger_thermal(g_xm_charger);
++	if (rc < 0)
++		stepchg_err("%s: Couldn't handle thermal rc = %d\n", __func__, rc);
++
++	schedule_delayed_work(&chip->status_change_work,
++			msecs_to_jiffies(STEP_CHG_DELAY_3S));
++}
++
++int charger_jeita_start_stop(struct xm_charger *charger,
++			struct chg_jeita_info *chip)
++{
++	stepchg_err("%s\n", __func__);
++
++	if (g_xm_charger->bc12_active) {
++		cancel_delayed_work_sync(&chip->status_change_work);
++		schedule_delayed_work(&chip->status_change_work, 0);
++	} else {
++		chip->chg_change_flag = false;
++		chip->chg_enable_flag = false;
++		chip->hot_cold_dis_chg = false;
++		cancel_delayed_work_sync(&chip->status_change_work);
++	}
++
++	return 0;
++}
++
++int charger_jeita_init(struct xm_charger *charger)
++{
++	struct chg_jeita_info *chip;
++	int rc;
++
++	stepchg_err("%s: Start\n", __func__);
++
++	if (charger->chg_jeita) {
++		stepchg_err("%s: Already initialized\n", __func__);
++		return -EINVAL;
++	}
++
++	chip = devm_kzalloc(charger->dev, sizeof(*chip), GFP_KERNEL);
++	if (!chip)
++		return -ENOMEM;
++
++	chip->dev = charger->dev;
++	chip->jeita_arb_en = false;
++	chip->jeita_fcc_index = -EINVAL;
++	chip->jeita_fv_index = -EINVAL;
++
++	chip->chg_change_flag = false;
++	chip->chg_enable_flag = false;
++
++	chip->jeita_fcc_cfg = devm_kzalloc(chip->dev,
++			sizeof(struct jeita_fcc_config), GFP_KERNEL);
++	chip->jeita_fv_cfg = devm_kzalloc(chip->dev,
++			sizeof(struct jeita_fv_config), GFP_KERNEL);
++	if (!chip->jeita_fcc_cfg || !chip->jeita_fv_cfg)
++		return -ENOMEM;
++
++	rc = get_jeita_config_from_dt(chip);
++	if (rc < 0) {
++		charger_err("%s: Couldn't parse jeita config rc=%d\n", __func__, rc);
++		return rc;
++	}
++
++	INIT_DELAYED_WORK(&chip->status_change_work, status_change_work);
++
++	charger->chg_jeita = chip;
++	stepchg_err("%s: End\n", __func__);
++
++	return 0;
++}
++
++void charger_jeita_deinit(struct xm_charger *charger)
++{
++	struct chg_jeita_info *chip = charger->chg_jeita;
++
++	if (!chip)
++		return;
++
++	cancel_delayed_work_sync(&chip->status_change_work);
++	charger->chg_jeita = NULL;
++
++	return;
++}
++
+--- /dev/null
++++ b/sheng-ports/pogo/battmngr/xm_charger_core.c
+@@ -0,0 +1,338 @@
++
++#include <linux/battmngr/qti_use_pogo.h>
++void xm_charger_destroy_votable(struct xm_charger *charger);
++
++struct xm_charger *g_xm_charger;
++EXPORT_SYMBOL(g_xm_charger);
++
++#if 0
++static int charger_check_battery_psy(struct xm_charger *charger)
++{
++	if (!charger->batt_psy) {
++		charger->batt_psy = power_supply_get_by_name("battery");
++		if (!charger->batt_psy) {
++			charger_err("%s batt psy not found!\n", __func__);
++			return -EINVAL;
++		}
++	}
++
++	return 0;
++}
++
++static int charger_check_usb_psy(struct xm_charger *charger)
++{
++	if (!charger->usb_psy) {
++		charger->usb_psy = power_supply_get_by_name("usb");
++		if (!charger->usb_psy) {
++			charger_err("%s usb psy not found!\n", __func__);
++			return -EINVAL;
++		}
++	}
++
++	return 0;
++}
++#endif
++
++static void update_pd_bc12_active(struct xm_charger *charger, struct battmngr_notify *noti_data)
++{
++	static int active_flag;
++	charger->pd_active = noti_data->pd_msg.pd_active;
++	if (!charger->pd_active) {
++		charger->pd_verified = 0;
++		noti_data->pd_msg.pd_verified = 0;
++	}
++
++	charger->bc12_active = noti_data->mainchg_msg.chg_plugin;
++
++	if (!active_flag && (charger->pd_active || charger->bc12_active)) {
++		vote(charger->awake_votable, CHG_AWAKE_VOTER, true, 0);
++		active_flag = 1;
++		charger_err("%s: chg pm_awake\n", __func__);
++	} else if (active_flag && !charger->pd_active && !charger->bc12_active) {
++		noti_data->misc_msg.disable_thermal = 0;
++		noti_data->misc_msg.vindpm_temp = 0;
++		vote(charger->awake_votable, CHG_AWAKE_VOTER, false, 0);
++		active_flag = 0;
++		charger_err("%s: chg pm_relax\n", __func__);
++	}
++
++	return;
++}
++
++static void update_usb_type(struct xm_charger *chg, struct battmngr_notify *noti_data)
++{
++	static int last_bc12_type;
++	static int last_pd_active;
++
++	if (chg->pd_active) {
++		chg->real_type = POWER_SUPPLY_TYPE_USB_PD;
++		charger_err("%s: pd_active=%d\n", __func__, chg->pd_active);
++	} else {
++		chg->bc12_type = noti_data->mainchg_msg.chg_type;
++		switch (chg->bc12_type) {
++		case POWER_SUPPLY_USB_TYPE_SDP:
++			chg->real_type = POWER_SUPPLY_TYPE_USB;
++			break;
++		case POWER_SUPPLY_TYPE_USB_FLOAT:
++		case POWER_SUPPLY_USB_TYPE_DCP:
++		case POWER_SUPPLY_TYPE_USB_HVDCP:
++		case POWER_SUPPLY_TYPE_USB_HVDCP_3:
++		case POWER_SUPPLY_TYPE_USB_HVDCP_3P5:
++			chg->real_type = POWER_SUPPLY_TYPE_USB_DCP;
++			break;
++		case POWER_SUPPLY_USB_TYPE_CDP:
++			chg->real_type = POWER_SUPPLY_TYPE_USB_CDP;
++			break;
++		default:
++			chg->real_type = POWER_SUPPLY_TYPE_UNKNOWN;
++		}
++	}
++
++	if (0) {
++		if (last_bc12_type != chg->bc12_type || last_pd_active != chg->pd_active) {
++			cancel_delayed_work(&(chg->chg_feature->xm_prop_change_work));
++			chg->chg_feature->update_cont = 0;
++			schedule_delayed_work(&(chg->chg_feature->xm_prop_change_work), msecs_to_jiffies(120));
++		}
++	}
++
++	last_bc12_type = chg->bc12_type;
++	last_pd_active = chg->pd_active;
++
++	charger_info("%s: usb_type=%d, chg->real_type=%d\n", __func__,
++			chg->bc12_type, chg->real_type);
++
++	return;
++}
++
++int charger_process_event_cp(struct battmngr_notify *noti_data)
++{
++	int rc = 0;
++
++	charger_err("%s: msg_type %d\n", __func__, noti_data->cp_msg.msg_type);
++
++	switch (noti_data->cp_msg.msg_type) {
++	case BATTMNGR_MSG_CP_MASTER:
++		break;
++	case BATTMNGR_MSG_CP_SLAVE:
++		break;
++	default:
++		break;
++	}
++
++	return rc;
++}
++EXPORT_SYMBOL(charger_process_event_cp);
++
++int charger_process_event_mainchg(struct battmngr_notify *noti_data)
++{
++	int rc = 0;
++
++	charger_err("%s: msg_type %d\n", __func__, noti_data->mainchg_msg.msg_type);
++
++	switch (noti_data->mainchg_msg.msg_type) {
++	case BATTMNGR_MSG_MAINCHG_TYPE:
++		update_pd_bc12_active(g_xm_charger, noti_data);
++		update_usb_type(g_xm_charger, noti_data);
++		charger_jeita_start_stop(g_xm_charger, g_xm_charger->chg_jeita);
++		xm_charger_set_fastcharge_mode(g_xm_charger, false);
++#if 0
++		night_charging_start_stop(g_xm_charger, g_xm_charger->chg_feature);
++#endif
++		break;
++	case BATTMNGR_MSG_MAINCHG_OTG_ENABLE:
++		g_xm_charger->otg_enable = noti_data->mainchg_msg.otg_enable;
++		break;
++	default:
++		break;
++	}
++
++	return rc;
++}
++EXPORT_SYMBOL(charger_process_event_mainchg);
++
++int charger_process_event_pd(struct battmngr_notify *noti_data)
++{
++	int rc = 0;
++
++	charger_err("%s: msg_type %d\n", __func__, noti_data->pd_msg.msg_type);
++
++	switch (noti_data->pd_msg.msg_type) {
++	case BATTMNGR_MSG_PD_ACTIVE:
++		update_pd_bc12_active(g_xm_charger, noti_data);
++		update_usb_type(g_xm_charger, noti_data);
++		charger_jeita_start_stop(g_xm_charger, g_xm_charger->chg_jeita);
++		//night_charging_start_stop(g_xm_charger, g_xm_charger->chg_feature);
++		xm_charger_set_fastcharge_mode(g_xm_charger, g_xm_charger->pd_verified);
++		break;
++	case BATTMNGR_MSG_PD_VERIFED:
++		xm_charger_set_fastcharge_mode(g_xm_charger, g_xm_charger->pd_verified);
++        	if (!g_xm_charger->chg_feature) return -EOPNOTSUPP;
++		cancel_delayed_work(&(g_xm_charger->chg_feature->xm_prop_change_work));
++		g_xm_charger->chg_feature->update_cont = 0;
++		schedule_delayed_work(&(g_xm_charger->chg_feature->xm_prop_change_work), msecs_to_jiffies(600));
++		break;
++	default:
++		break;
++	}
++
++	return rc;
++}
++EXPORT_SYMBOL(charger_process_event_pd);
++
++static int xm_charger_votable_init(struct xm_charger *charger)
++{
++	int ret;
++	charger->fcc_votable = find_votable("FCC");
++	charger->fv_votable = find_votable("FV");
++	charger->usb_icl_votable = find_votable("ICL");
++
++	if (!charger->fcc_votable || !charger->fv_votable
++		|| !charger->usb_icl_votable)
++		return -EINVAL;
++
++	ret = vote(charger->fcc_votable, CHG_INIT_VOTER, true, charger->dt.batt_current_max);
++
++	if (ret < 0) return ret;
++	ret = vote(charger->fv_votable, CHG_INIT_VOTER, true, charger->dt.chg_voltage_max);
++	if (ret < 0) return ret;
++	ret = vote(charger->usb_icl_votable, CHG_INIT_VOTER, true, charger->dt.input_batt_current_max);
++	if (ret < 0) return ret;
++
++	return 0;
++}
++
++static int xm_charger_parse_dt(struct xm_charger *charger)
++{
++	struct device_node *node = charger->dev->of_node;
++	int rc = 0;
++
++	if (!node) {
++		charger_err("%s: device tree node missing\n", __func__);
++		return -EINVAL;
++	}
++
++	rc = of_property_read_u32(node,
++				"xm,fv-max-uv", &charger->dt.chg_voltage_max);
++	if (rc < 0)
++		charger->dt.chg_voltage_max = 4480;
++
++	rc = of_property_read_u32(node,
++				"xm,fcc-max-ua", &charger->dt.batt_current_max);
++	if (rc < 0)
++		charger->dt.batt_current_max = 3000;
++
++	rc = of_property_read_u32(node,
++				"xm,fv-max-design-uv", &charger->dt.chg_design_voltage_max);
++	if (rc < 0)
++		charger->dt.chg_design_voltage_max = 9000;
++
++	rc = of_property_read_u32(node,
++				"xm,icl-max-ua", &charger->dt.input_batt_current_max);
++	if (rc < 0)
++		charger->dt.input_batt_current_max = 2500;
++
++	rc = of_property_read_u32(node,
++				"xm,non_ffc_iterm", &charger->dt.non_ffc_ieoc);
++	if (rc < 0)
++		charger->dt.non_ffc_ieoc = 220;
++
++	rc = of_property_read_u32(node,
++				"xm,non_ffc_cv", &charger->dt.non_ffc_cv);
++	if (rc < 0)
++		charger->dt.non_ffc_cv = 4480;
++
++	rc = of_property_read_u32(node,
++				"xm,ffc_cv", &charger->dt.ffc_cv);
++	if (rc < 0)
++		charger->dt.ffc_cv = 4480;
++
++	rc = of_property_read_u32(node,
++				"xm,non_ffc_cc", &charger->dt.non_ffc_cc);
++	if (rc < 0)
++		charger->dt.non_ffc_cc = 3000;
++
++	rc = xm_charger_parse_dt_therm(charger);
++	if (rc < 0) {
++		charger_err("%s: Couldn't initialize parse_dt_therm rc = %d\n",
++				__func__, rc);
++		return rc;
++	}
++	return 0;
++};
++
++int xm_charger_init(struct xm_charger *charger)
++{
++	int rc = 0;
++
++	charger_err("%s: Start\n", __func__);
++
++	rc = check_qti_ops(&charger->battmg_dev);
++	if (!rc) {
++		charger_err("%s: xm_charger_check_qti_ops fail, rc=%d\n", __func__, rc);
++		return -EPROBE_DEFER;
++	}
++
++	device_init_wakeup(charger->dev, true);
++
++	rc = xm_charger_parse_dt(charger);
++	if (rc < 0) {
++		charger_err("%s: Couldn't parse device tree rc=%d\n", __func__, rc);
++		goto cleanup;
++	}
++
++	rc = xm_charger_create_votable(charger);
++	if (rc < 0) {
++		charger_err("%s: xm_charger_create_votable fail, rc=%d\n", __func__, rc);
++		goto cleanup;
++	}
++
++	rc = xm_charger_votable_init(charger);
++	if (rc < 0) {
++		charger_err("%s: xm_charger_votable_init fail, rc=%d\n", __func__, rc);
++		goto cleanup;
++	}
++
++	rc = charger_jeita_init(charger);
++	if (rc < 0) {
++		charger_err("%s: xm_stepchg_jeita_init fail rc=%d\n", __func__, rc);
++		goto cleanup;
++	}
++
++	// rc = xm_chg_feature_init(charger);
++	// if (rc < 0) {
++	// 	charger_err("%s: Couldn't init xm_chg_feature_init rc=%d\n", __func__, rc);
++	// 	return;
++	// }
++
++	charger->batt_psy = power_supply_get_by_name("battery");
++	charger->usb_psy = power_supply_get_by_name("usb");
++	if (!charger->batt_psy || !charger->usb_psy) { rc = -EPROBE_DEFER; goto cleanup; }
++	if(charger->batt_psy && charger->usb_psy) {
++		charger_err("init successfully \n");
++	}
++
++	charger_err("%s: End\n", __func__);
++
++	return 0;
++cleanup:
++ xm_charger_deinit(charger);
++ return rc;
++}
++EXPORT_SYMBOL(xm_charger_init);
++
++void xm_charger_deinit(struct xm_charger *charger)
++{
++ charger_jeita_deinit(charger);
++ xm_charger_destroy_votable(charger);
++ if (charger->batt_psy) power_supply_put(charger->batt_psy);
++ if (charger->usb_psy) power_supply_put(charger->usb_psy);
++ if (charger->battmg_dev) put_device(&charger->battmg_dev->dev);
++ charger->batt_psy = NULL; charger->usb_psy = NULL; charger->battmg_dev = NULL;
++ device_init_wakeup(charger->dev, false);
++}
++EXPORT_SYMBOL(xm_charger_deinit);
++
++MODULE_DESCRIPTION("Xiaomi charger core");
++MODULE_AUTHOR("getian@xiaomi.com");
++MODULE_LICENSE("GPL v2");
+--- /dev/null
++++ b/sheng-ports/pogo/battmngr/xm_charger_feature.c
+@@ -0,0 +1,307 @@
++
++#include <linux/battmngr/xm_charger_core.h>
++#include <linux/battmngr/xm_battery_core.h>
++
++int xm_get_adapter_power_max(void)
++{
++	int val;
++	int apdo_max = 0;
++	int apdo_max_volt = 0, apdo_max_curr = 0;
++
++	if (g_xm_charger->input_suspend == 1)
++		return 0;
++
++	//xm_battmngr_read_iio_prop(g_battmngr_iio, PD_PHY, PD_APDO_VOLT_MAX, &apdo_max_volt);
++	//xm_battmngr_read_iio_prop(g_battmngr_iio, PD_PHY, PD_APDO_CURR_MAX, &apdo_max_curr);
++	apdo_max = (apdo_max_volt * apdo_max_curr) / 1000000;
++	charger_err("apdo_max:%d\n", apdo_max);
++
++	if (apdo_max == 65)
++		val = APDO_MAX_65W; /* only for J1 65W adapter */
++	else if (apdo_max >= 60)
++		val = APDO_MAX_67W;
++	else if (apdo_max >= 55 && apdo_max < 60)
++		val = APDO_MAX_55W;
++	else if (apdo_max >= 50 && apdo_max < 55)
++		val = APDO_MAX_50W;
++	else
++		val = apdo_max;
++
++	return val;
++}
++EXPORT_SYMBOL(xm_get_adapter_power_max);
++
++int xm_get_soc_decimal(void)
++{
++	int val = 0;
++
++	//xm_battmngr_read_iio_prop(g_battmngr_iio, BATT_FG, BATT_FG_SOC_DECIMAL, &val);
++
++	return val;
++}
++EXPORT_SYMBOL(xm_get_soc_decimal);
++
++int xm_get_soc_decimal_rate(void)
++{
++	int val = 0;
++
++	//xm_battmngr_read_iio_prop(g_battmngr_iio, BATT_FG, BATT_FG_SOC_DECIMAL_RATE, &val);
++	if(val > 100 || val < 0)
++		val = 0;
++
++	return val;
++}
++EXPORT_SYMBOL(xm_get_soc_decimal_rate);
++
++struct quick_charge adapter_cap[11] = {
++	{ POWER_SUPPLY_USB_TYPE_SDP,    QUICK_CHARGE_NORMAL },
++	{ POWER_SUPPLY_USB_TYPE_DCP,    QUICK_CHARGE_NORMAL },
++	{ POWER_SUPPLY_USB_TYPE_CDP,    QUICK_CHARGE_NORMAL },
++	{ POWER_SUPPLY_USB_TYPE_ACA,    QUICK_CHARGE_NORMAL },
++	{ POWER_SUPPLY_TYPE_USB_FLOAT,  QUICK_CHARGE_NORMAL },
++	{ POWER_SUPPLY_USB_TYPE_PD,       QUICK_CHARGE_FAST },
++	{ POWER_SUPPLY_TYPE_USB_HVDCP,    QUICK_CHARGE_FAST },
++	{ POWER_SUPPLY_TYPE_USB_HVDCP_3,  QUICK_CHARGE_FAST },
++	{ POWER_SUPPLY_TYPE_USB_HVDCP_3P5,  QUICK_CHARGE_FAST },
++	{ POWER_SUPPLY_TYPE_WIRELESS,     QUICK_CHARGE_FAST },
++	{0, 0},
++};
++int xm_get_quick_charge_type(void)
++{
++	int val = 0, i=0;
++	int power_max = 0;
++	int real_charger_type;
++
++	if (g_xm_charger->pd_active) {
++			real_charger_type = POWER_SUPPLY_USB_TYPE_PD;
++	} else {
++		real_charger_type = g_xm_charger->bc12_type;
++	}
++
++	charger_err("real charger type : %d\n ", real_charger_type);
++
++	//xm_battmngr_read_iio_prop(g_battmngr_iio, BATT_FG, BATT_FG_TEMP, &val);
++	if ((val >= BATT_WARM_THRESHOLD) || (val < LIGHTING_ICON_CHANGE)) {
++		charger_err("battery temp is under 5 or above 48\n");
++		return QUICK_CHARGE_NORMAL;
++	}
++	else if ((real_charger_type == POWER_SUPPLY_USB_TYPE_PD) && g_xm_charger->pd_verified) {
++		power_max = xm_get_adapter_power_max();
++		charger_err("power_max : %d\n ", power_max);
++
++		if (power_max >= 50)
++			return QUICK_CHARGE_SUPER;
++		else
++			return QUICK_CHARGE_TURBE;
++	}
++	else if (real_charger_type == POWER_SUPPLY_USB_TYPE_PD) {
++		return QUICK_CHARGE_FAST;
++	}
++	else {
++		while (adapter_cap[i].adap_type != 0) {
++			if (real_charger_type == adapter_cap[i].adap_type) {
++				return adapter_cap[i].adap_cap;
++			}
++			i++;
++		}
++	}
++
++	return 0;
++}
++EXPORT_SYMBOL(xm_get_quick_charge_type);
++
++#define MAX_UEVENT_LENGTH 50
++static void generate_xm_charge_uvent(struct work_struct *work)
++{
++	int count;
++	struct chg_feature_info *chip = container_of(work,
++			struct chg_feature_info, xm_prop_change_work.work);
++
++
++	static char uevent_string[][MAX_UEVENT_LENGTH+1] = {
++		"POWER_SUPPLY_SOC_DECIMAL=\n",	//length=31+8
++		"POWER_SUPPLY_SOC_DECIMAL_RATE=\n",	//length=31+8
++		"POWER_SUPPLY_QUICK_CHARGE_TYPE=\n",
++	};
++	static char *envp[] = {
++		uevent_string[0],
++		uevent_string[1],
++		uevent_string[2],
++		NULL,
++	};
++	char *prop_buf = NULL;
++
++	count = chip->update_cont;
++	if(chip->update_cont < 0)
++		return;
++
++	prop_buf = (char *)get_zeroed_page(GFP_KERNEL);
++	if (!prop_buf)
++		return;
++
++	scnprintf(prop_buf, PAGE_SIZE, "%u", xm_get_soc_decimal());
++	strncpy(uevent_string[0]+25, prop_buf,MAX_UEVENT_LENGTH-25);
++
++	scnprintf(prop_buf, PAGE_SIZE, "%u", xm_get_soc_decimal_rate());
++	strncpy(uevent_string[1]+30, prop_buf,MAX_UEVENT_LENGTH-30);
++
++	scnprintf(prop_buf, PAGE_SIZE, "%u", xm_get_quick_charge_type());
++	strncpy(uevent_string[2]+31, prop_buf,MAX_UEVENT_LENGTH-31);
++
++	charger_err("uevent test : %s, %s, %s, count %d\n",
++			envp[0], envp[1], envp[2], count);
++
++	/*add our prop end*/
++
++	kobject_uevent_env(&chip->dev->kobj, KOBJ_CHANGE, envp);
++
++	free_page((unsigned long)prop_buf);
++	chip->update_cont = count - 1;
++	schedule_delayed_work(&chip->xm_prop_change_work, msecs_to_jiffies(CONN_THERM_DELAY_2S));
++	return;
++}
++
++static int xm_get_prop_battery_input_suspend(void)
++{
++	int val;
++	val = (get_client_vote(g_xm_charger->fcc_votable, USER_VOTER) == 0);
++	return val;
++}
++
++static int xm_set_prop_battery_input_suspend(int val)
++{
++	int rc;
++
++	/* vote 0mA when battery suspended */
++	rc = vote(g_xm_charger->fcc_votable, USER_VOTER, (bool)val, 0);
++	if (rc < 0) {
++		battery_err("%s: Couldn't vote to %s fcc rc=%d\n",__func__,
++			(bool)val ? "suspend" : "resume", rc);
++		return rc;
++	}
++	g_xm_charger->chg_feature->battery_input_suspend = val;
++
++	power_supply_changed(g_xm_charger->batt_psy);
++	return rc;
++}
++
++static void night_chargig_change_work(struct work_struct *work)
++{
++	struct chg_feature_info *chip = container_of(work,
++			struct chg_feature_info, night_chargig_change_work.work);
++
++	static int pre_night_chg_flag = 0;
++	int capacity = 0, battery_input_suspend = 0;
++	int val = 0, rc = 0;
++
++	//rc = xm_battmngr_read_iio_prop(g_battmngr_iio, BATT_FG, BATT_FG_CAPACITY, &capacity);
++	battery_input_suspend = xm_get_prop_battery_input_suspend();
++	battery_err("%s: capacity:%d, battery_input_suspend:%d.\n", __func__,
++			capacity, battery_input_suspend);
++	battery_err("%s: pre_nchg:%d, nchg:%d.\n", __func__,
++			pre_night_chg_flag, g_xm_charger->chg_feature->night_chg_flag);
++
++	if (pre_night_chg_flag != g_xm_charger->chg_feature->night_chg_flag) {
++		if (g_xm_charger->chg_feature->night_chg_flag && capacity >= 80) {
++			val = 1;
++			rc = xm_set_prop_battery_input_suspend(val);
++			battery_err("%s: open night charging.\n", __func__);
++			pre_night_chg_flag = g_xm_charger->chg_feature->night_chg_flag;
++		}
++	}
++
++	if (battery_input_suspend &&
++			(!g_xm_charger->chg_feature->night_chg_flag || capacity <= 75)) {
++		val = 0;
++		xm_set_prop_battery_input_suspend(val);
++		battery_err("%s: close night charging.\n", __func__);
++		pre_night_chg_flag = 0;
++	}
++
++	schedule_delayed_work(&chip->night_chargig_change_work, msecs_to_jiffies(CONN_THERM_DELAY_10S));
++	return;
++}
++
++int night_charging_start_stop(struct xm_charger *charger,
++			struct chg_feature_info *chip)
++{
++	charger_err("%s\n", __func__);
++
++	if (g_xm_charger->bc12_active || g_xm_charger->pd_active) {
++		cancel_delayed_work_sync(&chip->night_chargig_change_work);
++		schedule_delayed_work(&chip->night_chargig_change_work, 0);
++	} else {
++		cancel_delayed_work_sync(&chip->night_chargig_change_work);
++	}
++
++	return 0;
++}
++
++static int xm_chg_feature_parse_dt(struct device *dev,
++				struct chg_feature_info *chip)
++{
++	int ret = 0;
++	struct device_node *np = dev->of_node;
++
++	chip->vbus_ctrl_gpio = of_get_named_gpio(np, "vbus_ctrl_gpio", 0);
++	if (chip->vbus_ctrl_gpio < 0) {
++		charger_err("%s no vbus_ctrl_gpio info\n", __func__);
++		return ret;
++	} else {
++		charger_err("%s vbus_ctrl_gpio info %d\n", __func__,
++				chip->vbus_ctrl_gpio);
++	}
++
++	return 0;
++}
++
++int xm_chg_feature_init(struct xm_charger *charger)
++{
++	int ret;
++	struct chg_feature_info *chip;
++
++	charger_err("%s: Start\n", __func__);
++
++	if (charger->chg_feature) {
++		charger_err("%s: Already initialized\n", __func__);
++		return -EINVAL;
++	}
++
++	chip = devm_kzalloc(charger->dev, sizeof(*chip), GFP_KERNEL);
++	if (!chip)
++		return -ENOMEM;
++	chip->dev = charger->dev;
++	chip->update_cont = 0;
++
++	ret = xm_chg_feature_parse_dt(chip->dev, chip);
++	if (ret) {
++		charger_err("%s parse dt fail(%d)\n", __func__, ret);
++		return ret;
++	}
++
++	INIT_DELAYED_WORK( &chip->xm_prop_change_work, generate_xm_charge_uvent);
++	INIT_DELAYED_WORK( &chip->night_chargig_change_work, night_chargig_change_work);
++
++	schedule_delayed_work(&chip->xm_prop_change_work,
++			msecs_to_jiffies(30000));
++
++	charger->chg_feature = chip;
++	charger_err("%s: End\n", __func__);
++
++	return 0;
++}
++
++void xm_chg_feature_deinit(void)
++{
++	struct chg_feature_info *chip = g_xm_charger->chg_feature;
++
++	if (!chip)
++		return;
++
++	cancel_delayed_work_sync(&chip->xm_prop_change_work);
++	cancel_delayed_work_sync(&chip->night_chargig_change_work);
++	chip = NULL;
++
++	return;
++}
++
+--- /dev/null
++++ b/sheng-ports/pogo/battmngr/xm_charger_ffc.c
+@@ -0,0 +1,152 @@
++
++#include <linux/battmngr/xm_charger_core.h>
++#include <../extSOC/inc/virtual_fg.h>
++
++static int xm_charger_config_iterm(struct xm_charger *charger, int mode)
++{
++	int rc = 0, val = 0;
++	int batt_temp;
++	union power_supply_propval pval = {
++		0,
++	};
++	//rc = xm_battmngr_read_iio_prop(g_battmngr_iio, BATT_FG,
++			//BATT_FG_TEMP, &val);
++	rc = power_supply_get_property(charger->batt_psy,
++			POWER_SUPPLY_PROP_TEMP, &pval);
++	if (rc < 0) {
++		charger_err("%s: Couldn't get battery temp:%d\n",
++					__func__, rc);
++		return rc;
++	}
++	batt_temp = pval.intval;
++	charger_err("%s: batt_temp:%d\n", __func__, batt_temp);
++	if (mode) {
++		if (batt_temp >= BATT_NORMAL_H_THRESHOLD)
++			val = charger->dt.ffc_ieoc_h;
++		else
++			val = charger->dt.ffc_ieoc_l;
++	} else {
++		val = charger->dt.non_ffc_ieoc;
++	}
++	val /= 1000;
++
++	charger_err("%s: charger_config_iterm:%d\n", __func__, val);
++	if (check_qti_ops(&charger->battmg_dev))
++		rc = battmngr_qtiops_set_term_cur(charger->battmg_dev, val);
++	if (rc < 0) {
++		charger_err("%s: Couldn't get charge term:%d\n",
++					__func__, rc);
++		return rc;
++	}
++
++	return 0;
++}
++
++int xm_charger_get_fastcharge_mode(struct xm_charger *charger, int *mode)
++{
++	int rc = 0;
++	int fastcharge_mode = 0;
++	//rc = xm_battmngr_read_iio_prop(g_battmngr_iio, BATT_FG,
++			//BATT_FG_FASTCHARGE_MODE, mode);
++	if (check_qti_ops(&charger->battmg_dev))
++		fastcharge_mode = battmngr_qtiops_get_fg1_fastcharge(charger->battmg_dev);
++
++	if (rc < 0) {
++		charger_err("%s: Couldn't write fastcharge mode:%d\n",
++					__func__, rc);
++		return rc;
++	}
++	*mode = fastcharge_mode;
++	charger_err("%s:  fastcharge mode:%d\n",
++					__func__, fastcharge_mode);
++	return 0;
++}
++
++int xm_charger_set_fastcharge_mode(struct xm_charger *charger, int mode)
++{
++	int rc = 0, val = 0, rc1=0;
++	int batt_temp;
++	union power_supply_propval pval = {0, };
++	int chip_ok = 0;
++
++	if (check_qti_ops(&charger->battmg_dev))
++		val = battmngr_qtiops_get_batt_auth(charger->battmg_dev);
++
++	if (val < 0) {
++		charger_err("%s: Couldn't get battery authentic:%d\n",
++					__func__, val);
++		return val;
++	}
++	charger_err("%s: get battery authentic:%d\n",__func__, val);
++	if (!val)
++		mode = false;
++
++	/*if soc > 95 do not set fastcharge flag*/
++	if (!charger->batt_psy)
++		charger->batt_psy = power_supply_get_by_name("battery");
++
++	rc = power_supply_get_property(charger->batt_psy,
++				POWER_SUPPLY_PROP_CAPACITY, &pval);
++	charger_err("%s: get fg capacity:%d\n",__func__, pval.intval);
++	if (rc < 0) {
++		charger_err("%s: Couldn't get fg capacity:%d\n",
++					__func__, rc);
++		return rc;
++	}
++	if (mode && pval.intval >= SOC_HIGH_THRESHOLD) {
++		charger_err("%s: soc:%d is more than 95, do not setfastcharge mode\n",
++					__func__, pval.intval);
++		mode = false;
++	}
++
++	/*if temp > 480 or temp < 150 do not set fastcharge flag*/
++	rc = power_supply_get_property(charger->batt_psy, POWER_SUPPLY_PROP_TEMP, &pval);
++	batt_temp = pval.intval;
++	charger_err("%s: get fg temp:%d\n",__func__, batt_temp);
++	if (rc < 0) {
++		charger_err("%s: Couldn't get fg temp:%d\n",
++					__func__, rc);
++		return rc;
++	}
++	if (mode && (batt_temp >= BATT_WARM_THRESHOLD  || batt_temp <= BATT_COOL_THRESHOLD)) {
++		charger_err("%s: temp:%d is abort, do not setfastcharge mode\n",
++					__func__, batt_temp);
++		mode = false;
++	}
++
++	if (check_qti_ops(&charger->battmg_dev))
++		chip_ok = battmngr_qtiops_get_chip_ok(charger->battmg_dev);
++
++	charger_err("%s: get fg chip_ok:%d\n",__func__, chip_ok);
++	if (chip_ok < 0) {
++		charger_err("%s: Couldn't get fg chip_ok:%d\n",
++					__func__, chip_ok);
++		return chip_ok;
++	}
++	if (mode && !chip_ok) {
++		charger_err("%s: chip_ok is :%d, do not setfastcharge mode\n",
++					__func__, chip_ok);
++		mode = false;
++	}
++
++	if (check_qti_ops(&charger->battmg_dev)) {
++		rc = battmngr_qtiops_set_fg1_fastcharge(charger->battmg_dev, mode);
++		rc = battmngr_qtiops_set_fg2_fastcharge(charger->battmg_dev, mode);
++
++	}
++	if (rc < 0 || rc1 < 0) {
++		charger_err("%s: Couldn't write fastcharge mode  FG1:%d\nFG2:%d\n",
++					__func__, rc, rc1);
++		return rc;
++	}
++
++	xm_charger_config_iterm(charger, mode);
++
++	//vote(charger->fcc_votable, FFC_MODE_VOTER, !mode, charger->dt.non_ffc_cc);
++	//vote(charger->fv_votable, FFC_MODE_VOTER, !mode, charger->dt.non_ffc_cv);
++
++	charger_err("%s: fastcharge mode:%d\n", __func__, mode);
++
++	return 0;
++}
++
+--- /dev/null
++++ b/sheng-ports/pogo/battmngr/xm_charger_thermal.c
+@@ -0,0 +1,162 @@
++#include "../sheng_consumer_notify.h"
++
++#include <linux/battmngr/xm_charger_core.h>
++
++int xm_charger_parse_dt_therm(struct xm_charger *charger)
++{
++	struct device_node *node = charger->dev->of_node;
++	int rc = 0, byte_len;
++
++
++	if (of_find_property(node, "xm,thermal-mitigation-icl", &byte_len)) {
++		charger->dt.thermal_mitigation_icl = devm_kzalloc(charger->dev, byte_len,
++			GFP_KERNEL);
++
++		if (charger->dt.thermal_mitigation_icl == NULL)
++			return -ENOMEM;
++
++		charger->thermal_levels = byte_len / sizeof(u32);
++		rc = of_property_read_u32_array(node,
++				"xm,thermal-mitigation-icl",
++				charger->dt.thermal_mitigation_icl,
++				charger->thermal_levels);
++		if (rc < 0) {
++			charger_err("%s: Couldn't read threm limits rc = %d\n",
++					__func__, rc);
++			return rc;
++		}
++	}
++
++	if (of_find_property(node, "xm,thermal-mitigation", &byte_len)) {
++		charger->dt.thermal_mitigation = devm_kzalloc(charger->dev, byte_len,
++			GFP_KERNEL);
++
++		if (charger->dt.thermal_mitigation == NULL)
++			return -ENOMEM;
++
++		charger->thermal_levels = byte_len / sizeof(u32);
++		rc = of_property_read_u32_array(node,
++				"xm,thermal-mitigation",
++				charger->dt.thermal_mitigation,
++				charger->thermal_levels);
++		if (rc < 0) {
++			charger_err("%s: Couldn't read threm limits rc = %d\n",
++					__func__, rc);
++			return rc;
++		}
++	}
++
++	if (of_find_property(node, "xm,thermal-mitigation-dcp", &byte_len)) {
++		charger->dt.thermal_mitigation_dcp = devm_kzalloc(charger->dev, byte_len,
++			GFP_KERNEL);
++
++		if (charger->dt.thermal_mitigation_dcp == NULL)
++			return -ENOMEM;
++
++		charger->thermal_levels = byte_len / sizeof(u32);
++		rc = of_property_read_u32_array(node,
++				"xm,thermal-mitigation-dcp",
++				charger->dt.thermal_mitigation_dcp,
++				charger->thermal_levels);
++		if (rc < 0) {
++			charger_err("%s: Couldn't read threm limits rc = %d\n",
++					__func__, rc);
++			return rc;
++		}
++	}
++
++	if (of_find_property(node, "xm,thermal-mitigation-qc2", &byte_len)) {
++		charger->dt.thermal_mitigation_qc2 = devm_kzalloc(charger->dev, byte_len,
++			GFP_KERNEL);
++
++		if (charger->dt.thermal_mitigation_qc2 == NULL)
++			return -ENOMEM;
++
++		charger->thermal_levels = byte_len / sizeof(u32);
++		rc = of_property_read_u32_array(node,
++				"xm,thermal-mitigation-qc2",
++				charger->dt.thermal_mitigation_qc2,
++				charger->thermal_levels);
++		if (rc < 0) {
++			charger_err("%s: Couldn't read threm limits rc = %d\n",
++					__func__, rc);
++			return rc;
++		}
++	}
++
++	if (of_find_property(node, "xm,thermal-mitigation-pd", &byte_len)) {
++		charger->dt.thermal_mitigation_pd = devm_kzalloc(charger->dev, byte_len,
++				GFP_KERNEL);
++
++		if (charger->dt.thermal_mitigation_pd == NULL)
++			return -ENOMEM;
++
++		charger->thermal_levels = byte_len / sizeof(u32);
++		rc = of_property_read_u32_array(node,
++				"xm,thermal-mitigation-pd",
++				charger->dt.thermal_mitigation_pd,
++				charger->thermal_levels);
++		if (rc < 0) {
++			charger_err("%s: Couldn't read threm limits rc = %d\n",
++					__func__, rc);
++			return rc;
++		}
++	}
++
++	if (of_find_property(node, "xm,thermal-mitigation-pd-cp", &byte_len)) {
++		charger->dt.thermal_mitigation_pd_cp = devm_kzalloc(charger->dev, byte_len,
++				GFP_KERNEL);
++
++		if (charger->dt.thermal_mitigation_pd_cp == NULL)
++			return -ENOMEM;
++
++		charger->thermal_levels = byte_len / sizeof(u32);
++		rc = of_property_read_u32_array(node,
++				"xm,thermal-mitigation-pd-cp",
++				charger->dt.thermal_mitigation_pd_cp,
++				charger->thermal_levels);
++		if (rc < 0) {
++			charger_err("%s: Couldn't read threm limits rc = %d\n",
++					__func__, rc);
++			return rc;
++		}
++	}
++
++	return rc;
++}
++
++int xm_charger_thermal(struct xm_charger *charger)
++{
++	SHENG_CONSUMER_STATE(noti_data);
++	if (!noti_data)
++		return -ENODEV;
++
++	int rc = 0;
++	int thermal_fcc = 0;
++
++	charger->system_temp_level = noti_data->misc_msg.thermal_level;
++	if ((charger->system_temp_level >= MAX_TEMP_LEVEL) ||
++			(charger->system_temp_level < 0))
++		return -EINVAL;
++
++	switch (charger->real_type) {
++	case POWER_SUPPLY_TYPE_USB_PD:
++		thermal_fcc = charger->dt.thermal_mitigation_pd[charger->system_temp_level];
++		break;
++	default:
++		thermal_fcc = charger->dt.thermal_mitigation_pd[charger->system_temp_level];
++		break;
++	}
++
++	rc = vote(charger->fcc_votable, THERMAL_DAEMON_VOTER, true, thermal_fcc);
++	if (rc < 0)
++		charger_err("%s: Couldn't disable USB thermal FCC vote rc = %d\n",
++				__func__, rc);
++
++	charger_err("%s: chg->system_temp_level: %d, thermal_fcc:%d, real_type:%d\n",
++		__func__, charger->system_temp_level, thermal_fcc, charger->real_type);
++
++	return rc;
++}
++EXPORT_SYMBOL(xm_charger_thermal);
++
+--- /dev/null
++++ b/sheng-ports/pogo/battmngr/xm_charger_votable.c
+@@ -0,0 +1,124 @@
++
++//#include <linux/battmngr/xm_charger_core.h>
++#include <linux/battmngr/qti_use_pogo.h>
++void xm_charger_destroy_votable(struct xm_charger *charger);
++
++
++static int xm_charger_fcc_vote_callback(struct votable *votable,
++			void *data, int value, const char *client)
++{
++
++	int rc = 0;
++
++	rc = write_voter_prop_id(Nanosic_FCC, value);
++	if (rc < 0) {
++		charger_err("%s, %s Failed to set FCC (%d uA) rc=%d\n", __func__, client, value, rc);
++	} else {
++		charger_err("%s: %s vote FCC = %d\n", __func__, client, value);
++	}
++
++	return rc;
++}
++
++static int xm_charger_fv_vote_callback(struct votable *votable,
++			void *data, int value, const char *client)
++{
++	int rc = 0;
++
++	rc = write_voter_prop_id(Nanosic_FV, value);
++	if (rc < 0) {
++		charger_err("%s, %s Failed to set FV (%d uA) rc=%d\n", __func__, client, value, rc);
++	} else {
++		charger_err("%s: %s vote FV = %d\n", __func__, client, value);
++
++	}
++
++	return rc;
++}
++
++static int xm_charger_icl_vote_callback(struct votable *votable,
++			void *data, int value, const char *client)
++{
++
++
++	int rc = 0;
++
++	rc = write_voter_prop_id(Nanosic_ICL, value);
++
++	if (rc < 0) {
++		charger_err("%s, %s Failed to set ICL (%d uA) rc=%d\n", __func__, client, value, rc);
++		return -ENODEV;
++	} else {
++		charger_err("%s: %s vote ICL = %d\n", __func__,  client, value);
++	}
++
++	return 0;
++}
++
++
++static int xm_charger_awake_vote_callback(struct votable *votable,
++			void *data, int awake, const char *client)
++{
++	struct xm_charger *charger = data;
++
++	if (awake)
++		pm_stay_awake(charger->dev);
++	else
++		pm_relax(charger->dev);
++
++	return 0;
++}
++
++static int xm_charger_input_suspend_vote_callback(struct votable *votable,
++			void *data, int value, const char *client)
++{
++	int ret = 0;
++
++	charger_err("%s: vote INPUT_SUSPEND = %d\n", __func__, value);
++
++	return ret;
++}
++
++static int xm_charger_smart_batt_vote_callback(struct votable *votable,
++			void *data, int value, const char *client)
++{
++	int ret = 0;
++
++	charger_err("%s: vote SMART_BATT = %d\n", __func__, value);
++
++	return ret;
++}
++
++void xm_charger_destroy_votable(struct xm_charger *charger)
++{
++ struct votable **votes[] = { &charger->smart_batt_votable, &charger->input_suspend_votable,
++  &charger->awake_votable, &charger->usb_icl_votable, &charger->fv_votable, &charger->fcc_votable };
++ unsigned int i;
++ for (i = 0; i < ARRAY_SIZE(votes); i++) {
++  if (!IS_ERR_OR_NULL(*votes[i])) destroy_votable(*votes[i]);
++  *votes[i] = NULL;
++ }
++}
++
++int xm_charger_create_votable(struct xm_charger *charger)
++{
++ int ret;
++ if (!check_g_bcdev_ops()) return -EPROBE_DEFER;
++ charger->fcc_votable = create_votable("FCC", VOTE_MIN, xm_charger_fcc_vote_callback, charger);
++ if (IS_ERR(charger->fcc_votable)) { ret = PTR_ERR(charger->fcc_votable); goto failure; }
++ charger->fv_votable = create_votable("FV", VOTE_MIN, xm_charger_fv_vote_callback, charger);
++ if (IS_ERR(charger->fv_votable)) { ret = PTR_ERR(charger->fv_votable); goto failure; }
++ charger->usb_icl_votable = create_votable("ICL", VOTE_MIN, xm_charger_icl_vote_callback, charger);
++ if (IS_ERR(charger->usb_icl_votable)) { ret = PTR_ERR(charger->usb_icl_votable); goto failure; }
++ charger->awake_votable = create_votable("AWAKE", VOTE_SET_ANY, xm_charger_awake_vote_callback, charger);
++ if (IS_ERR(charger->awake_votable)) { ret = PTR_ERR(charger->awake_votable); goto failure; }
++ charger->input_suspend_votable = create_votable("INPUT_SUSPEND", VOTE_SET_ANY, xm_charger_input_suspend_vote_callback, charger);
++ if (IS_ERR(charger->input_suspend_votable)) { ret = PTR_ERR(charger->input_suspend_votable); goto failure; }
++ charger->smart_batt_votable = create_votable("SMART_BATT", VOTE_MIN, xm_charger_smart_batt_vote_callback, charger);
++ if (IS_ERR(charger->smart_batt_votable)) { ret = PTR_ERR(charger->smart_batt_votable); goto failure; }
++ return 0;
++failure:
++ xm_charger_destroy_votable(charger);
++ return ret;
++}
++
+--- /dev/null
++++ b/sheng-ports/pogo/extSOC/inc/nano_macro.h
+@@ -0,0 +1,196 @@
++﻿/** ***************************************************************************
++ * @file nano_macro.h
++ *
++ */
++#ifndef _NANO_MACRO_H_
++#define _NANO_MACRO_H_
++
++#include <linux/device.h>
++#include <linux/sched.h>
++#include <linux/slab.h>
++#include <linux/version.h>
++#include <linux/delay.h>
++#include <linux/gpio.h>
++#include <linux/i2c.h>
++#include <linux/interrupt.h>
++#include <linux/input.h>
++#include <linux/timer.h>
++#include <linux/timex.h>
++#include <linux/rtc.h>
++#include <linux/types.h>
++#include <linux/notifier.h>
++#include <linux/module.h>
++#include <linux/kernel.h>
++#include <linux/workqueue.h>
++#include <linux/battmngr/battmngr_notifier.h>
++#include <linux/power_supply.h>
++#include <linux/battmngr/battmngr_voter.h>
++#include <linux/battmngr/platform_class.h>
++
++#define DRV_VERSION  "1.0.16"
++
++#define DRV_TOKEN    "nano_charge"
++
++#define DEBUG_LEVEL	            (7)
++#define INFO_LEVEL	            (5)
++#define ERROR_LEVEL	            (3)
++#define ALERT_LEVEL	            (1)
++
++#define I2C_DATA_LENGTH_WRITE   (66)
++
++#define I2C_DATA_LENGTH_READ    (68)
++
++#define FIELD_HOST              (0x80)
++#define FIELD_803X              (0x18)
++#define FIELD_176X              (0x38)
++#define FIELD_CHARGE            (0x81)
++
++#define SET_CHARGE_POWER_OFF    (6)
++#define SET_CHARGE_REG_ADDR_OFF (8)
++#define SET_CHARGE_REG_LENG_OFF (9)
++#define SET_CHARGE_REG_DATA_OFF (10)
++
++#define CMD_OK                  (0)
++
++#define CMD_MCU_RSP                  (0xF0)
++
++#define CMD_DEVICE_CONN_STATUS_RSP   (0x52)
++
++#define CMD_KEYBOARD_CONN_STATUS_RSP (0xA2)
++#define CMD_KEYBOARD_READ_VERSION_RSP (0x1)
++
++#define CMD_READ_CHARGE_STATUS       (0x40)
++#define CMD_READ_CHARGE_STATUS_RSP   (0x41)
++
++#define CMD_SET_CHARGE_REG           (0x42)
++#define CMD_SET_CHARGE_REG_RSP       (0x43)
++
++
++typedef int (*IIC_write_cb)(uint8_t* data,uint32_t datalen);
++typedef int (*ADSP_read_cb)(uint8_t* data,uint32_t datalen);
++typedef int (*i2c_write_cb)(void *buf, size_t len);
++
++/*
++ * Logging and Debugging
++ */ 
++    /* The main debug macro.  Uncomment to enable debug messages */
++#define DEBUG
++
++    /* Make sure we have a per-module token */
++#ifndef DRV_TOKEN
++#error Module must #define DRV_TOKEN to be a short nickname of the module.
++#endif
++    /* Error messages -- always sent to log */
++#undef errprint
++#undef errmsg
++#define errprint(__format_and_args...) \
++    printk(DRV_TOKEN ": ERROR: " __format_and_args)
++
++#define errmsg(__msg...) errprint(DRV_TOKEN,##__msg)
++
++static int debuglevel = 7;
++
++#undef dbgprint
++#undef dbgmsg
++#define dbgprint(__level, __format,__args...)   \
++do {                                            \
++    if ((int)debuglevel >= (int)__level) {      \
++        struct timespec64 ts;                   \
++        struct rtc_time tm;                     \
++        ktime_get_real_ts64(&ts);               \
++        rtc_time64_to_tm(ts.tv_sec,&tm);        \
++        switch((int)debuglevel) {               \
++            case 0: \
++            case 1: \
++            case 2:  printk("[%02d:%02d:%02d.%03zu] <2>" DRV_TOKEN ": " __format , tm.tm_hour, tm.tm_min, tm.tm_sec, ts.tv_nsec/1000000, ##__args); break; \
++            case 3:  printk("[%02d:%02d:%02d.%03zu] <3>" DRV_TOKEN ": " __format , tm.tm_hour, tm.tm_min, tm.tm_sec, ts.tv_nsec/1000000, ##__args); break; \
++            case 4:  printk("[%02d:%02d:%02d.%03zu] <4>" DRV_TOKEN ": " __format , tm.tm_hour, tm.tm_min, tm.tm_sec, ts.tv_nsec/1000000, ##__args); break; \
++            case 5:  printk("[%02d:%02d:%02d.%03zu] <5>" DRV_TOKEN ": " __format , tm.tm_hour, tm.tm_min, tm.tm_sec, ts.tv_nsec/1000000, ##__args); break; \
++            case 6:  printk("[%02d:%02d:%02d.%03zu] <6>" DRV_TOKEN ": " __format , tm.tm_hour, tm.tm_min, tm.tm_sec, ts.tv_nsec/1000000, ##__args); break; \
++            default: printk("[%02d:%02d:%02d.%03zu] <7>" DRV_TOKEN ": " __format , tm.tm_hour, tm.tm_min, tm.tm_sec, ts.tv_nsec/1000000, ##__args); break; \
++        } \
++    }\
++} while (0)
++
++#ifdef DEBUG
++    /**
++     * @brief Send a debug message to the log facility.
++     * @ingroup albrxdoc_util
++     * @details This macro sends a message to the logging facility with a
++     * simple token prefix.  This message is delivered iff the __level
++     * parameter is not greater than the value of the \c debug static variable.
++     * @note If \c DEBUG is undefined (i.e. the \#define is not active), no
++     * debug messages are sent to the logging facility, regardless of level.
++     */
++#define dbgmsg(__level,__msg...) dbgprint(__level,DRV_TOKEN,##__msg)
++#else /* !DEBUG */
++#define dbgmsg(__level,__msg...)
++#endif
++    /* Assertions -- only checked if DEBUG is defined */
++#undef ASSERT
++#ifdef DEBUG
++#define ASSERT(__condition,__fail_action) \
++    do { \
++        if (!(__condition)) { \
++            errmsg("ASSERT(%s:%d): %s\n",__FILE__,__LINE__,#__condition); \
++            __fail_action ; \
++        } \
++    } while (0)
++#else
++#define ASSERT(__c,__f)
++#endif
++
++#define STREAM_TO_UINT8(u8, p)   {u8 = (unsigned char)(*(p)); (p) += 1;}
++#define STREAM_TO_UINT16(u16, p) {u16 = ((unsigned short)(*(p)) + (((unsigned short)(*((p) + 1))) << 8)); (p) += 2;}
++
++struct nanochg {
++    struct device *dev;
++	unsigned int    status;
++	int		vbus_type;
++	int		charge_type;
++    u8    online;
++    u8      pd_flag;
++    u8      dpdm_in_state;
++    u8      dpdm;
++    int     protocol_volt;
++    int     protocol_curr;
++
++	bool	enabled;
++
++	int		vbus_volt;
++	int		vbat_volt;
++
++	struct power_supply *batt_psy;
++	struct power_supply *usb_psy;
++
++	struct votable *fcc_votable;
++	struct votable *usb_icl_votable;
++
++	int old_type;
++	int curr_flag;
++	bool force_exit_flag;
++	int count;
++	int input_suspend;
++	int dpdm_enabled;
++	u8 vbus_state;
++	u8 power_state;
++	u8 gObject;
++
++    struct mutex nano_i2c_write_mutex;
++    i2c_write_cb pogo_charge_i2c_write;
++
++    struct delayed_work	analyse_rawdata_work;
++};
++
++int Nanosic_Analysis_RawData(void *buf);
++
++extern struct nanochg* g_nodev;
++
++extern int  Nanosic_ADSP_Set_Charge_Status_Single(uint8_t addr, uint8_t addrlen, uint8_t* data, uint32_t datalen);
++extern int  Nanosic_ADSP_Set_Charge_Status(uint8_t* data,uint32_t datalen);
++extern int  Nanosic_ADSP_Read_Charge_Status(void);
++extern int  Nanosic_ADSP_Control_Charge_Power(bool on);
++extern int Nanosic_ADSP_Read_Charge_Status_Single(uint8_t addr);
++
++#endif /* _ALBRX_H_ */
++
+--- /dev/null
++++ b/sheng-ports/pogo/extSOC/inc/virtual_fg.h
+@@ -0,0 +1,370 @@
++
++#ifndef __VIRTUAL_FG_H
++#define __VIRTUAL_FG_H
++
++#include <linux/module.h>
++#include <linux/param.h>
++#include <linux/jiffies.h>
++#include <linux/workqueue.h>
++#include <linux/delay.h>
++#include <linux/platform_device.h>
++#include <linux/power_supply.h>
++#include <linux/i2c.h>
++#include <linux/slab.h>
++#include <linux/uaccess.h>
++#include <linux/interrupt.h>
++#include <linux/gpio/consumer.h>
++#include <linux/regmap.h>
++#include <linux/random.h>
++#include <linux/ktime.h>
++#include <linux/time.h>
++#include <linux/battmngr/battmngr_notifier.h>
++#include <linux/battmngr/battmngr_voter.h>
++#include <linux/battmngr/qti_use_pogo.h>
++#include "linux/battmngr/platform_class.h"
++
++enum print_reason {
++	PR_INTERRUPT    = BIT(0),
++	PR_REGISTER     = BIT(1),
++	PR_OEM		= BIT(2),
++	PR_DEBUG	= BIT(3),
++};
++
++#define PROBE_CNT_MAX	50
++
++#define	INVALID_REG_ADDR	0xFF
++
++#define FG_FLAGS_FD				BIT(4)
++#define	FG_FLAGS_FC				BIT(5)
++#define	FG_FLAGS_DSG				BIT(6)
++#define FG_FLAGS_RCA				BIT(9)
++#define FG_FLAGS_FASTCHAGE			BIT(5)
++
++#define BATTERY_DIGEST_LEN 32
++
++#define DEFUALT_FULL_DESIGN		5000
++
++#define BQ_REPORT_FULL_SOC	9800
++#define BQ_CHARGE_FULL_SOC	9750
++#define BQ_RECHARGE_SOC		9800
++#define BQ_DEFUALT_FULL_SOC		100
++
++#define BATT_NORMAL_H_THRESHOLD		350
++
++#define TI_TERM_CURRENT_L		1100
++#define TI_TERM_CURRENT_H		1232
++
++#define NFG_TERM_CURRENT_L		1237
++#define NFG_TERM_CURRENT_H		1458
++
++#define BQ27Z561_DEFUALT_TERM		-200
++#define BQ27Z561_DEFUALT_FFC_TERM	-680
++#define BQ27Z561_DEFUALT_RECHARGE_VOL	4380
++
++#define NO_FFC_OVER_FV	(4464 * 1000)
++#define STEP_FV	(16 * 1000)
++#define BATT_WARM_THRESHOLD		480
++
++#define PD_CHG_UPDATE_DELAY_US	20	/*20 sec*/
++#define BQ_I2C_FAILED_SOC	-107
++#define BQ_I2C_FAILED_TEMP	-307
++#define DEBUG_CAPATICY		15
++#define BMS_FG_VERIFY		"BMS_FG_VERIFY"
++#define CC_CV_STEP		"CC_CV_STEP"
++#define FCCMAIN_FG_CHARGE_FULL_VOTER		"FCCMAIN_FG_CHARGE_FULL_VOTER"
++#define OVER_FV_VOTER	"OVER_FV_VOTER"
++#define SMART_BATTERY_FV	"SMART_BATTERY_FV"
++
++#define BQ_PACK_MAXIUM_VOLTAGE_FOR_PMIC			4490
++#define BQ_MAXIUM_VOLTAGE_FOR_CELL			4480
++#define BQ_PACK_MAXIUM_VOLTAGE_FOR_PMIC_SAFETY	4477
++enum bq_fg_reg_idx {
++	BQ_FG_REG_CTRL = 0,
++	BQ_FG_REG_TEMP,		/* Battery Temperature */
++	BQ_FG_REG_VOLT,		/* Battery Voltage */
++	BQ_FG_REG_CN,		/* Current Now */
++	BQ_FG_REG_AI,		/* Average Current */
++	BQ_FG_REG_BATT_STATUS,	/* BatteryStatus */
++	BQ_FG_REG_TTE,		/* Time to Empty */
++	BQ_FG_REG_TTF,		/* Time to Full */
++	BQ_FG_REG_FCC,		/* Full Charge Capacity */
++	BQ_FG_REG_RM,		/* Remaining Capacity */
++	BQ_FG_REG_CC,		/* Cycle Count */
++	BQ_FG_REG_SOC,		/* Relative State of Charge */
++	BQ_FG_REG_SOH,		/* State of Health */
++	BQ_FG_REG_CHG_VOL,	/* Charging Voltage*/
++	BQ_FG_REG_CHG_CUR,	/* Charging Current*/
++	BQ_FG_REG_DC,		/* Design Capacity */
++	BQ_FG_REG_ALT_MAC,	/* AltManufactureAccess*/
++	BQ_FG_REG_MAC_DATA,	/* MACData*/
++	BQ_FG_REG_MAC_CHKSUM,	/* MACChecksum */
++	BQ_FG_REG_MAC_DATA_LEN,	/* MACDataLen */
++	NUM_REGS,
++};
++
++static u8 bq27z561_regs[NUM_REGS] = {
++	0x00,	/* CONTROL */
++	0x06,	/* TEMP */
++	0x08,	/* VOLT */
++	0x0C,	/* CURRENT NOW */
++	0x14,	/* AVG CURRENT */
++	0x0A,	/* FLAGS */
++	0x16,	/* Time to empty */
++	0x18,	/* Time to full */
++	0x12,	/* Full charge capacity */
++	0x10,	/* Remaining Capacity */
++	0x2A,	/* CycleCount */
++	0x2C,	/* State of Charge */
++	0x2E,	/* State of Health */
++	0x30,	/* Charging Voltage*/
++	0x32,	/* Charging Current*/
++	0x3C,	/* Design Capacity */
++	0x3E,	/* AltManufacturerAccess*/
++	0x40,	/* MACData*/
++	0x60,	/* MACChecksum */
++	0x61,	/* MACDataLen */
++};
++
++enum bq_fg_mac_cmd {
++	FG_MAC_CMD_CTRL_STATUS	= 0x0000,
++	FG_MAC_CMD_DEV_TYPE	= 0x0001,
++	FG_MAC_CMD_FW_VER	= 0x0002,
++	FG_MAC_CMD_HW_VER	= 0x0003,
++	FG_MAC_CMD_IF_SIG	= 0x0004,
++	FG_MAC_CMD_CHEM_ID	= 0x0006,
++	FG_MAC_CMD_GAUGING	= 0x0021,
++	FG_MAC_CMD_SEAL		= 0x0030,
++	FG_MAC_CMD_FASTCHARGE_EN = 0x003E,
++	FG_MAC_CMD_FASTCHARGE_DIS = 0x003F,
++	FG_MAC_CMD_DEV_RESET	= 0x0041,
++	FG_MAC_CMD_CHEM_NAME	= 0x004B,
++	FG_MAC_CMD_MANU_NAME	= 0x004C,
++	FG_MAC_CMD_CHARGING_STATUS = 0x0055,
++	FG_MAC_CMD_GAGUE_STATUS = 0x0056,
++	FG_MAC_CMD_LIFETIME1	= 0x0060,
++	FG_MAC_CMD_LIFETIME3	= 0x0062,
++	FG_MAC_CMD_ITSTATUS1	= 0x0073,
++	FG_MAC_CMD_QMAX		= 0x0075,
++	FG_MAC_CMD_FCC_SOH	= 0x0077,
++	FG_MAC_CMD_RA_TABLE	= 0x40C0,
++	FG_MAC_CMD_TERM_CURRENTS = 0x456E,
++};
++
++enum {
++	SEAL_STATE_RSVED,
++	SEAL_STATE_UNSEALED,
++	SEAL_STATE_SEALED,
++	SEAL_STATE_FA,
++};
++
++enum bq_fg_device {
++	BQ27Z561 = 0,
++	BQ28Z610,
++};
++
++static const unsigned char *device2str[] = {
++	"bq27z561",
++	"bq28z610",
++};
++
++struct cold_thermal {
++	int index;
++	int temp_l;
++	int temp_h;
++	int curr_th;
++};
++
++#define STEP_TABLE_MAX 3
++struct step_config {
++	int volt_lim;
++	int curr_lim;
++};
++
++/* for test
++struct step_config cc_cv_step_config[STEP_TABLE_MAX] = {
++	{4150-2,    5500},
++	{4190-1,    4200},
++	{4225-1,    3000},
++};*/
++
++static struct step_config cc_cv_step_config[STEP_TABLE_MAX] = {
++	{4200-3,    8820},
++	{4300-3,    7350},
++	{4400-3,    5880},
++};
++
++enum bq_fg_part_no {
++	TIBQ27Z561 = 0,
++	NFG1000B,
++};
++
++enum manu_macro {
++	TERMINATION = 0,
++	RECHARGE_VOL,
++	FFC_TERMINATION,
++	MANU_NAME,
++	MANU_DATA_LEN,
++};
++
++#define TERMINATION_BYTE	6
++#define TERMINATION_BASE	30
++#define TERMINATION_STEP	5
++
++#define RECHARGE_VOL_BYTE	7
++#define RECHARGE_VOL_BASE	4200
++#define RECHARGE_VOL_STEP	5
++
++#define FFC_TERMINATION_BYTE	8
++#define FFC_TERMINATION_BASE	400
++#define FFC_TERMINATION_STEP	20
++
++#define MANU_NAME_BYTE		3
++#define MANU_NAME_BASE		0x0C
++#define MANU_NAME_STEP		1
++
++struct manu_data {
++	int byte;
++	int base;
++	int step;
++	int data;
++};
++
++static struct manu_data manu_info[MANU_DATA_LEN] = {
++	{TERMINATION_BYTE, TERMINATION_BASE, TERMINATION_STEP},
++	{RECHARGE_VOL_BYTE, RECHARGE_VOL_BASE, RECHARGE_VOL_STEP},
++	{FFC_TERMINATION_BYTE, FFC_TERMINATION_BASE, FFC_TERMINATION_STEP},
++	{MANU_NAME, MANU_NAME_BASE, MANU_NAME_STEP},
++};
++
++#define SHUTDOWN_DELAY_VOL	3300
++#define BQ_RESUME_UPDATE_TIME	600
++
++static const u8 fg_dump_regs[] = {
++	0x00, 0x02, 0x04, 0x06,
++	0x08, 0x0A, 0x0C, 0x0E,
++	0x10, 0x16, 0x18, 0x1A,
++	0x1C, 0x1E, 0x20, 0x28,
++	0x2A, 0x2C, 0x2E, 0x30,
++	0x66, 0x68, 0x6C, 0x6E,
++};
++
++
++#ifndef abs
++#define abs(x) ((x) >0? (x) : -(x))
++#endif
++
++struct vir_bq_fg_chip
++{
++	struct device *dev;
++	char *model_name;
++	struct mutex data_lock;
++
++	int batt_st;
++	int batt_temp;
++	int batt_temp_m;
++	int batt_temp_s;
++	int batt_curr;
++	int batt_curr_m;
++	int batt_curr_s;
++	int batt_volt;
++	int batt_volt_m;
++	int batt_volt_s;
++	int term_curr;
++	int ffc_term_curr;
++	int recharge_volt;
++	int batt_ttf;
++	int batt_tte;
++	int batt_fcc;
++	int batt_soc;
++	int batt_rm;
++	int batt_rm_m;
++	int batt_rm_s;
++	int raw_soc;
++	int raw_soc_m;
++	int raw_soc_s;
++	int last_soc;
++	int batt_cyclecnt;
++	int batt_resistance;
++	int batt_dc;
++	int batt_capacity_level;
++	int batt_recharge_vol;
++	int soc_decimal;
++	int soc_decimal_rate;
++	int constant_charge_current_max;
++	bool verify_digest_success;
++	bool fast_mode;
++	int soh;
++	int fcc_master;
++	int fcc_slave;
++	bool fg1_batt_ctl_enabled;
++	bool fg2_batt_ctl_enabled;
++	int fg_master_disable_gpio;
++	int fg_slave_disable_gpio;
++
++	int fake_volt;
++	int fake_soc;
++	int fake_chip_ok;
++	int fake_temp;
++
++	int *dec_rate_seq;
++	int dec_rate_len;
++
++	struct votable *fcc_votable;
++	struct votable *fv_votable;
++	struct power_supply *fg_psy;
++	struct power_supply_desc fg_psy_d;
++	struct power_supply *fg_master_psy;
++	struct power_supply *fg_slave_psy;
++	struct power_supply *batt_psy;
++	struct power_supply *usb_psy;
++	struct delayed_work monitor_work;
++	//const struct battmngr_ops *fg_ops;
++	struct battmngr_device* battmg_dev;
++
++
++	/* workaround for debug or other purpose */
++	bool ignore_digest_for_debug;
++	bool old_hw;
++
++	bool shutdown_delay;
++	bool shutdown_delay_enable;
++
++	/* move update charge full states  */
++	bool charge_done;
++	bool charge_full;
++	int health;
++
++	/* counter for low temp soc smooth */
++	int master_soc_smooth_cnt;
++	int slave_soc_smooth_cnt;
++};
++
++
++//soc smooth
++
++#define BATT_HIGH_AVG_CURRENT		1000000
++#define NORMAL_TEMP_CHARGING_DELTA	10000
++#define NORMAL_DISTEMP_CHARGING_DELTA	60000
++#define LOW_TEMP_CHARGING_DELTA		20000
++#define LOW_TEMP_DISCHARGING_DELTA	40000
++#define FFC_SMOOTH_LEN			4
++#define FG_RAW_SOC_FULL			10000
++#define FG_REPORT_FULL_SOC		9400
++#define FG_OPTIMIZ_FULL_TIME		64000
++
++struct ffc_smooth {
++	int curr_lim;
++	int time;
++};
++
++static struct ffc_smooth ffc_dischg_smooth[FFC_SMOOTH_LEN] = {
++	{0,    300000},
++	{300,  150000},
++	{600,   72000},
++	{1000,  50000},
++};
++
++extern int battery_process_event_fg(struct battmngr_notify *noti_data);
++
++#endif /* __VIRTUAL_FG_H */
++
+--- /dev/null
++++ b/sheng-ports/pogo/extSOC/virtual_fg.c
+@@ -0,0 +1,1801 @@
++#include <linux/cleanup.h>
++
++#include "inc/virtual_fg.h"
++static DEFINE_MUTEX(fg_api_lock);
++static bool fg_stopping;
++#define JEITA_COOL_THR_DEGREE 150
++#define EXTREME_HIGH_DEGREE 1000
++#define MASTER_DEFAULT_FCC_MAH 4500000
++#define SLAVE_DEFAULT_FCC__MAH 4500000
++#define FG_FULL 100
++#define FG_RAW_FULL 10000
++#define SHUTDOWN_DELAY_VOL 3300
++#define BQ_MAXIUM_VOLTAGE_HYS  10000
++#define BMS_FG_VERIFY		"BMS_FG_VERIFY"
++#define SMART_BATTERY_FV    "SMART_BATTERY_FV"
++#ifndef MAX
++#define MAX(x, y) ((x) > (y) ? (x) : (y))
++#endif
++#ifndef MIN
++#define MIN(x, y) ((x) < (y) ? (x) : (y))
++#endif
++#ifndef abs
++#define abs(x) ((x) >0? (x) : -(x))
++#endif
++static int debug_mask = PR_OEM;
++module_param_named(debug_mask, debug_mask, int, 0600);
++struct vir_bq_fg_chip *global_vir_fg_info = NULL;
++
++//static int log_level = 2;
++#define virtualfg_err(fmt, ...)							\
++do {										\
++	if (log_level >= 0)							\
++		printk(KERN_ERR "[virtual_FG] " fmt, ##__VA_ARGS__);	\
++} while (0)
++#define virtualfg_info(fmt, ...)							\
++do {										\
++	if (log_level >= 1)							\
++		printk(KERN_ERR "[virtual_FG] " fmt, ##__VA_ARGS__);	\
++} while (0)
++#define virtualfg_dbg(fmt, ...)							\
++do {										\
++	if (log_level >= 2)							\
++		printk(KERN_ERR "[virtual_FG] " fmt, ##__VA_ARGS__);	\
++} while (0)
++
++struct vir_bq_fg_chip* g_bq = NULL;
++
++#if 0
++static int fg_read_system_soc(struct dual_fg_chip *bq);
++static int fg_read_volt(struct dual_fg_chip *bq);
++static int fg_read_current(struct dual_fg_chip *bq, int *curr);
++static int fg_get_batt_capacity_level(struct dual_fg_chip *bq);
++static int fg_get_soc_decimal(struct dual_fg_chip *bq);
++static int fg_get_soc_decimal_rate(struct dual_fg_chip *bq);
++static int fg_get_cold_thermal_level(struct dual_fg_chip *bq);
++static int fg_read_tte(struct dual_fg_chip *bq);
++static int fg_read_ttf(struct dual_fg_chip *bq);
++static int fg_read_cyclecount(struct dual_fg_chip *bq);
++static int fg_read_soh(struct dual_fg_chip *bq);
++static int fg_get_batt_status(struct dual_fg_chip *bq);
++/* auto define interface for dual fg */
++//static int fg_get_DesignedCapcity(struct dual_fg_chip *bq);
++static int fg_get_CurrentMax(struct dual_fg_chip *bq);
++static int fg_get_constant_charge_CurrentMax(struct dual_fg_chip *bq);
++static int fg_get_VoltageMax(struct dual_fg_chip *bq);
++static bool fg_get_chipok(struct dual_fg_chip *bq);
++static int fg_get_termination_current(struct dual_fg_chip *bq);
++static int fg_get_FFC_termination_current(struct dual_fg_chip *bq);
++static int fg_get_recharge_volt(struct dual_fg_chip *bq);
++static void fg_check_I2C_status(struct dual_fg_chip *bq);
++static void dual_fg_check_fg_matser_psy(struct dual_fg_chip *bq);
++static void dual_fg_check_fg_slave_psy(struct dual_fg_chip *bq);
++static void dual_fg_check_batt_psy(struct dual_fg_chip *bq);
++static int bq_battery_soc_smooth_tracking_new(struct dual_fg_chip *bq,int soc);
++static int fg_get_property(struct power_supply *psy,
++			   enum power_supply_property psp,
++			   union power_supply_propval *val);
++static int fg_set_property(struct power_supply *psy,
++			   enum power_supply_property prop,
++			   const union power_supply_propval *val);
++static int fg_prop_is_writeable(struct power_supply *psy,
++				enum power_supply_property prop);
++#endif
++static void fg_monitor_workfunc(struct work_struct *work);
++static void fg_update_status(struct vir_bq_fg_chip *bq);
++static int fg_update_charge_full(struct vir_bq_fg_chip *bq);
++static int fg_read_fcc(struct vir_bq_fg_chip *bq);
++static int fg_read_rm(struct vir_bq_fg_chip *bq);
++static int fg_get_raw_soc(struct vir_bq_fg_chip *bq);
++//static int fg_set_fastcharge_mode(struct vir_bq_fg_chip *bq, bool enable);
++// enable or diabled fg master or slave  by GPIO
++static int fg_master_set_disable(bool disable);
++static int fg_slave_set_disable(bool disable);
++//static bool check_qti_ops(struct vir_bq_fg_chip *bq);
++
++static int fg_master_set_disable(bool disable)
++{
++	if (disable) {
++		if (global_vir_fg_info->fg_master_disable_gpio)
++			gpio_set_value(
++				global_vir_fg_info->fg_master_disable_gpio, 1);
++		virtualfg_info( "fg_master_disable_gpio= %d \n", 1);
++	} else {
++		if (global_vir_fg_info->fg_master_disable_gpio)
++			gpio_set_value(
++				global_vir_fg_info->fg_master_disable_gpio, 0);
++		virtualfg_info( "fg_master_disable_gpio= %d \n", 0);
++	}
++	return 0;
++}
++static int fg_slave_set_disable(bool disable)
++{
++	if (disable) {
++		if (global_vir_fg_info->fg_slave_disable_gpio)
++			gpio_set_value(
++				global_vir_fg_info->fg_slave_disable_gpio, 1);
++		virtualfg_info( "fg_slave_disable_gpio= %d \n", 1);
++	} else {
++		if (global_vir_fg_info->fg_slave_disable_gpio)
++			gpio_set_value(
++				global_vir_fg_info->fg_slave_disable_gpio, 0);
++		virtualfg_info( "fg_slave_disable_gpio= %d \n", 0);
++	}
++	return 0;
++}
++int Dual_Fg_Check_Chg_Fg_Status_And_Disable_Chg_Path(struct vir_bq_fg_chip *bq);
++int Dual_Fg_Check_Chg_Fg_Status_And_Disable_Chg_Path(struct vir_bq_fg_chip *bq);
++int Dual_Fg_Check_Chg_Fg_Status_And_Disable_Chg_Path(struct vir_bq_fg_chip *bq)
++{
++	#if 0
++	int rc;
++	int fg_master_soc, fg_slave_soc;
++	int fg_master_volt, fg_slave_volt;
++	int fg_master_curr, fg_slave_curr;
++	int temp;
++	bool effective_fv_client = false;
++	union power_supply_propval pval = {
++		0,
++	};
++	struct power_supply *batt_psy = NULL;
++	int batt_chg_type;
++	batt_psy = power_supply_get_by_name("battery");
++	if (!batt_psy) {
++		pr_err("battery not found ,so cannot disable fg master or slave \n");
++		return 0;
++	}
++	rc = power_supply_get_property(batt_psy, POWER_SUPPLY_PROP_CHARGE_TYPE,
++				       &pval);
++	batt_chg_type = pval.intval;
++	if (batt_chg_type != POWER_SUPPLY_CHARGE_TYPE_TRICKLE &&
++	    batt_chg_type != POWER_SUPPLY_CHARGE_TYPE_FAST &&
++	    batt_chg_type != POWER_SUPPLY_CHARGE_TYPE_TAPER) {
++		return 0;
++	}
++	rc = power_supply_get_property(global_vir_fg_info->gl_fg_master_psy,
++				       POWER_SUPPLY_PROP_CAPACITY_RAW, &pval);
++	if (rc < 0) {
++		virtualfg_info( "failed get master fg SOC \n");
++		return -EINVAL;
++	}
++	fg_master_soc = pval.intval;
++	rc = power_supply_get_property(global_vir_fg_info->gl_fg_slave_psy,
++				       POWER_SUPPLY_PROP_CAPACITY_RAW, &pval);
++	if (rc < 0) {
++		virtualfg_info( "failed get slave fg SOC \n");
++		return -EINVAL;
++	}
++	fg_slave_soc = pval.intval;
++	rc = power_supply_get_property(global_vir_fg_info->gl_fg_master_psy,
++				       POWER_SUPPLY_PROP_VOLTAGE_NOW, &pval);
++	if (rc < 0) {
++		virtualfg_info( "failed get master fg volt \n");
++		return -EINVAL;
++	}
++	fg_master_volt = pval.intval;
++	rc = power_supply_get_property(global_vir_fg_info->gl_fg_slave_psy,
++				       POWER_SUPPLY_PROP_VOLTAGE_NOW, &pval);
++	if (rc < 0) {
++		virtualfg_info( "failed get slave fg volt \n");
++		return -EINVAL;
++	}
++	fg_slave_volt = pval.intval;
++	rc = power_supply_get_property(global_vir_fg_info->gl_fg_master_psy,
++				       POWER_SUPPLY_PROP_CURRENT_NOW, &pval);
++	if (rc < 0) {
++		virtualfg_info( "failed get master fg volt \n");
++		return -EINVAL;
++	}
++	fg_master_curr = pval.intval;
++	rc = power_supply_get_property(global_vir_fg_info->gl_fg_slave_psy,
++				       POWER_SUPPLY_PROP_CURRENT_NOW, &pval);
++	if (rc < 0) {
++		virtualfg_info( "failed get slave fg volt \n");
++		return -EINVAL;
++	}
++	fg_slave_curr = pval.intval;
++	temp = fg_read_temperature(bq);
++	if (!bq->fv_votable) {
++		bq->fv_votable = find_votable("FV");
++	}
++	effective_fv_client = strcmp(get_effective_client(bq->fv_votable), SMART_BATTERY_FV);
++	//virtualfg_info( "gpio master volt: %d,slave volt: %d, effective_fv_client:%d, bq->fast_mode:%d \n", fg_master_volt,
++					//fg_slave_volt, effective_fv_client, bq->fast_mode);
++	//virtualfg_info( "gpio master curr: %d,temp: %d\n", fg_master_curr, temp);
++	/* fg master or slave  */
++	if (!global_vir_fg_info->fg1_batt_ctl_enabled &&
++	    !global_vir_fg_info->fg2_batt_ctl_enabled) {
++		if (fg_master_soc >= fg_slave_soc) {
++			if ((effective_fv_client || bq->fast_mode) && fg_master_soc == FG_RAW_FULL && fg_master_volt >= 4470000) {
++				rc = fg_master_set_disable(true);
++				global_vir_fg_info->fg1_batt_ctl_enabled = true;
++			}
++			if ((!effective_fv_client || !bq->fast_mode) && fg_master_soc == FG_RAW_FULL) {
++				rc = fg_master_set_disable(true);
++				global_vir_fg_info->fg1_batt_ctl_enabled = true;
++			}
++		} else if (fg_master_soc < fg_slave_soc) {
++			if ((effective_fv_client || bq->fast_mode) && fg_slave_soc == FG_RAW_FULL && fg_slave_volt >= 4470000) {
++				rc = fg_slave_set_disable(true);
++				global_vir_fg_info->fg2_batt_ctl_enabled = true;
++			}
++			if ((!effective_fv_client || !bq->fast_mode) && fg_slave_soc == FG_RAW_FULL) {
++				rc = fg_slave_set_disable(true);
++				global_vir_fg_info->fg2_batt_ctl_enabled = true;
++			}
++		}
++	}
++#endif
++	return 0;
++}
++int Dual_Fg_Reset_Batt_Ctrl_gpio_default(void);
++int Dual_Fg_Reset_Batt_Ctrl_gpio_default(void);
++int Dual_Fg_Reset_Batt_Ctrl_gpio_default(void)
++{
++	int fg_master_gpio, fg_slave_gpio;
++	fg_master_gpio =
++		gpio_get_value(global_vir_fg_info->fg_master_disable_gpio);
++	fg_slave_gpio =
++		gpio_get_value(global_vir_fg_info->fg_slave_disable_gpio);
++	if (global_vir_fg_info->fg1_batt_ctl_enabled == true ||
++	    fg_master_gpio == 1) {
++		fg_master_set_disable(false);
++		global_vir_fg_info->fg1_batt_ctl_enabled = false;
++	}
++	if (global_vir_fg_info->fg2_batt_ctl_enabled == true ||
++	    fg_slave_gpio == 1) {
++		fg_slave_set_disable(false);
++		global_vir_fg_info->fg2_batt_ctl_enabled = false;
++	}
++	return 0;
++}
++int Dual_Fuel_Gauge_Batt_Ctrl_Init(void);
++int Dual_Fuel_Gauge_Batt_Ctrl_Init(void);
++int Dual_Fuel_Gauge_Batt_Ctrl_Init(void)
++{
++	if (global_vir_fg_info->fg_master_disable_gpio)
++		gpio_set_value(global_vir_fg_info->fg_master_disable_gpio, 0);
++	if (global_vir_fg_info->fg_slave_disable_gpio)
++		gpio_set_value(global_vir_fg_info->fg_slave_disable_gpio, 0);
++	return 0;
++}
++
++#if 0
++static int fg_set_fastcharge_mode(struct vir_bq_fg_chip *bq, bool enable)
++{
++	int rc1, rc2;
++	rc1 = global_vir_fg_info->fg_ops->set_fg1_fastcharge(enable);
++	rc2 = global_vir_fg_info->fg_ops->set_fg2_fastcharge(enable);
++	if (rc1 < 0 || rc2 < 0) {
++		pr_err("set fast charge mode is fail!\n");
++		return 0;
++	}
++	bq->fast_mode = enable;
++	return 0;
++}
++
++static int calc_delta_time(ktime_t time_last, int *delta_time)
++{
++	ktime_t time_now;
++	time_now = ktime_get();
++	*delta_time = ktime_ms_delta(time_now, time_last);
++	if (*delta_time < 0)
++		*delta_time = 0;
++	bq_dbg(PR_DEBUG,  "now:%ld, last:%ld, delta:%d\n", time_now, time_last, *delta_time);
++	return 0;
++}
++#define STEP_CHG_VOTER		"STEP_CHG_VOTER"
++#define STEP_CHG_LIMIT_VOTER   "STEP_CHG_LIMIT_VOTER"
++static void fg_check_dual_current(struct dual_fg_chip *bq)
++{
++	int step_curr, curr_max, div, thres, diff_step;
++	int batt_curr_master = 0, batt_curr_slave = 0;
++	static int oc_count = 0,last_curr = 0,offset_Curr = 0;
++	batt_curr_master = bq->batt_curr_m;
++	batt_curr_slave = bq->batt_curr_s;
++	if(!bq->fcc_votable)
++		bq->fcc_votable = find_votable("FCC");
++	step_curr = get_client_vote(bq->fcc_votable, STEP_CHG_VOTER);
++	if(step_curr <= 0)
++		return;
++	if(step_curr != last_curr) {
++		virtualfg_info("the step current:%d,last_curr: %d\n",step_curr,last_curr);
++		last_curr = step_curr;
++		oc_count = 0;
++		diff_step = step_curr;
++		vote(bq->fcc_votable, STEP_CHG_LIMIT_VOTER, false, diff_step);
++	}
++	thres = (step_curr == 12400000) ? 7000000 : step_curr/2;
++	curr_max = abs(MIN(batt_curr_master, batt_curr_slave));
++	if(curr_max >= thres) {
++		oc_count++;
++		offset_Curr = (offset_Curr > (curr_max - step_curr/2)) ? offset_Curr : (curr_max - step_curr/2);
++	}
++	virtualfg_info("oc_count:%d, before currmax:%d, half curr:%d.\n",oc_count, curr_max, thres);
++	if(oc_count >= 4) {
++		oc_count = 0;
++		div = offset_Curr / 50000;
++		if((offset_Curr % 50000) == 0)
++			offset_Curr = div * 50000;
++		else
++			offset_Curr = (div+1) * 50000;
++		diff_step -= offset_Curr * 2;
++		vote(bq->fcc_votable, STEP_CHG_LIMIT_VOTER, true, diff_step);
++		virtualfg_info("need down offset:%d, curr max:%d, div:%d, the diff current:%d\n", offset_Curr, curr_max, div, diff_step);
++	}
++}
++static int fg_read_volt(struct dual_fg_chip *bq)
++{
++	int batt_volt_master = 0, batt_volt_slave = 0;
++	int volt;
++	int rc;
++	union power_supply_propval pval = {
++		0,
++	};
++	dual_fg_check_fg_matser_psy(bq);
++	dual_fg_check_fg_slave_psy(bq);
++	if (!bq->fg_master_psy || !bq->fg_slave_psy) {
++		pr_err("bms_master or bms_slave not found\n");
++		return -EINVAL;
++	}
++	/* get master and slave fg voltage*/
++	rc = power_supply_get_property(bq->fg_master_psy,
++				       POWER_SUPPLY_PROP_VOLTAGE_NOW, &pval);
++	if (rc < 0) {
++		virtualfg_info( "failed get master fg batt voltage\n");
++		return -EINVAL;
++	}
++	batt_volt_master = pval.intval;
++	rc = power_supply_get_property(bq->fg_slave_psy,
++				       POWER_SUPPLY_PROP_VOLTAGE_NOW, &pval);
++	if (rc < 0) {
++		virtualfg_info( "failed get slave fg batt voltage\n");
++		return -EINVAL;
++	}
++	batt_volt_slave = pval.intval;
++	bq->batt_volt_m = batt_volt_master;
++	bq->batt_volt_s = batt_volt_slave;
++	volt = MAX(batt_volt_master, batt_volt_slave);
++	volt /= 1000;
++	return volt;
++}
++static int fg_read_current(struct dual_fg_chip *bq, int *curr)
++{
++	int batt_curr_master = 0, batt_curr_slave = 0;
++	int rc;
++	union power_supply_propval pval = {
++		0,
++	};
++	dual_fg_check_fg_matser_psy(bq);
++	dual_fg_check_fg_slave_psy(bq);
++	if (!bq->fg_master_psy || !bq->fg_slave_psy) {
++		pr_err("bms_master or bms_slave not found\n");
++		return -EINVAL;
++	}
++	/* get master and slave fg current*/
++	rc = power_supply_get_property(bq->fg_master_psy,
++				       POWER_SUPPLY_PROP_CURRENT_NOW, &pval);
++	if (rc < 0) {
++		virtualfg_info( "failed get master fg batt current\n");
++		return -EINVAL;
++	}
++	batt_curr_master = pval.intval;
++	rc = power_supply_get_property(bq->fg_slave_psy,
++				       POWER_SUPPLY_PROP_CURRENT_NOW, &pval);
++	if (rc < 0) {
++		virtualfg_info( "failed get slave fg batt current\n");
++		return -EINVAL;
++	}
++	batt_curr_slave = pval.intval;
++	bq->batt_curr_m = batt_curr_master;
++	bq->batt_curr_s = batt_curr_slave;
++	*curr = (batt_curr_master + batt_curr_slave) / 1000;
++	return 0;
++}
++static int fg_get_batt_status(struct dual_fg_chip *bq)
++{
++	int rc;
++	int st;
++	union power_supply_propval pval = {
++		0,
++	};
++	dual_fg_check_batt_psy(bq);
++	if (!bq->batt_psy) {
++		pr_err("battery not found\n");
++		return -EINVAL;
++	}
++	rc = power_supply_get_property(bq->batt_psy, POWER_SUPPLY_PROP_STATUS,
++				       &pval);
++	st = pval.intval;
++	return st;
++}
++static int fg_get_DesignedCapcity(struct dual_fg_chip *bq)
++{
++	int DesignedCapa_master = 0, DesignedCapa_slave = 0;
++	int rc;
++	union power_supply_propval pval = {
++		0,
++	};
++	/* get master and slave fg current*/
++	dual_fg_check_fg_matser_psy(bq);
++	dual_fg_check_fg_slave_psy(bq);
++	if (!bq->fg_master_psy || !bq->fg_slave_psy) {
++		pr_err("bms_master or bms_slave not found\n");
++		return -EINVAL;
++	}
++	rc = power_supply_get_property(
++		bq->fg_master_psy, POWER_SUPPLY_PROP_CHARGE_FULL_DESIGN, &pval);
++	if (rc < 0) {
++		virtualfg_info( "failed get master fg charge full design \n");
++		return -EINVAL;
++	}
++	DesignedCapa_master = pval.intval;
++	rc = power_supply_get_property(
++		bq->fg_slave_psy, POWER_SUPPLY_PROP_CHARGE_FULL_DESIGN, &pval);
++	if (rc < 0) {
++		virtualfg_info( "failed get slave fg charge full design\n");
++		return -EINVAL;
++	}
++	DesignedCapa_slave = pval.intval;
++	bq->batt_dc = DesignedCapa_master + DesignedCapa_slave;
++	return 0;
++}
++#endif
++
++static int fg_read_fcc(struct vir_bq_fg_chip *bq)
++{
++	int learned_master = 0, learned_slave = 0;
++	int fcc;
++
++	if (check_qti_ops(&bq->battmg_dev)) {
++		learned_master = battmngr_qtiops_get_fg1_fcc(bq->battmg_dev);
++		learned_slave = battmngr_qtiops_get_fg2_fcc(bq->battmg_dev);
++	} else {
++		pr_err("virual fg ops is null!\n");
++		return -EINVAL;
++	}
++
++	/* if rm of any battery(base or flip) decrease to 0, use default fcc of each other */
++	if (!bq->batt_rm_m || !bq->batt_rm_s) {
++		global_vir_fg_info->fcc_master = MASTER_DEFAULT_FCC_MAH;
++		global_vir_fg_info->fcc_slave = SLAVE_DEFAULT_FCC__MAH;
++	} else {
++		if (global_vir_fg_info->fcc_master != learned_master)
++			global_vir_fg_info->fcc_master = learned_master;
++		if (global_vir_fg_info->fcc_slave != learned_slave)
++			global_vir_fg_info->fcc_slave = learned_slave;
++	}
++	fcc = (learned_master + learned_slave) / 1000;
++	return fcc;
++}
++
++#if 0
++static int fg_read_soh(struct dual_fg_chip *bq)
++{
++	int soh_master = 0, soh_slave, soh = 0;
++	int rc;
++	union power_supply_propval pval = {
++		0,
++	};
++	dual_fg_check_fg_matser_psy(bq);
++	dual_fg_check_fg_slave_psy(bq);
++	if (!bq->fg_master_psy || !bq->fg_slave_psy) {
++		pr_err("bms_master or bms_slave not found\n");
++		return -EINVAL;
++	}
++	rc = power_supply_get_property(bq->fg_master_psy, POWER_SUPPLY_PROP_SOH,
++				       &pval);
++	soh_master = pval.intval;
++	rc = power_supply_get_property(bq->fg_slave_psy, POWER_SUPPLY_PROP_SOH,
++				       &pval);
++	soh_slave = pval.intval;
++	soh = MIN(soh_slave, soh_master);
++	return soh;
++}
++/* get MonotonicSoc*/
++#define HW_REPORT_FULL_SOC 9700
++#define SOC_PROPORTION 98
++#define SOC_PROPORTION_C 97
++static int fg_read_system_soc(struct dual_fg_chip *bq)
++{
++	int batt_soc_master = 15, batt_soc_slave = 15;
++	int rate_of_master = 50, rate_of_slave = 50;
++	static int last_batt_soc_master, last_batt_soc_slave;
++	int rc, soc;
++	union power_supply_propval pval = {
++		0,
++	};
++	dual_fg_check_fg_matser_psy(bq);
++	dual_fg_check_fg_slave_psy(bq);
++	if (!bq->fg_master_psy || !bq->fg_slave_psy) {
++		pr_err("bms_master or bms_slave not found\n");
++		return -EINVAL;
++	}
++	if (!global_vir_fg_info->fg1_batt_ctl_enabled) {
++		rc = power_supply_get_property(
++			bq->fg_master_psy, POWER_SUPPLY_PROP_CAPACITY, &pval);
++		batt_soc_master = pval.intval;
++		if (bq->batt_temp < 0 && bq->charge_done)
++			batt_soc_master = last_batt_soc_master;
++		else
++			last_batt_soc_master = batt_soc_master;
++	} else {
++		//fix low temp soc jump
++		if (last_batt_soc_master < FG_FULL && bq->batt_temp < 0
++				&& bq->master_soc_smooth_cnt++ > 30) {
++			batt_soc_master = ++last_batt_soc_master;
++			bq->master_soc_smooth_cnt = 0;
++		} else if (last_batt_soc_master < FG_FULL && bq->batt_temp < 0) {
++			batt_soc_master = last_batt_soc_master;
++		} else {
++			batt_soc_master = FG_FULL;
++			bq->master_soc_smooth_cnt = 0;
++		}
++	}
++	if (!global_vir_fg_info->fg2_batt_ctl_enabled) {
++		rc = power_supply_get_property(
++			bq->fg_slave_psy, POWER_SUPPLY_PROP_CAPACITY, &pval);
++		batt_soc_slave = pval.intval;
++		if (bq->batt_temp < 0 && bq->charge_done)
++			batt_soc_slave = last_batt_soc_slave;
++		else
++			last_batt_soc_slave = batt_soc_slave;
++	} else {
++		//fix low temp soc jump
++		if (last_batt_soc_slave < FG_FULL && bq->batt_temp < 0
++				&& bq->slave_soc_smooth_cnt++ > 30) {
++			batt_soc_slave = ++last_batt_soc_slave;
++			bq->slave_soc_smooth_cnt = 0;
++		} else if (last_batt_soc_slave < FG_FULL && bq->batt_temp < 0) {
++			batt_soc_slave = last_batt_soc_slave;
++		} else {
++			batt_soc_slave = FG_FULL;
++			bq->slave_soc_smooth_cnt = 0;
++		}
++	}
++	rate_of_master = global_vir_fg_info->fcc_master * 100 /
++			 (global_vir_fg_info->fcc_master +
++			  global_vir_fg_info->fcc_slave);
++	rate_of_slave = 100 - rate_of_master;
++	soc = (rate_of_master * batt_soc_master +
++	       rate_of_slave * batt_soc_slave + 50) /
++	      100;
++	if (bq->charge_full)
++		soc = 100;
++	// add report 100% ahead of time function
++	bq->raw_soc = fg_get_raw_soc(bq);
++	soc = bq_battery_soc_smooth_tracking_new(bq,soc);
++	return soc;
++}
++#define FFC_SMOOTH_LEN_DUAL			4
++struct dual_ffc_smooth {
++	int curr_lim;
++	int time;
++};
++struct dual_ffc_smooth dual_ffc_dischg_smooth[FFC_SMOOTH_LEN_DUAL] = {
++	{0,    300000},
++	{300,  150000},
++	{600,   72000},
++	{1000,  50000},
++};
++static int bq_battery_soc_smooth_tracking_new(struct dual_fg_chip *bq,int soc)
++{
++	int rc;
++	static int system_soc,last_system_soc;
++	int status = 0,temp;
++	int unit_time = 10000, delta_time = 0,soc_delta = 0;
++	int change_delta = 0;
++	static ktime_t last_change_time = -1;
++	int soc_changed = 0;
++	int batt_ma = 0,i;
++	static int ibat_pos_count = 0;
++	struct timespec64 time;
++	ktime_t tmp_time = 0;
++	union power_supply_propval pval = {
++		0,
++	};
++	tmp_time = ktime_get_boottime();
++	time = ktime_to_timespec64(tmp_time);
++	rc = fg_read_current(bq,&batt_ma);
++	temp = fg_read_temperature(bq);
++	if((batt_ma > 0) && (ibat_pos_count < 10))
++		ibat_pos_count++;
++	else if(batt_ma <= 0)
++		ibat_pos_count = 0;
++	if (bq->batt_psy) {
++		rc = power_supply_get_property(bq->batt_psy,
++				POWER_SUPPLY_PROP_STATUS, &pval);
++		if(rc < 0) {
++			virtualfg_info("Failed get battery status.\n");
++			return -EINVAL;
++		}
++		status = pval.intval;
++	}
++	// Map soc value according to raw_soc
++	if(bq->raw_soc > HW_REPORT_FULL_SOC)
++		system_soc = 100;
++	else {
++		system_soc = ((bq->raw_soc + SOC_PROPORTION_C) / SOC_PROPORTION);
++		if(system_soc > 99)
++			system_soc = 99;
++	}
++	// Get the initial value for the first time
++	if(last_change_time == -1) {
++		last_change_time = ktime_get();
++		if(system_soc != 0)
++			last_system_soc = system_soc;
++		else
++			last_system_soc = soc;
++	}
++	if ((status == POWER_SUPPLY_STATUS_DISCHARGING || status == POWER_SUPPLY_STATUS_NOT_CHARGING)
++		&& !bq->batt_rm && temp < 150 && last_system_soc >= 1) {
++			for(i = FFC_SMOOTH_LEN_DUAL-1; i >= 0; i--) {
++				if(batt_ma > dual_ffc_dischg_smooth[i].curr_lim) {
++					unit_time = dual_ffc_dischg_smooth[i].time;
++					break;
++				}
++			}
++		virtualfg_info("enter low temperature smooth unit_time=%d batt_ma_now=%d\n", unit_time, batt_ma);
++	}
++	// If the soc jump, will smooth one cap every 10S
++	soc_delta = abs(system_soc - last_system_soc);
++	if(soc_delta >= 1 || (bq->batt_volt < 3300 && system_soc > 0) ||(unit_time != 10000 && soc_delta == 1)) {
++		calc_delta_time(last_change_time, &change_delta);
++		delta_time = change_delta / unit_time;
++		if(delta_time < 0) {
++			last_change_time = ktime_get();
++			delta_time = 0;
++		}
++		soc_changed = min(1,delta_time);
++		if(soc_changed) {
++			if ((status == POWER_SUPPLY_STATUS_CHARGING) && (system_soc > last_system_soc))
++				system_soc = last_system_soc + soc_changed;
++			else if (status == POWER_SUPPLY_STATUS_DISCHARGING && system_soc < last_system_soc)
++				system_soc = last_system_soc - soc_changed;
++		} else {
++			system_soc = last_system_soc;
++		}
++		virtualfg_info("system soc=%d,last system soc: %d,delta time: %d,soc_changed:%d,unit_time:%d,soc_delta:%d\n",
++			system_soc,last_system_soc,delta_time,soc_changed,unit_time,soc_delta);
++	}
++	if(system_soc < last_system_soc)
++		system_soc = last_system_soc - 1;
++	// Avoid mismatches between charging status and soc changes
++	if (((status != POWER_SUPPLY_STATUS_CHARGING) && (system_soc > last_system_soc))
++	|| ((status == POWER_SUPPLY_STATUS_CHARGING) && (system_soc < last_system_soc) && (ibat_pos_count < 3) && ((time.tv_sec > 10))))
++		system_soc = last_system_soc;
++	if (system_soc != last_system_soc) {
++		last_change_time = ktime_get();
++		last_system_soc = system_soc;
++	}
++	if(system_soc > 100)
++		system_soc =100;
++	if(system_soc < 0)
++		system_soc =0;
++	if ((system_soc == 0) && ((bq->batt_volt >= 3400) || ((time.tv_sec <= 10)))) {
++		system_soc = 1;
++		virtualfg_info("uisoc::hold 1 when volt > 3400mv. \n");
++	}
++	if(bq->last_soc != system_soc){
++		bq->last_soc = system_soc;
++	}
++	return system_soc;
++}
++#endif
++static int fg_get_raw_soc(struct vir_bq_fg_chip *bq)
++{
++	int raw_soc_master, raw_soc_slave, raw_soc;
++	int rate_of_master = 50, rate_of_slave = 50;
++
++	if (check_qti_ops(&bq->battmg_dev)) {
++		raw_soc_master = battmngr_qtiops_get_fg1_raw_soc(bq->battmg_dev);
++		raw_soc_slave = battmngr_qtiops_get_fg2_raw_soc(bq->battmg_dev);
++	} else {
++		pr_err("virtual fg ops is null\n");
++		return -EINVAL;
++	}
++
++	rate_of_master = global_vir_fg_info->fcc_master * 100 /
++			 (global_vir_fg_info->fcc_master +
++			  global_vir_fg_info->fcc_slave);
++	rate_of_slave = 100 - rate_of_master;
++	raw_soc = (rate_of_master * raw_soc_master +
++		   rate_of_slave * raw_soc_slave + 50) /
++		  100;
++
++	bq->raw_soc_m = raw_soc_master;
++	bq->raw_soc_s = raw_soc_slave;
++    return raw_soc;
++}
++static int fg_read_rm(struct vir_bq_fg_chip *bq)
++{
++	int rm_master = 0, rm_slave = 0;
++	int rm;
++
++	if (check_qti_ops(&bq->battmg_dev)) {
++		rm_master = battmngr_qtiops_get_fg1_rm(bq->battmg_dev);
++		rm_slave = battmngr_qtiops_get_fg2_rm(bq->battmg_dev);
++	} else {
++		pr_err("qti virtual ops is null!\n");
++		return -EINVAL;
++	}
++
++	bq->batt_rm_m = rm_master;
++	bq->batt_rm_s = rm_slave;
++	rm = (rm_master + rm_slave) / 1000;
++	return rm;
++}
++#if 0
++static int fg_get_batt_capacity_level(struct dual_fg_chip *bq)
++{
++	int capacity_level_master = 3, capacity_level_slave = 3;
++	int rc, capacity_level;
++	union power_supply_propval pval = {
++		0,
++	};
++	dual_fg_check_fg_matser_psy(bq);
++	dual_fg_check_fg_slave_psy(bq);
++	if (!bq->fg_master_psy || !bq->fg_slave_psy) {
++		pr_err("bms_master or bms_slave not found\n");
++		return -EINVAL;
++	}
++	rc = power_supply_get_property(bq->fg_master_psy,
++				       POWER_SUPPLY_PROP_CAPACITY_LEVEL, &pval);
++	capacity_level_master = pval.intval;
++	rc = power_supply_get_property(bq->fg_slave_psy,
++				       POWER_SUPPLY_PROP_CAPACITY_LEVEL, &pval);
++	capacity_level_slave = pval.intval;
++	/* dual battery is same  for k81*/
++	capacity_level = (capacity_level_master + capacity_level_slave + 1) / 2;
++	return capacity_level;
++}
++static int fg_get_soc_decimal(struct dual_fg_chip *bq)
++{
++	int soc_decimal = 50;
++	int batt_soc_master = 0, batt_soc_slave = 0;
++	int rate_of_master = 50, rate_of_slave = 50;
++	int rc;
++	union power_supply_propval pval = {
++		0,
++	};
++	dual_fg_check_fg_matser_psy(bq);
++	dual_fg_check_fg_slave_psy(bq);
++	if (!bq->fg_master_psy || !bq->fg_slave_psy) {
++		pr_err("bms_master or bms_slave not found\n");
++		return -EINVAL;
++	}
++	if (!global_vir_fg_info->fg1_batt_ctl_enabled) {
++		rc = power_supply_get_property(
++			bq->fg_master_psy, POWER_SUPPLY_PROP_CAPACITY, &pval);
++		batt_soc_master = pval.intval;
++	} else {
++		batt_soc_master = FG_FULL;
++	}
++	if (!global_vir_fg_info->fg2_batt_ctl_enabled) {
++		rc = power_supply_get_property(
++			bq->fg_slave_psy, POWER_SUPPLY_PROP_CAPACITY, &pval);
++		batt_soc_slave = pval.intval;
++	} else {
++		batt_soc_slave = FG_FULL;
++	}
++	rate_of_master = global_vir_fg_info->fcc_master * 100 /
++			 (global_vir_fg_info->fcc_master +
++			  global_vir_fg_info->fcc_slave);
++	rate_of_slave = 100 - rate_of_master;
++	soc_decimal = (rate_of_master * batt_soc_master +
++		       rate_of_slave * batt_soc_slave + 50) %
++		      100;
++	return soc_decimal;
++}
++static int fg_get_soc_decimal_rate(struct dual_fg_chip *bq)
++{
++	int soc, i;
++	if (bq->dec_rate_len <= 0)
++		return 0;
++	soc = fg_read_system_soc(bq);
++	for (i = 0; i < bq->dec_rate_len; i += 2) {
++		if (soc < bq->dec_rate_seq[i]) {
++			return bq->dec_rate_seq[i - 1];
++		}
++	}
++	return bq->dec_rate_seq[bq->dec_rate_len - 1];
++}
++static int fg_get_cold_thermal_level(struct dual_fg_chip *bq)
++{
++	int cold_master = 0, cold_slave = 0, cold = 0;
++	int rc;
++	union power_supply_propval pval = {
++		0,
++	};
++	dual_fg_check_fg_matser_psy(bq);
++	dual_fg_check_fg_slave_psy(bq);
++	if (!bq->fg_master_psy || !bq->fg_slave_psy) {
++		pr_err("bms_master or bms_slave not found\n");
++		return -EINVAL;
++	}
++	rc = power_supply_get_property(
++		bq->fg_master_psy, POWER_SUPPLY_PROP_COLD_THERMAL_LEVEL, &pval);
++	cold_master = pval.intval;
++	rc = power_supply_get_property(
++		bq->fg_slave_psy, POWER_SUPPLY_PROP_COLD_THERMAL_LEVEL, &pval);
++	cold_slave = pval.intval;
++	cold = MIN(cold_master, cold_slave);
++	return cold;
++}
++static int fg_read_tte(struct dual_fg_chip *bq)
++{
++	int tte_master, tte_slave, tte;
++	int rc;
++	union power_supply_propval pval = {
++		0,
++	};
++	dual_fg_check_fg_matser_psy(bq);
++	dual_fg_check_fg_slave_psy(bq);
++	if (!bq->fg_master_psy || !bq->fg_slave_psy) {
++		pr_err("bms_master or bms_slave not found\n");
++		return -EINVAL;
++	}
++	rc = power_supply_get_property(
++		bq->fg_master_psy, POWER_SUPPLY_PROP_TIME_TO_EMPTY_NOW, &pval);
++	tte_master = pval.intval;
++	rc = power_supply_get_property(
++		bq->fg_slave_psy, POWER_SUPPLY_PROP_TIME_TO_EMPTY_NOW, &pval);
++	tte_slave = pval.intval;
++	tte = MAX(tte_master, tte_slave);
++	return tte;
++}
++static int fg_read_ttf(struct dual_fg_chip *bq)
++{
++	int ttf_master, ttf_slave, ttf;
++	int rc;
++	union power_supply_propval pval = {
++		0,
++	};
++	dual_fg_check_fg_matser_psy(bq);
++	dual_fg_check_fg_slave_psy(bq);
++	if (!bq->fg_master_psy || !bq->fg_slave_psy) {
++		pr_err("bms_master or bms_slave not found\n");
++		return -EINVAL;
++	}
++	rc = power_supply_get_property(
++		bq->fg_master_psy, POWER_SUPPLY_PROP_TIME_TO_FULL_AVG, &pval);
++	ttf_master = pval.intval;
++	rc = power_supply_get_property(
++		bq->fg_slave_psy, POWER_SUPPLY_PROP_TIME_TO_FULL_AVG, &pval);
++	ttf_slave = pval.intval;
++	ttf = MAX(ttf_master, ttf_slave);
++	return ttf;
++}
++static int fg_read_cyclecount(struct dual_fg_chip *bq)
++{
++	u16 cc;
++	int cc_master = 0, cc_slave = 0;
++	int rc;
++	union power_supply_propval pval = {
++		0,
++	};
++	dual_fg_check_fg_matser_psy(bq);
++	dual_fg_check_fg_slave_psy(bq);
++	if (!bq->fg_master_psy || !bq->fg_slave_psy) {
++		pr_err("bms_master or bms_slave not found\n");
++		return -EINVAL;
++	}
++	rc = power_supply_get_property(bq->fg_master_psy,
++				       POWER_SUPPLY_PROP_CYCLE_COUNT, &pval);
++	cc_master = pval.intval;
++	rc = power_supply_get_property(bq->fg_slave_psy,
++				       POWER_SUPPLY_PROP_CYCLE_COUNT, &pval);
++	cc_slave = pval.intval;
++	cc = MIN(cc_master, cc_slave);
++	return cc;
++}
++static int fg_get_CurrentMax(struct dual_fg_chip *bq)
++{
++	int curr_max = 0, curr_max_master, curr_max_slave;
++	int rc;
++	union power_supply_propval pval = {
++		0,
++	};
++	dual_fg_check_fg_matser_psy(bq);
++	dual_fg_check_fg_slave_psy(bq);
++	if (!bq->fg_master_psy || !bq->fg_slave_psy) {
++		pr_err("bms_master or bms_slave not found\n");
++		return -EINVAL;
++	}
++	rc = power_supply_get_property(bq->fg_master_psy,
++				       POWER_SUPPLY_PROP_CURRENT_MAX, &pval);
++	curr_max_master = pval.intval;
++	rc = power_supply_get_property(bq->fg_slave_psy,
++				       POWER_SUPPLY_PROP_CURRENT_MAX, &pval);
++	curr_max_slave = pval.intval;
++	curr_max = curr_max_master + curr_max_slave;
++	return curr_max;
++}
++static int fg_get_constant_charge_CurrentMax(struct dual_fg_chip *bq)
++{
++	int curr_max = 0, curr_max_master, curr_max_slave;
++	int rc;
++	union power_supply_propval pval = {
++		0,
++	};
++	dual_fg_check_fg_matser_psy(bq);
++	dual_fg_check_fg_slave_psy(bq);
++	if (!bq->fg_master_psy || !bq->fg_slave_psy) {
++		pr_err("bms_master or bms_slave not found\n");
++		return -EINVAL;
++	}
++	rc = power_supply_get_property(
++		bq->fg_master_psy,
++		POWER_SUPPLY_PROP_CONSTANT_CHARGE_CURRENT_MAX, &pval);
++	curr_max_master = pval.intval;
++	rc = power_supply_get_property(
++		bq->fg_slave_psy, POWER_SUPPLY_PROP_CONSTANT_CHARGE_CURRENT_MAX,
++		&pval);
++	curr_max_slave = pval.intval;
++	curr_max = curr_max_master + curr_max_slave;
++	return curr_max;
++}
++static int fg_get_VoltageMax(struct dual_fg_chip *bq)
++{
++	int volt_max = 0, volt_max_master, volt_max_slave;
++	int rc;
++	union power_supply_propval pval = {
++		0,
++	};
++	dual_fg_check_fg_matser_psy(bq);
++	dual_fg_check_fg_slave_psy(bq);
++	if (!bq->fg_master_psy || !bq->fg_slave_psy) {
++		pr_err("bms_master or bms_slave not found\n");
++		return -EINVAL;
++	}
++	rc = power_supply_get_property(bq->fg_master_psy,
++				       POWER_SUPPLY_PROP_VOLTAGE_MAX, &pval);
++	volt_max_master = pval.intval;
++	rc = power_supply_get_property(bq->fg_slave_psy,
++				       POWER_SUPPLY_PROP_VOLTAGE_MAX, &pval);
++	volt_max_slave = pval.intval;
++	if (volt_max_master && volt_max_slave)
++		volt_max = MIN(volt_max_master, volt_max_slave);
++	else
++		volt_max = MAX(volt_max_master, volt_max_slave);
++	if (global_vir_fg_info->fg1_batt_ctl_enabled || global_vir_fg_info->fg2_batt_ctl_enabled) {
++		volt_max += BQ_MAXIUM_VOLTAGE_HYS;
++		virtualfg_info( "add 10mv to fv\n");
++	}
++	if (!bq->fv_votable)
++		bq->fv_votable = find_votable("FV");
++	virtualfg_info( "dual_gauge voltage max:%d,effective_fv:%d\n", volt_max,get_effective_result(bq->fv_votable));
++	return volt_max;
++}
++static bool fg_get_chipok(struct dual_fg_chip *bq)
++{
++	bool chip_master, chip_slave;
++	int rc;
++	union power_supply_propval pval = {
++		0,
++	};
++	dual_fg_check_fg_matser_psy(bq);
++	dual_fg_check_fg_slave_psy(bq);
++	if (!bq->fg_master_psy || !bq->fg_slave_psy) {
++		pr_err("bms_master or bms_slave not found\n");
++		return false;
++	}
++	rc = power_supply_get_property(bq->fg_master_psy,
++				       POWER_SUPPLY_PROP_CHIP_OK, &pval);
++	chip_master = !!pval.intval;
++	rc = power_supply_get_property(bq->fg_slave_psy,
++				       POWER_SUPPLY_PROP_CHIP_OK, &pval);
++	chip_slave = !!pval.intval;
++	if (chip_master == true && chip_slave == true)
++		return true;
++	else
++		return false;
++}
++static int fg_get_termination_current(struct dual_fg_chip *bq)
++{
++	int current_master, current_slave;
++	int rc, curr;
++	union power_supply_propval pval = {
++		0,
++	};
++	dual_fg_check_fg_matser_psy(bq);
++	dual_fg_check_fg_slave_psy(bq);
++	if (!bq->fg_master_psy || !bq->fg_slave_psy) {
++		pr_err("bms_master or bms_slave not found\n");
++		return -EINVAL;
++	}
++	rc = power_supply_get_property(bq->fg_master_psy,
++				       POWER_SUPPLY_PROP_TERMINATION_CURRENT,
++				       &pval);
++	current_master = pval.intval;
++	rc = power_supply_get_property(
++		bq->fg_slave_psy, POWER_SUPPLY_PROP_TERMINATION_CURRENT, &pval);
++	current_slave = pval.intval;
++	curr = current_master + current_slave;
++	return curr;
++}
++static int fg_get_FFC_termination_current(struct dual_fg_chip *bq)
++{
++	int current_master, current_slave;
++	int rc, curr;
++	union power_supply_propval pval = {
++		0,
++	};
++	dual_fg_check_fg_matser_psy(bq);
++	dual_fg_check_fg_slave_psy(bq);
++	if (!bq->fg_master_psy || !bq->fg_slave_psy) {
++		pr_err("bms_master or bms_slave not found\n");
++		return -EINVAL;
++	}
++	rc = power_supply_get_property(
++		bq->fg_master_psy, POWER_SUPPLY_PROP_FFC_TERMINATION_CURRENT,
++		&pval);
++	current_master = pval.intval;
++	rc = power_supply_get_property(
++		bq->fg_slave_psy, POWER_SUPPLY_PROP_FFC_TERMINATION_CURRENT,
++		&pval);
++	current_slave = pval.intval;
++	curr = current_master + current_slave;
++	return curr;
++}
++static int fg_get_recharge_volt(struct dual_fg_chip *bq)
++{
++	int recharge_volt, recharge_volt_master, recharge_volt_slave;
++	int rc;
++	union power_supply_propval pval = {
++		0,
++	};
++	dual_fg_check_fg_matser_psy(bq);
++	dual_fg_check_fg_slave_psy(bq);
++	if (!bq->fg_master_psy || !bq->fg_slave_psy) {
++		pr_err("bms_master or bms_slave not found\n");
++		return -EINVAL;
++	}
++	rc = power_supply_get_property(bq->fg_master_psy,
++				       POWER_SUPPLY_PROP_RECHARGE_VBAT, &pval);
++	recharge_volt_master = pval.intval;
++	rc = power_supply_get_property(bq->fg_slave_psy,
++				       POWER_SUPPLY_PROP_RECHARGE_VBAT, &pval);
++	recharge_volt_slave = pval.intval;
++	recharge_volt = MAX(recharge_volt_master, recharge_volt_slave);
++	return recharge_volt;
++}
++static void fg_check_I2C_status(struct dual_fg_chip *bq)
++{
++	union power_supply_propval pval = {
++		0,
++	};
++	int rc;
++	const char *master_model_name, *slave_model_name;
++	if (!bq->fg_slave_psy || !bq->fg_master_psy)
++		return;
++	rc = power_supply_get_property(bq->fg_master_psy,
++				       POWER_SUPPLY_PROP_MODEL_NAME, &pval);
++	master_model_name = pval.strval;
++	rc = power_supply_get_property(bq->fg_slave_psy,
++				       POWER_SUPPLY_PROP_MODEL_NAME, &pval);
++	slave_model_name = pval.strval;
++	if (strncmp(master_model_name, "unknown", 7) == 0 ||
++	    strncmp(slave_model_name, "unknown", 7) == 0) {
++		/* for draco p0 and p0.1 */
++		if (bq->ignore_digest_for_debug)
++			bq->old_hw = true;
++		else
++			bq->old_hw = false;
++		virtualfg_info( "master fg or slave fg I2C failed\n");
++	}
++}
++#endif
++#if 0
++static int fg_get_property(struct power_supply *psy,
++			   enum power_supply_property psp,
++			   union power_supply_propval *val)
++{
++	struct dual_fg_chip *bq = power_supply_get_drvdata(psy);
++	int ret, status;
++	int vbat_mv;
++	static bool shutdown_delay_cancel;
++	static bool last_shutdown_delay;
++	union power_supply_propval pval = {
++		0,
++	};
++	switch (psp) {
++	case POWER_SUPPLY_PROP_MODEL_NAME:
++		if (bq->old_hw) {
++			val->strval = "unknown";
++			break;
++		}
++		val->strval = bq->model_name;
++		break;
++	case POWER_SUPPLY_PROP_VOLTAGE_NOW:
++		if (bq->fake_volt != -EINVAL) {
++			val->intval = bq->fake_volt;
++			break;
++		}
++		if (bq->old_hw) {
++			val->intval = 3700 * 1000;
++			break;
++		}
++		ret = fg_read_volt(bq);
++		if (ret >= 0)
++			bq->batt_volt = ret;
++		val->intval = bq->batt_volt * 1000;
++		break;
++	case POWER_SUPPLY_PROP_PRESENT:
++		val->intval = 1;
++		break;
++	case POWER_SUPPLY_PROP_CURRENT_NOW:
++		if (bq->old_hw) {
++			val->intval = -500 * 2;
++			break;
++		}
++		fg_read_current(bq, &bq->batt_curr);
++		val->intval = bq->batt_curr * 1000;
++		break;
++	case POWER_SUPPLY_PROP_CAPACITY:
++		if (bq->fake_soc >= 0) {
++			val->intval = bq->fake_soc;
++			break;
++		}
++		if (bq->old_hw) {
++			val->intval = 15;
++			break;
++		}
++		val->intval = fg_read_system_soc(bq);
++		bq->batt_soc = val->intval;
++		Dual_Fg_Check_Chg_Fg_Status_And_Disable_Chg_Path(bq);
++		//add shutdown delay feature
++		if (bq->shutdown_delay_enable) {
++			if (val->intval == 0) {
++				vbat_mv = fg_read_volt(bq);
++				if (bq->batt_psy) {
++					power_supply_get_property(
++						bq->batt_psy,
++						POWER_SUPPLY_PROP_STATUS,
++						&pval);
++					status = pval.intval;
++				}
++				if (vbat_mv > SHUTDOWN_DELAY_VOL &&
++				    status != POWER_SUPPLY_STATUS_CHARGING) {
++					bq->shutdown_delay = true;
++					val->intval = 1;
++				} else if (status ==
++						   POWER_SUPPLY_STATUS_CHARGING &&
++					   bq->shutdown_delay) {
++					bq->shutdown_delay = false;
++					shutdown_delay_cancel = true;
++					val->intval = 1;
++				} else {
++					bq->shutdown_delay = false;
++					virtualfg_info( "shutdown_delay_cancel:%d, shutdown vbat_uv_2::%d\n",shutdown_delay_cancel,vbat_mv);
++					if (vbat_mv > SHUTDOWN_DELAY_VOL + 50)
++						val->intval = 1;
++				}
++			} else {
++				bq->shutdown_delay = false;
++				shutdown_delay_cancel = false;
++			}
++			if (last_shutdown_delay != bq->shutdown_delay) {
++				last_shutdown_delay = bq->shutdown_delay;
++				if (bq->fg_psy)
++					power_supply_changed(bq->fg_psy);
++			}
++		}
++		break;
++	case POWER_SUPPLY_PROP_CAPACITY_LEVEL:
++		val->intval = fg_get_batt_capacity_level(bq);
++		break;
++	case POWER_SUPPLY_PROP_SHUTDOWN_DELAY:
++		val->intval = bq->shutdown_delay;
++		break;
++	case POWER_SUPPLY_PROP_CAPACITY_RAW:
++		val->intval = bq->raw_soc;
++		break;
++	case POWER_SUPPLY_PROP_SOC_DECIMAL:
++		val->intval = fg_get_soc_decimal(bq);
++		break;
++	case POWER_SUPPLY_PROP_SOC_DECIMAL_RATE:
++		val->intval = fg_get_soc_decimal_rate(bq);
++		break;
++	case POWER_SUPPLY_PROP_COLD_THERMAL_LEVEL:
++		val->intval = fg_get_cold_thermal_level(bq);
++		break;
++	case POWER_SUPPLY_PROP_TEMP:
++		if (bq->fake_temp != -EINVAL) {
++			val->intval = bq->fake_temp;
++			break;
++		}
++		if (bq->old_hw) {
++			val->intval = 250;
++			break;
++		}
++		val->intval = bq->batt_temp;
++		break;
++	case POWER_SUPPLY_PROP_TIME_TO_EMPTY_NOW:
++		if (bq->old_hw) {
++			val->intval = bq->batt_tte;
++			break;
++		}
++		ret = fg_read_tte(bq);
++		if (ret >= 0)
++			bq->batt_tte = ret;
++		val->intval = bq->batt_tte;
++		break;
++	case POWER_SUPPLY_PROP_TIME_TO_FULL_AVG:
++		if (bq->old_hw) {
++			val->intval = bq->batt_ttf;
++			break;
++		}
++		ret = fg_read_ttf(bq);
++		if (ret >= 0)
++			bq->batt_ttf = ret;
++		val->intval = bq->batt_ttf;
++		break;
++	case POWER_SUPPLY_PROP_CHARGE_FULL:
++		if (bq->old_hw) {
++			val->intval = 4050000;
++			break;
++		}
++		val->intval = bq->batt_fcc * 1000;
++		break;
++	case POWER_SUPPLY_PROP_CHARGE_FULL_DESIGN:
++		val->intval = bq->batt_dc;
++		break;
++	case POWER_SUPPLY_PROP_CYCLE_COUNT:
++		if (bq->old_hw) {
++			val->intval = 1;
++			break;
++		}
++		ret = fg_read_cyclecount(bq);
++		if (ret >= 0)
++			bq->batt_cyclecnt = ret;
++		val->intval = bq->batt_cyclecnt;
++		break;
++	case POWER_SUPPLY_PROP_TECHNOLOGY:
++		val->intval = POWER_SUPPLY_TECHNOLOGY_LIPO;
++		break;
++	case POWER_SUPPLY_PROP_RESISTANCE:
++		val->intval = bq->batt_resistance;
++		break;
++	case POWER_SUPPLY_PROP_RESISTANCE_ID:
++		val->intval = 100000;
++		break;
++	case POWER_SUPPLY_PROP_UPDATE_NOW:
++		val->intval = 0;
++		break;
++	case POWER_SUPPLY_PROP_CURRENT_MAX:
++		if (bq->old_hw) {
++			val->intval = 8000000;
++			break;
++		}
++		val->intval = fg_get_CurrentMax(bq);
++		break;
++	case POWER_SUPPLY_PROP_VOLTAGE_MAX:
++		if (bq->old_hw) {
++			val->intval = 4450000;
++			break;
++		}
++		val->intval = fg_get_VoltageMax(bq);
++		break;
++	case POWER_SUPPLY_PROP_AUTHENTIC:
++		val->intval = bq->verify_digest_success;
++		break;
++	case POWER_SUPPLY_PROP_CHIP_OK:
++		if (bq->fake_chip_ok != -EINVAL) {
++			val->intval = bq->fake_chip_ok;
++			break;
++		}
++		val->intval = fg_get_chipok(bq);
++		break;
++	case POWER_SUPPLY_PROP_CONSTANT_CHARGE_CURRENT_MAX:
++		if (bq->constant_charge_current_max != 0)
++			val->intval = bq->constant_charge_current_max;
++		else {
++			val->intval = fg_get_constant_charge_CurrentMax(bq);
++		}
++		break;
++	case POWER_SUPPLY_PROP_FASTCHARGE_MODE:
++		if (bq->old_hw) {
++			val->intval = 0;
++			break;
++		}
++		val->intval = bq->fast_mode;
++		break;
++	case POWER_SUPPLY_PROP_CHARGE_COUNTER:
++		if (bq->old_hw) {
++			val->intval = 4050000;
++			break;
++		}
++		val->intval = bq->batt_rm * 1000;
++		break;
++	case POWER_SUPPLY_PROP_TERMINATION_CURRENT:
++		val->intval = fg_get_termination_current(bq);
++		break;
++	case POWER_SUPPLY_PROP_FFC_TERMINATION_CURRENT:
++		val->intval = fg_get_FFC_termination_current(bq);
++		break;
++	case POWER_SUPPLY_PROP_RECHARGE_VBAT:
++		if (bq->batt_recharge_vol > 0)
++			val->intval = bq->batt_recharge_vol;
++		else
++			val->intval = fg_get_recharge_volt(bq);
++		break;
++	case POWER_SUPPLY_PROP_SOH:
++		val->intval = fg_read_soh(bq);
++		break;
++	default:
++		return -EINVAL;
++	}
++	return 0;
++}
++static int fg_set_property(struct power_supply *psy,
++			   enum power_supply_property prop,
++			   const union power_supply_propval *val)
++{
++	struct dual_fg_chip *bq = power_supply_get_drvdata(psy);
++	switch (prop) {
++	case POWER_SUPPLY_PROP_TEMP:
++		bq->fake_temp = val->intval;
++		break;
++	case POWER_SUPPLY_PROP_CAPACITY:
++		bq->fake_soc = val->intval;
++		power_supply_changed(bq->fg_psy);
++		break;
++	case POWER_SUPPLY_PROP_UPDATE_NOW:
++		break;
++	case POWER_SUPPLY_PROP_AUTHENTIC:
++		bq->verify_digest_success = !!val->intval;
++		if (!bq->fcc_votable)
++			bq->fcc_votable = find_votable("FCC");
++		vote(bq->fcc_votable, BMS_FG_VERIFY, !bq->verify_digest_success,
++				!bq->verify_digest_success ? 2000000 : 0);
++		break;
++	case POWER_SUPPLY_PROP_CHIP_OK:
++		bq->fake_chip_ok = !!val->intval;
++		break;
++	case POWER_SUPPLY_PROP_CONSTANT_CHARGE_CURRENT_MAX:
++		bq->constant_charge_current_max = val->intval;
++		break;
++	case POWER_SUPPLY_PROP_FASTCHARGE_MODE:
++		fg_set_fastcharge_mode(bq, !!val->intval);
++		break;
++	case POWER_SUPPLY_PROP_VOLTAGE_NOW:
++		bq->fake_volt = val->intval;
++		break;
++	default:
++		return -EINVAL;
++	}
++	return 0;
++}
++static int fg_prop_is_writeable(struct power_supply *psy,
++				enum power_supply_property prop)
++{
++	int ret;
++	switch (prop) {
++	case POWER_SUPPLY_PROP_TEMP:
++	case POWER_SUPPLY_PROP_CAPACITY:
++	case POWER_SUPPLY_PROP_UPDATE_NOW:
++	case POWER_SUPPLY_PROP_AUTHENTIC:
++	case POWER_SUPPLY_PROP_CHIP_OK:
++	case POWER_SUPPLY_PROP_FASTCHARGE_MODE:
++	case POWER_SUPPLY_PROP_VOLTAGE_NOW:
++	case POWER_SUPPLY_PROP_CONSTANT_CHARGE_CURRENT_MAX:
++		ret = 1;
++		break;
++	default:
++		ret = 0;
++		break;
++	}
++	return ret;
++}
++static int fg_psy_register(struct dual_fg_chip *bq)
++{
++	struct power_supply_config fg_psy_cfg = {};
++	bq->fg_psy_d.name = "bms";
++	bq->fg_psy_d.type = POWER_SUPPLY_TYPE_BMS;
++	bq->fg_psy_d.properties = fg_props;
++	bq->fg_psy_d.num_properties = ARRAY_SIZE(fg_props);
++	bq->fg_psy_d.get_property = fg_get_property;
++	bq->fg_psy_d.set_property = fg_set_property;
++	bq->fg_psy_d.property_is_writeable = fg_prop_is_writeable;
++	fg_psy_cfg.drv_data = bq;
++	fg_psy_cfg.num_supplicants = 0;
++	bq->fg_psy =
++		devm_power_supply_register(bq->dev, &bq->fg_psy_d, &fg_psy_cfg);
++	if (IS_ERR(bq->fg_psy)) {
++		virtualfg_info( "Failed to register fg_psy");
++		return PTR_ERR(bq->fg_psy);
++	}
++	return 0;
++}
++#endif
++
++// static bool check_qti_ops(struct vir_bq_fg_chip *bq)
++// {
++// 	if (bq->battmg_dev)
++// 		return true;
++
++// 	bq->battmg_dev = get_adapter_by_name("qti_ops");
++// 	if (!bq->battmg_dev) {
++// 		virtualfg_err("virtual fg get battmngr dev is fail");
++// 		return -EPROBE_DEFER;
++// 		return false;
++// 	}
++// 	//virtualfg_info("virtual fg get battmngr dev is success");
++// 	return true;
++// }
++
++/* periodically update fg data*/
++static void fg_monitor_workfunc(struct work_struct *work)
++{
++	if (READ_ONCE(fg_stopping)) return;
++	struct vir_bq_fg_chip *bq =
++		container_of(work, struct vir_bq_fg_chip, monitor_work.work);
++
++	if (!check_qti_ops(&bq->battmg_dev)) {
++		if (!READ_ONCE(fg_stopping)) schedule_delayed_work(&bq->monitor_work, 10 * HZ);
++		return;
++	}
++	if (!bq->old_hw) {
++		fg_update_status(bq);
++		fg_update_charge_full(bq);
++	}
++	if (!READ_ONCE(fg_stopping)) schedule_delayed_work(&bq->monitor_work, 10 * HZ);
++}
++static void fg_update_status(struct vir_bq_fg_chip *bq)
++{
++	static int last_st, last_soc, last_temp;
++	//int vbus=0,vph=0;
++	//int rc=0;
++// ->fg_soc && global_vir_fg_info->fg_ops->fg_soc && global_vir_fg_info->fg_ops->fg_curr && 
++			//global_vir_fg_info->fg_ops->fg_temp && global_vir_fg_info->fg_ops->charge_status
++	mutex_lock(&bq->data_lock);
++	pr_err("enter-1:%s\n", __func__);
++	if (check_qti_ops(&bq->battmg_dev)) {
++		//rc = global_vir_fg_info->fg_ops->fg_soc(&bq->batt_soc);
++		bq->batt_soc = battmngr_qtiops_get_fg_soc(bq->battmg_dev);
++
++		//rc = global_vir_fg_info->fg_ops->fg_volt(&bq->batt_volt);
++		bq->batt_volt = battmngr_qtiops_get_fg_volt(bq->battmg_dev);
++
++		//rc = global_vir_fg_info->fg_ops->fg_curr(&bq->batt_curr);
++		bq->batt_curr = battmngr_qtiops_get_fg_curr(bq->battmg_dev);
++
++		//rc = global_vir_fg_info->fg_ops->fg_temp(&bq->batt_temp);
++		bq->batt_temp = battmngr_qtiops_get_fg_temp(bq->battmg_dev);
++
++		//rc = global_vir_fg_info->fg_ops->charge_status(&bq->batt_st);
++		bq->batt_st = battmngr_qtiops_get_charge_status(bq->battmg_dev);
++
++	} else {
++		pr_err("get fg ops is fail\n");
++		mutex_unlock(&bq->data_lock);
++		return;
++	}
++
++	bq->batt_rm = fg_read_rm(bq);
++
++	bq->batt_fcc = fg_read_fcc(bq);
++
++	bq->raw_soc = fg_get_raw_soc(bq);
++
++	//fg_get_DesignedCapcity(bq);
++	//fg_check_dual_current(bq);
++	// if (global_vir_fg_info->fg_ops->fg1_ibatt && global_vir_fg_info->fg_ops->fg1_volt && global_vir_fg_info->fg_ops->fg1_temp &&
++	// 		global_vir_fg_info->fg_ops->fg2_ibatt && global_vir_fg_info->fg_ops->fg2_volt && global_vir_fg_info->fg_ops->fg2_temp) {
++
++	bq->batt_curr_m = battmngr_qtiops_get_fg1_ibatt(bq->battmg_dev);
++
++	bq->batt_volt_m = battmngr_qtiops_get_fg1_volt(bq->battmg_dev);
++
++	bq->batt_temp_m = battmngr_qtiops_get_fg1_temp(bq->battmg_dev);
++
++	bq->batt_curr_s = battmngr_qtiops_get_fg2_ibatt(bq->battmg_dev);
++
++	bq->batt_volt_s = battmngr_qtiops_get_fg2_volt(bq->battmg_dev);
++
++	bq->batt_temp_s = battmngr_qtiops_get_fg2_temp(bq->battmg_dev);
++
++	mutex_unlock(&bq->data_lock);
++	virtualfg_info("SOC:%d,Volt:%d,Cur:%d,Temp:%d,RM:%d,FC:%d,FAST:%d,Raw_soc:%d,Charging status:%d",
++	       bq->batt_soc, bq->batt_volt, bq->batt_curr, bq->batt_temp,
++	       bq->batt_rm, bq->batt_fcc, bq->fast_mode,bq->raw_soc,bq->batt_st);
++	virtualfg_info("Print master info. Volt_m:%d, Curr_m:%d, Temp_m:%d, Raw_soc_m:%d\n",
++		bq->batt_volt_m,bq->batt_curr_m,bq->batt_temp_m,bq->raw_soc_m);
++	virtualfg_info("Print slave info. Volt_s:%d, Curr_s:%d, Temp_s:%d, Raw_soc_s:%d\n",
++		bq->batt_volt_s,bq->batt_curr_s,bq->batt_temp_s,bq->raw_soc_s);
++	if (!bq->usb_psy) {
++		bq->usb_psy = power_supply_get_by_name("usb");
++		if (!bq->usb_psy) {
++			return;
++		}
++	}
++	if (!bq->batt_psy) {
++		bq->batt_psy = power_supply_get_by_name("battery");
++		if (!bq->batt_psy) {
++			return;
++		}
++	}
++	// rc = power_supply_get_property(bq->usb_psy,
++	// 			       POWER_SUPPLY_PROP_VOLTAGE_VPH, &prop);
++	// vph = prop.intval;
++	// rc = power_supply_get_property(bq->usb_psy,
++	// 			       POWER_SUPPLY_PROP_VOLTAGE_NOW, &prop);
++	// vbus = prop.intval;
++	// virtualfg_info("Print Vbus:%d, Vph:%d\n",vbus,vph);
++	if ((last_soc != bq->batt_soc) || (last_temp != bq->batt_temp) ||
++	    (last_st != bq->batt_st)) {
++		if (bq->batt_psy)
++			power_supply_changed(bq->batt_psy);
++	}
++	last_soc = bq->batt_soc;
++	last_temp = bq->batt_temp;
++	last_st = bq->batt_st;
++}
++static int fg_update_charge_full(struct vir_bq_fg_chip *bq)
++{
++	//int rc;
++	return 0;
++// 	if (!bq->batt_psy) {
++// 		bq->batt_psy = power_supply_get_by_name("battery");
++// 		if (!bq->batt_psy) {
++// 			return 0;
++// 		}
++// 	}
++// 	rc = power_supply_get_property(bq->batt_psy,
++// 				       POWER_SUPPLY_PROP_CHARGE_DONE, &prop);
++// 	bq->charge_done = prop.intval;
++// 	rc = power_supply_get_property(bq->batt_psy, POWER_SUPPLY_PROP_HEALTH,
++// 				       &prop);
++// 	bq->health = prop.intval;
++// 	virtualfg_info( "raw:%d,done:%d,full:%d,health:%d\n", bq->raw_soc,
++// 	       bq->charge_done, bq->charge_full, bq->health);
++// 	if (bq->charge_done && !bq->charge_full) {
++// 		if (bq->raw_soc >= BQ_REPORT_FULL_SOC) {
++// 			virtualfg_info( "Setting charge_full to true\n");
++// 			bq->charge_full = true;
++// 		} else {
++// 			virtualfg_info( "charging is done raw soc:%d\n",
++// 			       bq->raw_soc);
++// 		}
++// 	} else if (bq->raw_soc <= BQ_CHARGE_FULL_SOC && !bq->charge_done &&
++// 		   bq->charge_full) {
++// 		rc = power_supply_get_property(
++// 			bq->batt_psy, POWER_SUPPLY_PROP_CHARGE_DONE, &prop);
++// 		bq->charge_done = prop.intval;
++// 		if (bq->charge_done)
++// 			goto out;
++// 		bq->charge_full = false;
++// 	}
++// 	if ((bq->raw_soc <= BQ_RECHARGE_SOC) && bq->charge_done &&
++// 	    bq->health != POWER_SUPPLY_HEALTH_WARM) {
++// 		prop.intval = true;
++// 		rc = power_supply_set_property(
++// 			bq->batt_psy, POWER_SUPPLY_PROP_FORCE_RECHARGE, &prop);
++// 		if (rc < 0) {
++// 			virtualfg_info( "bq could not set force recharging!\n");
++// 			return rc;
++// 		}
++// 		Dual_Fg_Reset_Batt_Ctrl_gpio_default();
++// 	}
++// 	//fix mtbf corner case
++// 	if ((global_vir_fg_info->fg1_batt_ctl_enabled || global_vir_fg_info->fg2_batt_ctl_enabled)
++// 		&& bq->raw_soc <= BQ_RESET_BATT_CTRL_SOC
++// 		&& bq->health == POWER_SUPPLY_HEALTH_GOOD) {
++// 		virtualfg_info( "reset batt ctrl\n");
++// 		Dual_Fg_Reset_Batt_Ctrl_gpio_default();
++// 	}
++// out:
++// 	return 0;
++}
++
++int battery_process_event_fg(struct battmngr_notify *noti_data)
++{
++ int dc;
++ guard(mutex)(&fg_api_lock);
++ if (!g_bq || !noti_data) return -ENODEV;
++ dc = qti_get_DCIN_STATE();
++ if (dc < 0) return dc;
++ if (dc) schedule_delayed_work(&g_bq->monitor_work, 10 * HZ);
++ else cancel_delayed_work_sync(&g_bq->monitor_work);
++ return 0;
++}
++EXPORT_SYMBOL(battery_process_event_fg);
++
++static int bq_parse_dt(struct vir_bq_fg_chip *bq)
++{
++	struct device_node *node = bq->dev->of_node;
++	int ret, size;
++	bq->ignore_digest_for_debug =
++		of_property_read_bool(node, "bq,ignore-digest-debug");
++	bq->shutdown_delay_enable =
++		of_property_read_bool(node, "bq,shutdown-delay-enable");
++	ret = of_property_read_u32(node, "bq,recharge-voltage",
++				   &bq->batt_recharge_vol);
++	size = 0;
++	of_get_property(node, "bq,soc_decimal_rate", &size);
++	if (size) {
++		bq->dec_rate_seq = devm_kzalloc(bq->dev, size, GFP_KERNEL);
++		if (bq->dec_rate_seq) {
++			bq->dec_rate_len = (size / sizeof(*bq->dec_rate_seq));
++			if (bq->dec_rate_len % 2) {
++				virtualfg_info(
++				       "invalid soc decimal rate seq\n");
++				return -EINVAL;
++			}
++			of_property_read_u32_array(node, "bq,soc_decimal_rate",
++						   bq->dec_rate_seq,
++						   bq->dec_rate_len);
++		} else {
++			virtualfg_info(
++			       "error allocating memory for dec_rate_seq\n");
++		}
++	}
++	/* parse control fg master or slave gpio*/
++	bq->fg_master_disable_gpio = of_get_named_gpio(
++		node, "fg-master-disable-gpio", 0);
++	if ((!gpio_is_valid(bq->fg_master_disable_gpio))) {
++		virtualfg_info(
++		       "Failed to read node of fg-master-disable-gpio \n");
++	} else {
++		ret = gpio_request(bq->fg_master_disable_gpio,
++				   "fg_master_disable_gpio");
++		if (ret) {
++			virtualfg_info(
++			       "%s: unable to request fg master gpio [%d]\n",
++			       __func__,
++			       bq->fg_master_disable_gpio);
++		}
++		ret = gpio_direction_output(
++			bq->fg_master_disable_gpio, 0);
++		if (ret) {
++			virtualfg_info(
++			       "%s: unable to set direction for fg master gpio[%d]\n",
++			       __func__,
++			       bq->fg_master_disable_gpio);
++		}
++	}
++	bq->fg_slave_disable_gpio = of_get_named_gpio(
++		node, "fg-slave-disable-gpio", 0);
++	if ((!gpio_is_valid(bq->fg_slave_disable_gpio))) {
++		virtualfg_err("Failed to read node of fg-slave-disable-gpio \n");
++	} else {
++		ret = gpio_request(bq->fg_slave_disable_gpio,
++				   "fg_slave_disable_gpio");
++		if (ret) {
++			virtualfg_info("%s: unable to request fg slave gpio [%d]\n", __func__,
++			       bq->fg_slave_disable_gpio);
++		}
++		ret = gpio_direction_output(
++			bq->fg_slave_disable_gpio, 0);
++		if (ret) {
++			virtualfg_info("%s: unable to set direction for fg slave gpio[%d]\n", __func__,
++			       bq->fg_slave_disable_gpio);
++		}
++	}
++	return 0;
++}
++
++static int vir_fuelgauge_probe(struct platform_device *pdev)
++{
++	struct vir_bq_fg_chip* bq;
++	static int probe_cnt = 0;
++	int rc = 0;
++
++	virtualfg_info("virtual fg probe enter: probe_cnt: %d", ++probe_cnt);
++	bq = devm_kzalloc(&pdev->dev, sizeof(struct vir_bq_fg_chip), GFP_KERNEL);
++	if (!bq)
++		return -ENOMEM;
++
++	bq->dev = &pdev->dev;
++	platform_set_drvdata(pdev, bq);
++
++	if (!g_bcdev) {
++		virtualfg_err("%s: g_bcdev is null\n", __func__);
++		rc = -EPROBE_DEFER;
++		msleep(100);
++		goto g_bcdev_failure;
++	}
++
++	bq->model_name = "bq27z561_vir_fg";
++	bq->batt_soc = -ENODATA;
++	bq->batt_fcc = -ENODATA;
++	bq->batt_rm = -ENODATA;
++	bq->batt_dc = -ENODATA;
++	bq->batt_volt = -ENODATA;
++	bq->batt_temp = -ENODATA;
++	bq->batt_curr = -ENODATA;
++	bq->batt_cyclecnt = -ENODATA;
++	bq->batt_tte = -ENODATA;
++	bq->batt_ttf = -ENODATA;
++	bq->raw_soc = -ENODATA;
++	bq->last_soc = -ENODATA;
++	bq->fake_soc = -EINVAL;
++	bq->fake_temp = -EINVAL;
++	bq->fake_volt = -EINVAL;
++	bq->fake_chip_ok = -EINVAL;
++	bq->fg_master_psy = NULL;
++	bq->fg_slave_psy = NULL;
++
++	rc = bq_parse_dt(bq);
++	if (rc < 0) return rc;
++	mutex_init(&bq->data_lock);
++	//dual_fg_check_batt_psy(bq);
++	//fg_update_status(bq);
++	//fg_set_fastcharge_mode(bq, false);
++	bq->fg1_batt_ctl_enabled = false;
++	bq->fg2_batt_ctl_enabled = false;
++	/* init gpio*/
++	if (0)
++		Dual_Fuel_Gauge_Batt_Ctrl_Init();
++	bq->battmg_dev = get_adapter_by_name("qti_ops");
++	if (!bq->battmg_dev) {
++		virtualfg_err("virtual fg get battmngr dev is fail");
++		return -EPROBE_DEFER;
++	}
++
++	INIT_DELAYED_WORK(&bq->monitor_work, fg_monitor_workfunc);
++	virtualfg_info("virtual fg probe successfully");
++	mutex_lock(&fg_api_lock);
++	fg_stopping = false;
++	global_vir_fg_info = bq;
++	g_bq = bq;
++	mutex_unlock(&fg_api_lock);
++
++	platform_set_drvdata(pdev, bq);
++	pr_err("%s %s !!\n", __func__,
++		rc == -EPROBE_DEFER ? "Over probe cnt max" : "OK");
++	return 0;
++
++g_bcdev_failure:
++	return rc;
++}
++static void vir_fuelgauge_remove(struct platform_device *pdev)
++{
++ struct vir_bq_fg_chip *bq = platform_get_drvdata(pdev);
++ if (!bq) return;
++ mutex_lock(&fg_api_lock);
++ fg_stopping = true; g_bq = NULL; global_vir_fg_info = NULL;
++ mutex_unlock(&fg_api_lock);
++ cancel_delayed_work_sync(&bq->monitor_work);
++ if (bq->battmg_dev) put_device(&bq->battmg_dev->dev);
++ if (bq->batt_psy) power_supply_put(bq->batt_psy);
++ if (bq->usb_psy) power_supply_put(bq->usb_psy);
++ mutex_destroy(&bq->data_lock);
++ platform_set_drvdata(pdev, NULL);
++}
++static const struct of_device_id vir_fuelgauge_of_match[] = {
++	{
++		.compatible = "xiaomi,virtual-FuelGauge",
++	},
++	{},
++};
++MODULE_DEVICE_TABLE(of, vir_fuelgauge_of_match);
++
++static struct platform_driver vir_fuelgauge_driver = {
++	.driver = {
++		.name = "virtual-fuelgauge",
++		.owner = THIS_MODULE,
++		.of_match_table = of_match_ptr(vir_fuelgauge_of_match),
++	},
++	.probe = vir_fuelgauge_probe,
++	.remove = vir_fuelgauge_remove,
++};
++static int __init virtual_fg_register(void)
++{
++	pr_err("%s: check-1\n", __func__);
++	//return 0;
++	return platform_driver_register(&vir_fuelgauge_driver);
++}
++//EXPORT_SYMBOL(virtual_fg_register);
++static void __exit virtual_fg_unregister(void)
++{
++	platform_driver_unregister(&vir_fuelgauge_driver);
++}
++//EXPORT_SYMBOL(virtual_fg_unregister);
++module_init(virtual_fg_register);
++module_exit(virtual_fg_unregister);
++//MODULE_SOFTDEP("pre: qti_battery_charger");
++MODULE_DESCRIPTION("Xiaomi virtual fuel gauge for bq27z561");
++MODULE_LICENSE("GPL");
++MODULE_AUTHOR("litianpeng6<litianpeng6@xiaomi.com>");
+--- /dev/null
++++ b/sheng-ports/pogo/init/inc/xm_battmngr_init.h
+@@ -0,0 +1,33 @@
++
++#ifndef __XM_BATTMNGR_INIT_H
++#define __XM_BATTMNGR_INIT_H
++
++#include <linux/slab.h>
++#include <linux/module.h>
++#include <linux/kernel.h>
++#include <linux/string.h>
++#include <linux/power_supply.h>
++#include <linux/delay.h>
++#include <linux/workqueue.h>
++#include <linux/platform_device.h>
++#include <linux/of.h>
++#include <linux/of_device.h>
++#include <linux/of_irq.h>
++#include <linux/debugfs.h>
++#include <linux/device.h>
++
++#include <linux/battmngr/battmngr_voter.h>
++#include <linux/battmngr/battmngr_notifier.h>
++#include <linux/battmngr/xm_charger_core.h>
++#include "../../extSOC/inc/virtual_fg.h"
++
++struct xm_battmngr {
++	struct device *dev;
++	struct xm_charger charger;
++	struct vir_bq_fg_chip fg;
++	struct notifier_block battmngr_nb;
++	struct battmngr_notify battmngr_noti;
++};
++
++#endif /* __XM_BATTMNGR_INIT_H */
++
+--- /dev/null
++++ b/sheng-ports/pogo/init/xm_battmngr_init.c
+@@ -0,0 +1,116 @@
++
++#include "inc/xm_battmngr_init.h"
++
++struct xm_battmngr *g_battmngr;
++EXPORT_SYMBOL(g_battmngr);
++
++static int battmngr_notifier_call(struct notifier_block *nb,
++		unsigned long event, void *data)
++{
++	struct battmngr_notify *noti_data = data;
++	int ret = 0;
++
++	pr_err("%s: event %lu\n", __func__, event);
++
++	switch (event) {
++	case BATTMNGR_EVENT_FG:
++		ret = battery_process_event_fg(noti_data);
++		break;
++	case BATTMNGR_EVENT_MAINCHG:
++		ret = charger_process_event_mainchg(noti_data);
++		break;
++	case BATTMNGR_EVENT_MCU:
++		ret = charger_process_event_mcu(noti_data);
++		break;
++	case BATTMNGR_EVENT_IRQ:
++		ret = charger_process_event_irq(noti_data);
++		break;
++	case BATTMNGR_EVENT_THERMAL:
++		g_xm_charger->system_temp_level = noti_data->misc_msg.thermal_level;
++		pr_err("%s: thermal level: %d\n", __func__, g_xm_charger->system_temp_level);
++		ret = xm_charger_thermal(g_xm_charger);
++		break;
++	default:
++		break;
++	}
++
++	return notifier_from_errno(ret < 0 ? ret : 0);
++}
++
++static int xm_battmngr_probe(struct platform_device *pdev)
++{
++ struct xm_battmngr *manager;
++ int ret;
++ if (!check_g_bcdev_ops()) return -EPROBE_DEFER;
++ manager = devm_kzalloc(&pdev->dev, sizeof(*manager), GFP_KERNEL);
++ if (!manager) return -ENOMEM;
++ manager->dev = &pdev->dev;
++ manager->charger.dev = &pdev->dev;
++ mutex_init(&manager->battmngr_noti.notify_lock);
++ ret = xm_charger_init(&manager->charger);
++ if (ret < 0) return ret;
++ manager->battmngr_nb.notifier_call = battmngr_notifier_call;
++ ret = battmngr_notifier_register(&manager->battmngr_nb);
++ if (ret < 0) goto deinit;
++ g_xm_charger = &manager->charger;
++ g_battmngr = manager;
++ ret = battmngr_notify_publish(&manager->battmngr_noti);
++ if (ret) goto unregister;
++ platform_set_drvdata(pdev, manager);
++ return 0;
++unregister:
++ g_xm_charger = NULL; g_battmngr = NULL;
++ battmngr_notifier_unregister(&manager->battmngr_nb);
++deinit:
++ xm_charger_deinit(&manager->charger);
++ return ret;
++}
++
++static void xm_battmngr_remove(struct platform_device *pdev)
++{
++ struct xm_battmngr *manager = platform_get_drvdata(pdev);
++ if (!manager) return;
++ battmngr_notify_unpublish(&manager->battmngr_noti);
++ battmngr_notifier_unregister(&manager->battmngr_nb);
++ g_xm_charger = NULL; g_battmngr = NULL;
++ xm_charger_deinit(&manager->charger);
++ platform_set_drvdata(pdev, NULL);
++}
++
++static void xm_battmngr_shutdown(struct platform_device *pdev)
++{ xm_battmngr_remove(pdev); }
++
++static const struct of_device_id match_table[] = {
++	{.compatible = "xiaomi,battmngr"},
++	{},
++};
++
++MODULE_DEVICE_TABLE(of, match_table);
++
++static struct platform_driver xm_battmngr_driver = {
++	.driver = {
++		.owner = THIS_MODULE,
++		.name = "xm_battmngr",
++		.of_match_table = match_table,
++	},
++	.probe = xm_battmngr_probe,
++	.remove = xm_battmngr_remove,
++	.shutdown = xm_battmngr_shutdown,
++};
++
++static int __init xm_battmngr_init(void)
++{
++	pr_err("%s: cxlcheck1\n", __func__);
++	return platform_driver_register(&xm_battmngr_driver);
++}
++module_init(xm_battmngr_init);
++
++static void __exit xm_battmngr_exit(void)
++{
++	platform_driver_unregister(&xm_battmngr_driver);
++}
++module_exit(xm_battmngr_exit);
++
++MODULE_DESCRIPTION("Xiaomi Battery Management");
++MODULE_AUTHOR("yinshunan@xiaomi.com");
++MODULE_LICENSE("GPL v2");
+--- /dev/null
++++ b/sheng-ports/pogo/sheng_consumer_notify.h
+@@ -0,0 +1,18 @@
++/* SPDX-License-Identifier: GPL-2.0-only */
++#ifndef SHENG_CONSUMER_NOTIFY_H
++#define SHENG_CONSUMER_NOTIFY_H
++#include <linux/cleanup.h>
++#include <linux/battmngr/battmngr_notifier.h>
++struct sheng_consumer_guard { struct battmngr_notify *data; int cookie; };
++static inline struct sheng_consumer_guard sheng_consumer_acquire(void)
++{
++ struct sheng_consumer_guard guard = { .cookie = -1 };
++ guard.data = battmngr_notify_acquire(&guard.cookie);
++ return guard;
++}
++static inline void sheng_consumer_release(struct sheng_consumer_guard *guard)
++{ battmngr_notify_release(guard->cookie); }
++#define SHENG_CONSUMER_STATE(name) \
++ struct sheng_consumer_guard __cleanup(sheng_consumer_release) sheng_guard = sheng_consumer_acquire(); \
++ struct battmngr_notify *name = sheng_guard.data
++#endif
+--- a/sheng-ports/pogo/Kbuild
++++ b/sheng-ports/pogo/Kbuild
+@@ -4,3 +4,9 @@
+ xm_utils-y := battmngr_voter.o battmngr_notifier.o platform_class.o
+ 
+ obj-m += nanosic_platform.o
++
++ccflags-y += -I$(src)/battmngr -DCONFIG_QTI_POGO_CHG=1
++obj-m += xm_charger.o xm_battmngr_init.o virtual_fg.o
++xm_charger-y := battmngr/xm_charger_core.o battmngr/xm_charger_votable.o battmngr/xm_charger_ffc.o battmngr/xm_charger_thermal.o battmngr/step-chg-jeita.o battmngr/main_charge.o
++xm_battmngr_init-y := init/xm_battmngr_init.o
++virtual_fg-y := extSOC/virtual_fg.o
+--- a/sheng-ports/pogo/nanosic_platform.c
++++ b/sheng-ports/pogo/nanosic_platform.c
+@@ -37,6 +37,7 @@
+ #include "sheng_nano_charge_protocol.h"
+ #include "sheng_nano_charge_supply.h"
+ #include "inc/nano_macro.h"
++int Nanosic_ADSP_Get_Object(u8 *object);
+ 
+ 
+ static ADSP_read_cb g_ADSP_read_cb = NULL;
+@@ -501,8 +502,7 @@
+ static int nano_is_charge_online_locked(u8* online, struct battmngr_notify *data)
+ {
+     if (g_nodev) {
+-        if (!g_nodev->usb_icl_votable)
+-            g_nodev->usb_icl_votable = find_votable("ICL");
++        g_nodev->usb_icl_votable = find_votable("ICL");
+ 
+         if (!g_nodev->usb_icl_votable || !data)
+             return -ENODEV;
+@@ -521,11 +521,11 @@
+ 	return -ENODEV;
+ }
+ 
+-static int nano_input_curr_limit_locked(int* curr_limit)
+-{
++static int nano_input_curr_limit_locked(int* curr_limit, struct battmngr_notify *data)
++{
++    if (!data) return -ENODEV;
+     if (g_nodev) {
+-        if (!g_nodev->usb_icl_votable)
+-            g_nodev->usb_icl_votable = find_votable("ICL");
++        g_nodev->usb_icl_votable = find_votable("ICL");
+         if (!g_nodev->usb_icl_votable)
+             return -ENODEV;
+         *curr_limit = get_effective_result(g_nodev->usb_icl_votable);
+@@ -596,16 +596,7 @@
+ 
+ SHENG_NANO_NOTIFY_GETTER(nano_is_charge_online, u8, nano_is_charge_online_locked)
+ 
+-static int nano_input_curr_limit(int *curr_limit)
+-{
+-	int ret;
+-	if (!curr_limit)
+-		return -EINVAL;
+-	mutex_lock(&nano_api_lock);
+-	ret = g_nodev ? nano_input_curr_limit_locked(curr_limit) : -ENODEV;
+-	mutex_unlock(&nano_api_lock);
+-	return ret;
+-}
++SHENG_NANO_NOTIFY_GETTER(nano_input_curr_limit, int, nano_input_curr_limit_locked)
+ 
+ static int nano_get_power_max(int *powr_max)
+ {
+@@ -1104,3 +1095,15 @@
+ 	mutex_unlock(&nano_api_lock);
+ 	return ret;
+ }
++
++int Nanosic_ADSP_Get_Object(u8 *object)
++{
++ int ret = 0;
++ if (!object) return -EINVAL;
++ mutex_lock(&nano_api_lock);
++ if (!g_nodev) ret = -ENODEV;
++ else *object = READ_ONCE(g_nodev->gObject);
++ mutex_unlock(&nano_api_lock);
++ return ret;
++}
++EXPORT_SYMBOL(Nanosic_ADSP_Get_Object);
+--- /dev/null
++++ b/sheng-ports/pogo/battmngr/main_charge.c
+@@ -0,0 +1,1078 @@
++#include "../sheng_consumer_notify.h"
++int Nanosic_ADSP_Get_Object(u8 *object);
++#include <linux/gpio.h>
++#include <linux/i2c.h>
++#include <linux/init.h>
++#include <linux/interrupt.h>
++#include <linux/module.h>
++#include <linux/power_supply.h>
++#include <linux/slab.h>
++#include <linux/kernel.h>
++#include <linux/sched.h>
++#include <linux/kthread.h>
++#include <linux/delay.h>
++#include <linux/of_gpio.h>
++#include <linux/pinctrl/consumer.h>
++#include <linux/battmngr/battmngr_notifier.h>
++#include <linux/battmngr/battmngr_voter.h>
++#include <linux/regulator/driver.h>
++#include <../extSOC/inc/virtual_fg.h>
++#include <linux/battmngr/xm_charger_core.h>
++#include <../extSOC/inc/nano_macro.h>
++
++#define main_err(fmt, ...)							\
++do {										\
++	if (chg_log_level >= 0)							\
++		printk(KERN_ERR "[main_charge] " fmt, ##__VA_ARGS__);	\
++} while (0)
++
++#define main_info(fmt, ...)							\
++do {										\
++	if (chg_log_level >= 1)							\
++		printk(KERN_ERR "[main_charge] " fmt, ##__VA_ARGS__);	\
++} while (0)
++
++#define main_dbg(fmt, ...)							\
++do {										\
++	if (chg_log_level >= 2)							\
++		printk(KERN_ERR "[main_charge] " fmt, ##__VA_ARGS__);	\
++} while (0)
++
++#define BQ_FCC_VOTER	"BQ_FCC_VOTER"
++#define BQ_ICL_VOTER	"BQ_ICL_VOTER"
++#define BQ_FV_VOTER	"BQ_FV_VOTER"
++#define USER_VOTER	"USER_VOTER"
++
++#define POGO_TERM_VOLT 4480*1000
++
++struct xm_config {
++	int		charge_current;
++	int		term_current;
++};
++
++enum Scene {
++	FOREIGN = -1,
++	NONE,
++	PAD_KEY,
++	KEY_TYPEC_PAD,
++	PAD_KEY_TYPEC,
++	PAD_CAR,
++};
++
++struct mainchg {
++	struct device *dev;
++	struct i2c_client *client;
++
++	int	vbus_type;
++	int	charge_type;
++	bool	vbat_prot_flag;
++	struct	xm_config	cfg;
++	struct delayed_work first_irq_work;
++	struct work_struct irq_work;
++	struct work_struct adapter_in_work;
++	struct work_struct adapter_out_work;
++	struct delayed_work monitor_work;
++	struct delayed_work handler_mcu_work;
++	struct delayed_work handler_adsp_work;
++
++	struct power_supply *batt_psy;
++	struct power_supply *usb_psy;
++
++	struct votable *fcc_votable;
++	struct votable *usb_icl_votable;
++	struct votable *fv_votable;
++
++	int old_type;
++	int input_suspend;
++	u8 power_state;
++	unsigned int kb_ovp_en_gpio;
++	unsigned int kb_boost_5v_gpio;
++	struct pinctrl *kb_pinctrl;
++	struct pinctrl_state *kb_gpio_active;
++	struct pinctrl_state *kb_gpio_suspend;
++	struct battmngr_device* battmg_dev;
++	bool flag;
++	bool stopping;
++};
++
++enum xm_vbus_type {
++	XM_VBUS_NONE,
++	XM_VBUS_USB_FLOAT = 4,
++	XM_VBUS_USB_SDP = 6,
++	XM_VBUS_USB_CDP = 9, /*CDP for bq25890, Adapter for bq25892*/
++	XM_VBUS_USB_DCP = 10,
++	XM_VBUS_USB_QC_5v = 16,
++	XM_VBUS_USB_QC2,
++	XM_VBUS_USB_QC2_12v,
++	XM_VBUS_USB_QC3 = 20,
++	XM_VBUS_UNKNOWN,
++	XM_VBUS_NONSTAND,
++	XM_VBUS_OTG,
++	XM_VBUS_TYPE_NUM,
++};
++
++static struct mainchg* g_bq = NULL;
++static bool mcu_received;
++static DEFINE_MUTEX(main_api_lock);
++
++static int plug_flag;
++static u8 dc_in;
++static u8 kb_in;
++static u8 currState;
++static u8 object;
++
++static bool bq_check_vote(struct mainchg *bq)
++{
++	bool vote_flag;
++
++	if (!bq->usb_icl_votable)
++		bq->usb_icl_votable = find_votable("ICL");
++
++	if (!bq->fcc_votable)
++		bq->fcc_votable = find_votable("FCC");
++
++	if (!bq->fv_votable)
++		bq->fv_votable = find_votable("FV");
++
++	if (!bq->usb_icl_votable || !bq->fcc_votable || !bq->fv_votable) {
++		vote_flag = false;
++	} else
++		vote_flag = true;
++	main_err("%s: vote_flag %d\n", __func__, vote_flag);
++
++	return vote_flag;
++}
++
++static int charger_enable_keyboard_ovp(struct mainchg *bq, int enable)
++{
++	int ret = 0;
++
++	if (gpio_is_valid(bq->kb_ovp_en_gpio)) {
++
++		ret = gpio_direction_output(bq->kb_ovp_en_gpio, enable);
++		if (ret) {
++			main_err("%s: cannot set direction for kb_ovp_en_gpio[%d]\n", __func__,
++					bq->kb_ovp_en_gpio);
++			return -EINVAL;
++		}
++	} else {
++		main_err("%s: unable to set kb_ovp_en_gpio\n", __func__);
++		return -EINVAL;
++	}
++
++	return ret;
++}
++static int charger_enable_keyboard_boost(struct mainchg *bq, int enable)
++{
++	int ret = 0;
++
++	main_info("%s: test-2 %d\n", __func__, ret);
++	if (enable) {
++		ret = charger_enable_keyboard_ovp(bq, enable);
++		if (ret < 0) {
++			main_err("%s: open kb_ovp_en_gpio[%d] is failed\n", __func__,
++					bq->kb_ovp_en_gpio);
++			return -EINVAL;
++		}
++	}
++
++	main_info("%s: test-3 %d\n", __func__, ret);
++	if (gpio_is_valid(bq->kb_boost_5v_gpio)) {
++
++		ret = gpio_direction_output(bq->kb_boost_5v_gpio, enable);
++		if (ret) {
++			main_err("%s: cannot set direction for kb_boost_5v_gpio[%d], enable:%d\n", __func__,
++					bq->kb_boost_5v_gpio, enable);
++			return -EINVAL;
++		}
++	} else {
++		main_err("%s: unable to set kb_boost_5v_gpio\n", __func__);
++		return -EINVAL;
++	}
++
++	if (!enable) {
++		ret = charger_enable_keyboard_ovp(bq, enable);
++		if (ret < 0) {
++			main_err("%s: close kb_ovp_en_gpio[%d] is failed\n", __func__,
++					bq->kb_ovp_en_gpio);
++			return -EINVAL;
++		}
++	}
++
++	return ret;
++}
++
++
++int charger_process_event_irq(struct battmngr_notify *noti_data)
++{
++	guard(mutex)(&main_api_lock);
++	if (!g_bq || READ_ONCE(g_bq->stopping) || !noti_data) return -ENODEV;
++
++	int rc = 0;
++
++	main_info("%s: msg_type %d, value:%d\n", __func__, noti_data->irq_msg.irq_type, noti_data->irq_msg.value);
++	switch (noti_data->irq_msg.irq_type) {
++	case DCIN_IRQ:
++		noti_data->mainchg_msg.dc_plugin = 1;
++		dc_in = noti_data->irq_msg.value;
++
++		if (g_bq) {
++			schedule_delayed_work(&g_bq->handler_adsp_work, msecs_to_jiffies(200));
++			main_info("%s: start irq_work\n", __func__);
++		} else
++			main_info("%s g_bq is null.\n", __func__);
++		break;
++	case CHARGER_DONE_IRQ:
++		noti_data->mainchg_msg.chg_done = noti_data->irq_msg.value;
++		break;
++	case RECHARGE_IRQ:
++		noti_data->fg_msg.recharge_flag = noti_data->irq_msg.value;
++		break;
++
++	default:
++		break;
++	}
++
++	return rc;
++}
++EXPORT_SYMBOL(charger_process_event_irq);
++
++int charger_process_event_mcu(struct battmngr_notify *noti_data)
++{
++	guard(mutex)(&main_api_lock);
++	if (!g_bq || READ_ONCE(g_bq->stopping) || !noti_data) return -ENODEV;
++	struct read_mcu_data *mcu_data = READ_ONCE(mcu_received) ? &noti_data->mcu_msg.mcu_data : NULL;
++
++
++	int rc = 0;
++	u8 typec_chg = 0;
++
++	main_info("%s: msg_type %d, %d\n", __func__, noti_data->mcu_msg.msg_type, noti_data->mcu_msg.kb_attach);
++	object = noti_data->mcu_msg.object_type;
++
++	switch (noti_data->mcu_msg.msg_type) {
++	case BATTMNGR_MSG_MCU_TYPE:
++		if (object == 0x38) {
++			mcu_data = &noti_data->mcu_msg.mcu_data;
++			WRITE_ONCE(mcu_received, true);
++		} else {
++			mcu_data = &noti_data->mcu_msg.mcu_data;
++			WRITE_ONCE(mcu_received, true);
++			switch (noti_data->mcu_msg.mcu_data.addr)
++			{
++			case 0x10:
++				mcu_data->typec_state = noti_data->mcu_msg.mcu_data.typec_state;
++				break;
++			case 0x15:
++				mcu_data->vout_low = noti_data->mcu_msg.mcu_data.vout_low;
++				break;
++			case 0x16:
++				mcu_data->vout_high = noti_data->mcu_msg.mcu_data.vout_high;
++				break;
++			default:
++				break;
++			}
++			main_info("Address:%02x, typec_state:%02x, vout_low:%02x, vout_high:%02x\n",
++                                 noti_data->mcu_msg.mcu_data.addr, mcu_data->typec_state, mcu_data->vout_low, mcu_data->vout_high);
++		}
++		main_info("%s: object %02x\n", __func__, object);
++
++		typec_chg = mcu_data->typec_state & BIT(0);
++		break;
++	case BATTMNGR_MSG_MCU_BOOST:
++		if (noti_data->mcu_msg.kb_attach && object == 0x38) {
++			if (Nanosic_ADSP_Read_Charge_Status() < 0) {
++				main_err("%s: read charge data is fail.\n", __func__);
++			}
++		}
++		return rc;
++		kb_in = noti_data->mcu_msg.kb_attach;
++		if (g_bq)
++			schedule_delayed_work(&g_bq->handler_mcu_work, msecs_to_jiffies(100));
++		else
++			main_info("%s g_bq is null.\n", __func__);
++
++		break;
++	default:
++		break;
++	}
++
++	return rc;
++}
++EXPORT_SYMBOL(charger_process_event_mcu);
++
++static int xm_set_input_volt_limit(int volt)
++{
++	int ret = -1;
++	uint8_t val = 0xd0;
++
++	if (object == 0x38) {
++		val = volt / 100;
++		ret = Nanosic_ADSP_Set_Charge_Status_Single(0x0C, 1, &val, sizeof(val));
++	} else {
++		ret = Nanosic_ADSP_Set_Charge_Status_Single(0x01, 1, &val, sizeof(val));
++	}
++
++	if (ret < 0) {
++		main_err("%s: set input volt is fail\n", __func__);
++	}
++	main_info("%s: set input volt: %d, ret:%d\n", __func__, volt, ret);
++
++	return ret;
++}
++
++static int xm_set_term_current(struct mainchg *bq, int curr)
++{
++	int ret = 0;
++
++	if (check_qti_ops(&bq->battmg_dev)) {
++		ret = battmngr_qtiops_set_term_cur(bq->battmg_dev, curr);
++		if (ret < 0)
++			main_err("%s: set term curr is fail\n", __func__);
++
++	} else {
++		main_err("%s: qti ops is null\n", __func__);
++		ret = -1;
++	}
++
++	return ret;
++}
++
++static int xm_enable_charger(void)
++{
++	int ret = 0;
++
++    if (check_g_bcdev_ops()) {
++        ret = qti_enale_charge(true);
++
++        if (ret < 0) {
++            main_err("%s enable charge is fail. \n", __func__);
++            return ret;
++        }
++        main_info("%s enable charge is successful. \n", __func__);
++    } else {
++        main_err("%s check_g_bcdev_ops is null. \n", __func__);
++        return -1;
++    }
++	return ret;
++}
++
++static int xm_disable_charger(void)
++{
++	int ret = 0;
++
++    if (check_g_bcdev_ops()) {
++        ret = qti_enale_charge(false);
++
++        if (ret < 0) {
++            main_err("%s disable charge is fail. \n", __func__);
++            return ret;
++        }
++        main_info("%s disable charge is successful. \n", __func__);
++    } else {
++        main_err("%s check_g_bcdev_ops is null. \n", __func__);
++        return -1;
++    }
++	return ret;
++}
++
++static int xm_get_vbus_type(struct mainchg *bq)
++{
++	SHENG_CONSUMER_STATE(noti_data);
++	if (!noti_data)
++		return -EPROBE_DEFER;
++	struct read_mcu_data *mcu_data = READ_ONCE(mcu_received) ? &noti_data->mcu_msg.mcu_data : NULL;
++
++
++	u8 pd_flag = 0, dpdm_in_ready = 0;
++
++	if (mcu_data) {
++		if (object == 0x38) {
++			pd_flag = (mcu_data->typec_state & BIT(2));
++			dpdm_in_ready = (mcu_data->dpdm_in_state & BIT(7));
++		} else {
++			pd_flag = (mcu_data->typec_state & 0x10);
++		}
++
++		if (pd_flag) {
++			noti_data->pd_msg.pd_active = pd_flag ? 1 : 0;
++		}
++
++		if (!dpdm_in_ready) {
++			main_err("%s need wait finish bc1.2 . \n", __func__);
++			return XM_VBUS_UNKNOWN;
++		}
++
++		bq->vbus_type = mcu_data->dpdm0_state;
++	} else {
++		main_err("%s gobal mcu data is null. \n", __func__);
++		return 0;
++	}
++
++	return bq->vbus_type;
++}
++
++static int xm_get_chg_usb_type(struct mainchg *bq)
++{
++	SHENG_CONSUMER_STATE(noti_data);
++	if (!noti_data)
++		return -EPROBE_DEFER;
++
++	u8 val;
++	int type;
++
++	val = xm_get_vbus_type(bq);
++	type = (int)val;
++	main_info("%s type=%d, old_type=%d \n", __func__, type, bq->old_type);
++
++	if (object == 0x3B) {
++		if (noti_data->pd_msg.pd_active) {
++			bq->charge_type = POWER_SUPPLY_USB_TYPE_PD;
++		} else
++			bq->charge_type = POWER_SUPPLY_USB_TYPE_UNKNOWN;
++	}
++
++	main_info("%s charge_type=%d\n", __func__, bq->charge_type);
++
++	return 0;
++}
++
++static void xm_adapter_in_workfunc(struct work_struct *work)
++{
++	SHENG_CONSUMER_STATE(noti_data);
++	if (!noti_data)
++		return;
++
++	struct mainchg *bq = container_of(work, struct mainchg, adapter_in_work);
++
++	if(!bq_check_vote(bq))
++		return;
++
++	if (xm_enable_charger() < 0) {
++		return;
++	}
++
++	Nanosic_ADSP_Control_Charge_Power(true);
++	if (noti_data->pd_msg.pd_active) {
++		main_info("%s:PD plugged in\n", __func__);
++	} else {
++		main_info("%s:other adapter plugged in,vbus_type is %d\n", __func__, bq->vbus_type);
++	}
++
++	cancel_delayed_work_sync(&bq->monitor_work);
++	if (!READ_ONCE(bq->stopping)) schedule_delayed_work(&bq->monitor_work, 0);
++}
++
++static void xm_adapter_out_workfunc(struct work_struct *work)
++{
++	SHENG_CONSUMER_STATE(noti_data);
++	if (!noti_data)
++		return;
++
++	struct mainchg *bq = container_of(work, struct mainchg, adapter_out_work);
++
++	Nanosic_ADSP_Control_Charge_Power(false);
++	bq->vbat_prot_flag = false;
++	bq->flag = false;
++
++	if (xm_disable_charger() < 0) {
++		return;
++	}
++	vote(bq->usb_icl_votable, BQ_ICL_VOTER, true, 0);
++	vote(bq->fcc_votable, BQ_FCC_VOTER, false, 0);
++	vote(bq->fv_votable, BQ_FV_VOTER, false, 0);
++	vote(bq->fcc_votable, THERMAL_DAEMON_VOTER, false, 0);
++	vote(bq->fv_votable, JEITA_VOTER, false, 0);
++	vote(bq->fcc_votable, JEITA_VOTER, false, 0);
++}
++
++#define HOLDER_ICL_MAX	2500000
++static void xm_monitor_workfunc(struct work_struct *work)
++{
++	SHENG_CONSUMER_STATE(noti_data);
++	if (!noti_data)
++		return;
++
++	struct mainchg *bq = container_of(work, struct mainchg, monitor_work.work);
++	static int ibus_limit = 500;
++	static int ibat_limit = 500;
++	static int last_chg_type;
++	int rc, volt_now;
++	union power_supply_propval pval = {0, };
++
++	if(!bq_check_vote(bq))
++		return;
++
++	xm_set_input_volt_limit(9000);
++	if (!bq->flag) {
++		main_info("%s:first set current, delay 1s\n", __func__);
++		msleep(1000);
++		bq->flag = true;
++	}
++
++	ibus_limit = HOLDER_ICL_MAX;
++	vote(bq->usb_icl_votable, BQ_ICL_VOTER, true, ibus_limit);
++
++	ibat_limit = 7000*1000;
++	vote(bq->fcc_votable, BQ_FCC_VOTER, true, ibat_limit);
++
++	if (object == 0x38)
++		Nanosic_ADSP_Read_Charge_Status();
++	else {
++		main_info("%s:check volt and curr! \n", __func__);
++		Nanosic_ADSP_Read_Charge_Status_Single(0x13);
++		msleep(5);
++		Nanosic_ADSP_Read_Charge_Status_Single(0x14);
++		msleep(5);
++
++		Nanosic_ADSP_Read_Charge_Status_Single(0x1e);
++		msleep(5);
++		Nanosic_ADSP_Read_Charge_Status_Single(0x1f);
++		msleep(5);
++
++		Nanosic_ADSP_Read_Charge_Status_Single(0x01);
++		msleep(5);
++
++		Nanosic_ADSP_Read_Charge_Status_Single(0x12);
++		msleep(5);
++	}
++
++	rc = power_supply_get_property(bq->batt_psy, POWER_SUPPLY_PROP_VOLTAGE_NOW,
++			&pval);
++	if (rc < 0) {
++		main_info("%s: Get battery voltage failed, rc=%d\n", __func__, rc);
++		return;
++	}
++	volt_now = pval.intval;
++	if (volt_now >= POGO_TERM_VOLT && !bq->vbat_prot_flag) {
++		bq->vbat_prot_flag = true;
++		vote(bq->fv_votable, BQ_FV_VOTER, true, POGO_TERM_VOLT - 10*1000);
++		main_info("%s: volt_now=%d, Voltage overvoltage, down 10mv\n", __func__, volt_now);
++	}
++
++	last_chg_type = bq->charge_type;
++
++	main_info("%s:pd_active=%d ibus_limit=%d, ibat_limit:%d\n", __func__, noti_data->pd_msg.pd_active, ibus_limit, ibat_limit);
++
++	if (!READ_ONCE(bq->stopping)) schedule_delayed_work(&bq->monitor_work, msecs_to_jiffies(3000));
++}
++
++static void xm_charger_irq_workfunc(struct work_struct *work)
++{
++	SHENG_CONSUMER_STATE(noti_data);
++	if (!noti_data)
++		return;
++	struct read_mcu_data *mcu_data = READ_ONCE(mcu_received) ? &noti_data->mcu_msg.mcu_data : NULL;
++
++
++	struct mainchg *bq = container_of(work, struct mainchg, irq_work);
++	static int last_chg_type;
++	static int last_plug_in;
++    int  pWlsPluginSt = 0;
++
++	int input_volt = 0, input_watt = 0;
++	u8 typec_chg = 0, pd_flag = 0;
++	u8 dpdm_in_ready = 0;
++	int protocol_volt = 0, protocol_curr = 0, vbus_mon = 0;
++	int typec_curr = 0;
++
++	if (mcu_data) {
++		if (object == 0x38) {
++			input_volt = mcu_data->input_volt;
++			input_watt = mcu_data->input_watt;
++			typec_chg = (mcu_data->typec_state & BIT(0));
++			pd_flag = (mcu_data->typec_state & BIT(2));
++			dpdm_in_ready = (mcu_data->dpdm_in_state & BIT(7));
++			protocol_volt = mcu_data->protocol_volt;
++			protocol_curr = mcu_data->protocol_curr;
++			vbus_mon = mcu_data->vbus_mon;
++			typec_curr = mcu_data->typec_curr;
++			bq->vbus_type = mcu_data->dpdm0_state;
++		} else {
++			if (dc_in) {
++				typec_chg = 1;
++				pd_flag = 1;
++			} else {
++				typec_chg = 0;
++				pd_flag = 0;
++			}
++		}
++	}
++
++	noti_data->pd_msg.pd_active = pd_flag ? 1 : 0;;
++    pWlsPluginSt = dc_in; // the flag from adsp
++
++    // read typec-vbus value
++    bq->power_state = typec_chg;// type_state(0x11) --> CHARGE
++
++	main_info("%s: power_good=%d, vbus_type=%d, dc_in=%d\n", __func__, bq->power_state, bq->vbus_type, dc_in);
++
++	if (!pWlsPluginSt) {
++		cancel_delayed_work_sync(&bq->monitor_work);
++		msleep(10);
++		bq->old_type = XM_VBUS_NONE;
++		bq->vbus_type = XM_VBUS_NONE;
++		bq->power_state = 0;
++		plug_flag = 0;
++		main_info("%s:adapter removed\n", __func__);
++		noti_data->mainchg_msg.chg_plugin = 0;
++		noti_data->mainchg_msg.chg_done = 0;
++		cancel_delayed_work_sync(&bq->monitor_work);
++		if (!READ_ONCE(bq->stopping)) schedule_work(&bq->adapter_out_work);
++	} else if (bq->power_state
++		&& (noti_data->pd_msg.pd_active || bq->vbus_type != XM_VBUS_NONE)
++		&& pWlsPluginSt) {
++		main_info("%s:adapter plugged in\n", __func__);
++		noti_data->mainchg_msg.chg_plugin = 1;
++		if (!READ_ONCE(bq->stopping)) schedule_work(&bq->adapter_in_work);
++	}
++
++	xm_get_chg_usb_type(bq);
++	if ((last_chg_type != bq->charge_type)
++		|| (last_plug_in != noti_data->mainchg_msg.chg_plugin)) {
++		mutex_lock(&noti_data->notify_lock);
++		noti_data->mainchg_msg.chg_type = bq->charge_type;
++		noti_data->mainchg_msg.msg_type = BATTMNGR_MSG_MAINCHG_TYPE;
++		battmngr_notifier_call_chain(BATTMNGR_EVENT_MAINCHG, noti_data);
++		mutex_unlock(&noti_data->notify_lock);
++
++		mutex_lock(&noti_data->notify_lock);
++		battmngr_notifier_call_chain(BATTMNGR_EVENT_FG, noti_data);
++		mutex_unlock(&noti_data->notify_lock);
++	}
++	last_chg_type = bq->charge_type;
++	last_plug_in = noti_data->mainchg_msg.chg_plugin;
++
++	return;
++}
++
++static void xm_handler_mcu_workfunc(struct work_struct *work)
++{
++	SHENG_CONSUMER_STATE(noti_data);
++	if (!noti_data)
++		return;
++
++	struct mainchg *bq = container_of(work, struct mainchg, handler_mcu_work.work);
++	int rc = 0, retry = 0;
++
++	if (kb_in) {
++		if (dc_in) {
++			currState = KEY_TYPEC_PAD;
++			main_info("%s: detect KEY_TYPEC_PAD scene.\n", __func__);
++			return;
++		} else {
++			do {
++				if (!check_g_bcdev_ops()) {
++					msleep(50);
++					main_err("%s: check_g_bcdev_ops is null, wait retry %d\n", __func__, retry);
++					if (retry++ > 10)
++						break;
++					continue;
++				}
++
++				retry = 0;
++				rc = sc8651_wpc_gate_set(0);
++				main_info("%s: test wpc.\n", __func__);
++				if (rc < 0) {
++					main_err("%s: close sc8651 wpc gate is failed %d\n", __func__, rc);
++					return;
++				}
++			} while(!check_g_bcdev_ops());
++			rc = charger_enable_keyboard_boost(bq, true);
++			currState = PAD_KEY;
++			main_info("%s: detect PAD_KEY scene.\n", __func__);
++			main_info("%s: open keyboard boost %d\n", __func__, rc);
++		}
++
++	} // attach KB
++	else {
++		switch (currState)
++		{
++		case PAD_KEY:
++			main_info("%s: test-1 %d\n", __func__, rc);
++			rc = charger_enable_keyboard_boost(bq, false);
++			retry = 0;
++			// Restore sc8651 config
++			if (check_g_bcdev_ops()) {
++				rc = sc8651_wpc_gate_set(1);
++				if (rc < 0) {
++					main_info("%s: close sc8651 wpc gate is failed %d\n", __func__, rc);
++					return;
++				}
++			}
++			main_info("%s: close keyboard boost %d\n", __func__, rc);
++			currState = NONE;
++			break;
++
++		default:
++			break;
++		}
++
++	} // dettach KB
++}
++
++static void xm_handler_adsp_workfunc(struct work_struct *work)
++{
++	SHENG_CONSUMER_STATE(noti_data);
++	if (!noti_data)
++		return;
++
++	struct mainchg *bq = container_of(work, struct mainchg, handler_adsp_work.work);
++	int rc  = 0, retry = 0;
++
++	if (!bq) {
++		main_info("%s: bq is null\n", __func__);
++		return;
++	}
++
++	if (dc_in) {
++		if (!kb_in) {
++			currState = PAD_CAR;
++			if (object == 0x38) {
++				if (Nanosic_ADSP_Read_Charge_Status() < 0) {
++					main_err("%s: read charge data is fail.\n", __func__);
++				}
++			} else {
++				rc = Nanosic_ADSP_Read_Charge_Status_Single(0x15);
++				msleep(5);
++				rc = Nanosic_ADSP_Read_Charge_Status_Single(0x16);
++				msleep(5);
++				if (rc < 0) {
++					main_err("%s: read holder charge data is fail.\n", __func__);
++				}
++			}
++			main_info("%s: detect PAD_CAR scene\n", __func__);
++		}
++		else {
++			if (currState == PAD_KEY) {
++
++				currState = PAD_KEY_TYPEC;
++				main_info("%s: detect PAD_KEY_TYPEC scene%d\n", __func__, PAD_KEY_TYPEC);
++
++				// disable KB boost
++				rc = charger_enable_keyboard_boost(bq, false);
++				// Restore sc8651 config
++				if (check_g_bcdev_ops()) {
++					rc = sc8651_wpc_gate_set(1);
++					if (rc < 0) {
++						main_info("%s: close sc8651 wpc gate is failed %d\n", __func__, rc);
++						return;
++					}
++				}
++				main_info("%s: close keyboard boost %d\n", __func__, rc);
++			}
++		}
++
++		if (!READ_ONCE(bq->stopping)) schedule_work(&bq->irq_work);
++	} // dc_in online
++	else {
++		if (!READ_ONCE(bq->stopping)) schedule_work(&bq->irq_work);
++
++		if (kb_in) {
++			// open boost
++			do {
++				if (!check_g_bcdev_ops()) {
++					msleep(50);
++					main_err("%s: check_g_bcdev_ops is null, wait retry %d\n", __func__, retry);
++					if (retry > 10)
++						break;
++					continue;
++				}
++
++				rc = sc8651_wpc_gate_set(0);
++				if (rc < 0) {
++					main_err("%s: close sc8651 wpc gate is failed %d\n", __func__, rc);
++					return;
++				}
++			} while(!check_g_bcdev_ops());
++			retry = 0;
++			rc = charger_enable_keyboard_boost(g_bq, true);
++			currState = PAD_KEY;
++			main_info("%s: detect PAD_KEY scene%d\n", __func__, PAD_KEY);
++			main_info("%s: open keyboard boost %d\n", __func__, rc);
++		}
++
++	} // dc_in not online
++}
++
++static void xm_first_irq_workfunc(struct work_struct *work)
++{
++	SHENG_CONSUMER_STATE(noti_data);
++	if (!noti_data)
++		return;
++	struct read_mcu_data *mcu_data = READ_ONCE(mcu_received) ? &noti_data->mcu_msg.mcu_data : NULL;
++
++
++	struct mainchg *bq = container_of(work, struct mainchg, first_irq_work.work);
++	static int first_dcin_count, first_mcu_count;
++
++	if ((first_dcin_count > 50) || (first_mcu_count > 50)) {
++		main_info("%s get dcin or mcu over 50\n", __func__);
++		return;
++	}
++	{
++ int queried = qti_get_DCIN_STATE();
++ if (queried < 0) {
++  if (!READ_ONCE(bq->stopping)) schedule_delayed_work(&bq->first_irq_work, msecs_to_jiffies(400));
++  return;
++ }
++ dc_in = queried;
++}
++ {
++  u8 detected;
++  if (!Nanosic_ADSP_Get_Object(&detected))
++   WRITE_ONCE(noti_data->mcu_msg.object_type, detected);
++ }
++	noti_data->irq_msg.value = dc_in;
++	main_err("%s: start first_irq_work, dcin state:%d\n", __func__, dc_in);
++	if (bq && dc_in) {
++		if (mcu_data) {
++			qti_deal_report();
++			if (!READ_ONCE(bq->stopping)) schedule_delayed_work(&bq->handler_adsp_work, 0);
++			main_info("%s: start irq_work\n", __func__);
++		} else {
++			if (noti_data->mcu_msg.object_type) {
++				if (noti_data->mcu_msg.object_type == 0x3B) {
++					mutex_lock(&noti_data->notify_lock);
++					noti_data->mcu_msg.object_type = 0x3B;
++					noti_data->mcu_msg.msg_type = BATTMNGR_MSG_MCU_TYPE;
++					battmngr_notifier_call_chain(BATTMNGR_EVENT_MCU, noti_data);
++					mutex_unlock(&noti_data->notify_lock);
++				}
++			}
++			if (!READ_ONCE(bq->stopping)) schedule_delayed_work(&bq->first_irq_work, msecs_to_jiffies(400));
++			first_mcu_count++;
++			main_info("%s mcu_data is null, send noti, first_mcu_count:%d\n", __func__, first_mcu_count);
++		}
++	} else if (noti_data->mcu_msg.object_type == 0x3B) {
++		if (!READ_ONCE(bq->stopping)) schedule_delayed_work(&bq->first_irq_work, msecs_to_jiffies(400));
++		first_dcin_count++;
++		main_info("%s dc_in is null, wait, first_dcin_count:%d\n", __func__, first_dcin_count);
++	} else if (noti_data->mcu_msg.object_type == 0x38) {
++		qti_set_keyboard_plugin(1);
++		main_info("%s keyboard already plugin, move mos to manual\n", __func__);
++	}
++}
++
++static int xm_parse_dt(struct device *dev, struct mainchg *bq)
++{
++	int ret;
++	struct device_node *np = dev->of_node;
++
++	ret = of_property_read_u32(np, "xm,charge-current",&bq->cfg.charge_current);
++	if (ret)
++		return ret;
++
++	ret = of_property_read_u32(np, "xm,term-current",&bq->cfg.term_current);
++	if (ret)
++		return ret;
++
++	/*bq->kb_ovp_en_gpio = of_get_named_gpio(np, "xm,kb_ovp_boost_en", 0);
++	main_err("%s:bq->kb_ovp_en_gpio: %d\n", __func__, bq->kb_ovp_en_gpio);
++	if ((!gpio_is_valid(bq->kb_ovp_en_gpio)))
++		return -EINVAL;
++
++	ret = gpio_request(bq->kb_ovp_en_gpio, "xm_kb_ovp_boost_en");
++	if (ret) {
++		main_err("%s: unable to kb_ovp_en_gpio [%d],ret:%d\n", __func__,
++				bq->kb_ovp_en_gpio, ret);
++		return -EINVAL;
++	}
++
++	bq->kb_boost_5v_gpio = of_get_named_gpio(np, "xm,kb_boost_5v", 0);
++	main_err("%s:bq->kb_boost_5v_gpio: %d\n", __func__, bq->kb_boost_5v_gpio);
++	if ((!gpio_is_valid(bq->kb_boost_5v_gpio)))
++		return -EINVAL;
++
++	ret = gpio_request(bq->kb_boost_5v_gpio, "xm_kb_boost_5v");
++	if (ret) {
++		main_err("%s: unable to kb_boost_5v_gpio [%d],ret:%d\n", __func__,
++				bq->kb_boost_5v_gpio, ret);
++		return -EINVAL;
++	}*/
++	return 0;
++}
++
++static int xm_init_device(struct mainchg *bq)
++{
++	int ret;
++
++	ret = xm_set_term_current(bq, bq->cfg.term_current);
++	if (ret < 0) {
++		main_err("%s:Failed to set termination current:%d\n", __func__, ret);
++		return ret;
++	}
++
++	if (bq_check_vote(bq)) {
++		vote(bq->usb_icl_votable, BQ_ICL_VOTER, true, bq->cfg.charge_current * 1000);
++	}
++
++	return ret;
++}
++
++/*static int bq_charger_gpio_init(struct mainchg *bq)
++{
++	int ret = 0;
++
++	bq->kb_pinctrl = devm_pinctrl_get(bq->dev);
++	if (IS_ERR_OR_NULL(bq->kb_pinctrl)) {
++		main_err("No pinctrl config specified\n");
++		ret = PTR_ERR(bq->dev);
++		return ret;
++	}
++	bq->kb_gpio_active =
++	    pinctrl_lookup_state(bq->kb_pinctrl, "mcu_active");
++	if (IS_ERR_OR_NULL(bq->kb_gpio_active)) {
++		main_err("No active config specified\n");
++		ret = PTR_ERR(bq->kb_gpio_active);
++		return ret;
++	}
++	bq->kb_gpio_suspend =
++	    pinctrl_lookup_state(bq->kb_pinctrl, "mcu_suspend");
++	if (IS_ERR_OR_NULL(bq->kb_gpio_suspend)) {
++		main_err("No suspend config specified\n");
++		ret = PTR_ERR(bq->kb_gpio_suspend);
++		return ret;
++	}
++
++	ret = pinctrl_select_state(bq->kb_pinctrl, bq->kb_gpio_active);
++	if (ret < 0) {
++		main_err("fail to select pinctrl active rc=%d\n", ret);
++		return ret;
++	}
++
++	return ret;
++}*/
++
++static int xm_pogocharge_probe(struct platform_device *pdev)
++{
++	SHENG_CONSUMER_STATE(noti_data);
++	if (!noti_data)
++		return -EPROBE_DEFER;
++
++	struct mainchg *bq;
++	int ret;
++	static int probe_cnt = 0;
++
++	main_info("%s probe_cnt = %d\n", __func__, ++probe_cnt);
++
++	bq = devm_kzalloc(&pdev->dev, sizeof(*bq), GFP_KERNEL);
++	if (!bq) {
++		dev_err(&pdev->dev, "%s: out of memory\n", __func__);
++		return -ENOMEM;
++	}
++
++	bq->dev = &pdev->dev;
++	platform_set_drvdata(pdev, bq);
++
++	bq->battmg_dev = NULL;
++	bq->vbat_prot_flag = false;
++
++	bq->batt_psy = power_supply_get_by_name("battery");
++	bq->usb_psy = power_supply_get_by_name("usb");
++	ret = bq_check_vote(bq);
++	if (ret == 0) {
++		main_err("Failed to initialize BQ VOTE, rc=%d\n", ret);
++	}
++	if (!check_g_bcdev_ops() || !bq->batt_psy || !bq->usb_psy || !ret || !noti_data) {
++		main_err("%s check_g_bcdev_ops or battery or usbor noti_data not ready\n", __func__);
++		ret = -EPROBE_DEFER;
++		msleep(100);
++		goto release;
++	}
++
++	ret = xm_parse_dt(&pdev->dev, bq);
++	if (ret < 0) goto release;
++
++	/*ret = bq_charger_gpio_init(bq);
++	if (ret < 0) {
++		main_err("%s: Couldn't init gpio rc=%d\n", __func__, ret);
++		goto release;
++	}*/
++
++	ret = xm_init_device(bq);
++	if (ret < 0) {
++		main_err("device init failure: %d\n", ret);
++		goto release;
++	}
++
++	INIT_WORK(&bq->irq_work, xm_charger_irq_workfunc);
++	INIT_WORK(&bq->adapter_in_work, xm_adapter_in_workfunc);
++	INIT_WORK(&bq->adapter_out_work, xm_adapter_out_workfunc);
++	INIT_DELAYED_WORK(&bq->monitor_work, xm_monitor_workfunc);
++	INIT_DELAYED_WORK(&bq->first_irq_work, xm_first_irq_workfunc);
++	INIT_DELAYED_WORK(&bq->handler_mcu_work, xm_handler_mcu_workfunc);
++	INIT_DELAYED_WORK(&bq->handler_adsp_work, xm_handler_adsp_workfunc);
++
++	mutex_lock(&main_api_lock);
++	g_bq = bq;
++	mutex_unlock(&main_api_lock);
++
++	if (!READ_ONCE(bq->stopping)) schedule_delayed_work(&bq->first_irq_work, msecs_to_jiffies(100));
++
++	main_info("%s %s!!\n", __func__, ret == -EPROBE_DEFER ?
++				"Over probe cnt max" : "OK");
++	return 0;
++
++release:
++ if (bq->battmg_dev) put_device(&bq->battmg_dev->dev);
++ if (bq->batt_psy) power_supply_put(bq->batt_psy);
++ if (bq->usb_psy) power_supply_put(bq->usb_psy);
++ platform_set_drvdata(pdev, NULL);
++ return ret;
++
++}
++
++static void xm_pogocharge_shutdown(struct platform_device *pdev)
++{
++ struct mainchg *bq = platform_get_drvdata(pdev);
++ if (!bq) return;
++ mutex_lock(&main_api_lock); WRITE_ONCE(bq->stopping, true); mutex_unlock(&main_api_lock);
++ cancel_delayed_work_sync(&bq->first_irq_work);
++ cancel_delayed_work_sync(&bq->handler_mcu_work);
++ cancel_delayed_work_sync(&bq->handler_adsp_work);
++ cancel_work_sync(&bq->irq_work);
++ cancel_work_sync(&bq->adapter_in_work);
++ cancel_work_sync(&bq->adapter_out_work);
++ cancel_delayed_work_sync(&bq->monitor_work);
++ mutex_lock(&main_api_lock); g_bq = NULL; mutex_unlock(&main_api_lock);
++ if (bq->battmg_dev) put_device(&bq->battmg_dev->dev);
++ if (bq->batt_psy) power_supply_put(bq->batt_psy);
++ if (bq->usb_psy) power_supply_put(bq->usb_psy);
++ platform_set_drvdata(pdev, NULL);
++}
++
++static const struct of_device_id match_table[] = {
++	{.compatible = "xiaomi,pogocharge"},
++	{},
++};
++
++MODULE_DEVICE_TABLE(of, match_table);
++
++static struct platform_driver xm_pogocharge_driver = {
++	.driver = {
++		.owner = THIS_MODULE,
++		.name = "xm_pogocharge",
++		.of_match_table = match_table,
++	},
++	.probe = xm_pogocharge_probe,
++	.shutdown = xm_pogocharge_shutdown,
++	.remove = xm_pogocharge_shutdown,
++};
++
++static int __init xm_pogocharge_init(void)
++{
++	return platform_driver_register(&xm_pogocharge_driver);
++}
++module_init(xm_pogocharge_init);
++
++static void __exit xm_pogocharge_exit(void)
++{
++	platform_driver_unregister(&xm_pogocharge_driver);
++}
++module_exit(xm_pogocharge_exit);
++
++MODULE_DESCRIPTION("POGO main charger");
++MODULE_AUTHOR("yinshunan@xiaomi.com");
++MODULE_AUTHOR("litianpeng6@xiaomi.com");
++MODULE_LICENSE("GPL v2");
+--- a/soc/drivers/power/supply/qti_battery_charger.c
++++ b/soc/drivers/power/supply/qti_battery_charger.c
+@@ -2050,51 +2050,28 @@
+ 	return rc;
+ }
+ 
+-static int battery_psy_set_charge_current(struct battery_chg_dev *bcdev,
+-					int val)
+-{
+-	int rc;
+-	//u32 fcc_ua, prev_fcc_ua;
+-	struct psy_state *pst = NULL;
+-
+-	pst = &bcdev->psy_list[PSY_TYPE_XM];
+-	if (!bcdev->num_thermal_levels)
+-		return 0;
+-
+-	if (bcdev->num_thermal_levels < 0) {
+-		pr_err("Incorrect num_thermal_levels\n");
+-		return -EINVAL;
+-	}
+-
+-	if (val < 0 || val >= bcdev->num_thermal_levels)
+-		return -EINVAL;
+-
+-	rc = write_property_id(bcdev, &bcdev->psy_list[PSY_TYPE_BATTERY],
+-				BATT_CHG_CTRL_LIM, val);
+-	if (rc < 0)
+-		pr_err("Failed to set ccl:%d, rc=%d\n", val, rc);
+-
+-	bcdev->curr_thermal_level = val;
+-
+-	pr_err("chg_type=%s tl:=%d  ffc:=%d, pd_verifed:=%d\n",get_usb_type_name(pst->prop[XM_PROP_REAL_TYPE]),
+-			bcdev->curr_thermal_level, pst->prop[XM_PROP_FASTCHGMODE], pst->prop[XM_PROP_PD_VERIFED]);
+-#if 0	
+-	if (bcdev->thermal_fcc_step == 0)
+-		fcc_ua = bcdev->thermal_levels[val];
+-	else
+-		fcc_ua = bcdev->psy_list[PSY_TYPE_BATTERY].prop[BATT_CHG_CTRL_LIM_MAX]
+-				- (bcdev->thermal_fcc_step * val);
+-
+-	prev_fcc_ua = bcdev->thermal_fcc_ua;
+-	bcdev->thermal_fcc_ua = fcc_ua;
+-
+-	rc = __battery_psy_set_charge_current(bcdev, fcc_ua);
+-	if (!rc)
+-		bcdev->curr_thermal_level = val;
+-	else
+-		bcdev->thermal_fcc_ua = prev_fcc_ua;
+-#endif
+-	return rc;
++static int battery_psy_set_charge_current(struct battery_chg_dev *bcdev, int val)
++{
++ struct battmngr_notify *data;
++ int ret, cookie, previous;
++ if (!bcdev->num_thermal_levels) return 0;
++ if (bcdev->num_thermal_levels < 0 || val < 0 || val >= bcdev->num_thermal_levels)
++  return -EINVAL;
++ if (READ_ONCE(bcdev->sheng_fg.pogo)) {
++  data = battmngr_notify_acquire(&cookie);
++  if (!data) return -ENODEV;
++  mutex_lock(&data->notify_lock);
++  previous = data->misc_msg.thermal_level;
++  data->misc_msg.thermal_level = val;
++  ret = notifier_to_errno(battmngr_notifier_call_chain(BATTMNGR_EVENT_THERMAL, data));
++  if (ret) data->misc_msg.thermal_level = previous;
++  mutex_unlock(&data->notify_lock);
++  battmngr_notify_release(cookie);
++ } else {
++  ret = write_property_id(bcdev, &bcdev->psy_list[PSY_TYPE_BATTERY], BATT_CHG_CTRL_LIM, val);
++ }
++ if (!ret) bcdev->curr_thermal_level = val;
++ return ret;
+ }
+ 
+ static int battery_psy_set_fcc(struct battery_chg_dev *bcdev, u32 prop_id, int val)

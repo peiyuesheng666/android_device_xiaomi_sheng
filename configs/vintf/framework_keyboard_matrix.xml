@@ -1,0 +1,19 @@
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<compatibility-matrix version="1.0" type="framework">
+    <hal format="hidl" optional="true">
+        <name>vendor.xiaomi.hardware.keyboardnanoapp</name>
+        <version>1.0</version>
+        <interface>
+            <name>IKeyboardNanoapp</name>
+            <instance>default</instance>
+        </interface>
+    </hal>
+    <hal format="hidl" optional="true">
+        <name>vendor.xiaomi.hardware.midevauth</name>
+        <version>1.0</version>
+        <interface>
+            <name>IMidevauthService</name>
+            <instance>default</instance>
+        </interface>
+    </hal>
+</compatibility-matrix>

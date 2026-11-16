@@ -1,0 +1,10 @@
+{
+  "package": "com.sohu.inputmethod.sogouoem",
+  "source_filename": "com.sohu.inputmethod.sogouoem.apk",
+  "source_origin": "User-provided extraction from an OPPO device",
+  "sha256": "36587aaea09b86619aa26e926f05f9ea1a2fef6c5ae42881ea09f44ce219e207",
+  "bytes": 99559299,
+  "certificate_sha256": "01cb5a64feb3f6169e9dbe9c4304b1a7fab12c92af6814dd5f9892aabc01f0f3",
+  "preserve_original_signature": true,
+  "redistribution_license_provided": false
+}

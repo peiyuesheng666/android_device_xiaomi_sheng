@@ -1,0 +1,172 @@
+--- a/sheng-ports/pogo/battmngr/xm_charger_ffc.c
++++ b/sheng-ports/pogo/battmngr/xm_charger_ffc.c
+@@ -31,8 +31,8 @@
+ 	val /= 1000;
+ 
+ 	charger_err("%s: charger_config_iterm:%d\n", __func__, val);
+-	if (check_qti_ops(&charger->battmg_dev))
+-		rc = battmngr_qtiops_set_term_cur(charger->battmg_dev, val);
++	if (!check_qti_ops(&charger->battmg_dev)) return -ENODEV;
++	rc = battmngr_qtiops_set_term_cur(charger->battmg_dev, val);
+ 	if (rc < 0) {
+ 		charger_err("%s: Couldn't get charge term:%d\n",
+ 					__func__, rc);
+@@ -48,8 +48,10 @@
+ 	int fastcharge_mode = 0;
+ 	//rc = xm_battmngr_read_iio_prop(g_battmngr_iio, BATT_FG,
+ 			//BATT_FG_FASTCHARGE_MODE, mode);
+-	if (check_qti_ops(&charger->battmg_dev))
+-		fastcharge_mode = battmngr_qtiops_get_fg1_fastcharge(charger->battmg_dev);
++	if (!mode) return -EINVAL;
++	if (!check_qti_ops(&charger->battmg_dev)) return -ENODEV;
++	fastcharge_mode = battmngr_qtiops_get_fg1_fastcharge(charger->battmg_dev);
++	if (fastcharge_mode < 0) return fastcharge_mode;
+ 
+ 	if (rc < 0) {
+ 		charger_err("%s: Couldn't write fastcharge mode:%d\n",
+@@ -69,8 +71,8 @@
+ 	union power_supply_propval pval = {0, };
+ 	int chip_ok = 0;
+ 
+-	if (check_qti_ops(&charger->battmg_dev))
+-		val = battmngr_qtiops_get_batt_auth(charger->battmg_dev);
++	if (!check_qti_ops(&charger->battmg_dev)) return -ENODEV;
++	val = battmngr_qtiops_get_batt_auth(charger->battmg_dev);
+ 
+ 	if (val < 0) {
+ 		charger_err("%s: Couldn't get battery authentic:%d\n",
+@@ -84,6 +86,7 @@
+ 	/*if soc > 95 do not set fastcharge flag*/
+ 	if (!charger->batt_psy)
+ 		charger->batt_psy = power_supply_get_by_name("battery");
++	if (!charger->batt_psy) return -ENODEV;
+ 
+ 	rc = power_supply_get_property(charger->batt_psy,
+ 				POWER_SUPPLY_PROP_CAPACITY, &pval);
+@@ -114,8 +117,8 @@
+ 		mode = false;
+ 	}
+ 
+-	if (check_qti_ops(&charger->battmg_dev))
+-		chip_ok = battmngr_qtiops_get_chip_ok(charger->battmg_dev);
++	if (!check_qti_ops(&charger->battmg_dev)) return -ENODEV;
++	chip_ok = battmngr_qtiops_get_chip_ok(charger->battmg_dev);
+ 
+ 	charger_err("%s: get fg chip_ok:%d\n",__func__, chip_ok);
+ 	if (chip_ok < 0) {
+@@ -129,18 +132,13 @@
+ 		mode = false;
+ 	}
+ 
+-	if (check_qti_ops(&charger->battmg_dev)) {
+-		rc = battmngr_qtiops_set_fg1_fastcharge(charger->battmg_dev, mode);
+-		rc = battmngr_qtiops_set_fg2_fastcharge(charger->battmg_dev, mode);
+-
+-	}
+-	if (rc < 0 || rc1 < 0) {
+-		charger_err("%s: Couldn't write fastcharge mode  FG1:%d\nFG2:%d\n",
+-					__func__, rc, rc1);
+-		return rc;
+-	}
+-
+-	xm_charger_config_iterm(charger, mode);
++	if (!check_qti_ops(&charger->battmg_dev)) return -ENODEV;
++	rc = battmngr_qtiops_set_fg1_fastcharge(charger->battmg_dev, mode);
++	if (rc < 0) return rc;
++	rc1 = battmngr_qtiops_set_fg2_fastcharge(charger->battmg_dev, mode);
++	if (rc1 < 0) return rc1;
++	rc = xm_charger_config_iterm(charger, mode);
++	if (rc < 0) return rc;
+ 
+ 	//vote(charger->fcc_votable, FFC_MODE_VOTER, !mode, charger->dt.non_ffc_cc);
+ 	//vote(charger->fv_votable, FFC_MODE_VOTER, !mode, charger->dt.non_ffc_cv);
+--- a/sheng-ports/pogo/init/xm_battmngr_init.c
++++ b/sheng-ports/pogo/init/xm_battmngr_init.c
+@@ -3,11 +3,14 @@
+ 
+ struct xm_battmngr *g_battmngr;
+ EXPORT_SYMBOL(g_battmngr);
++static DEFINE_MUTEX(manager_owner_lock);
+ 
+ static int battmngr_notifier_call(struct notifier_block *nb,
+ 		unsigned long event, void *data)
+ {
+ 	struct battmngr_notify *noti_data = data;
++	struct xm_battmngr *manager = container_of(nb, struct xm_battmngr, battmngr_nb);
++	int previous;
+ 	int ret = 0;
+ 
+ 	pr_err("%s: event %lu\n", __func__, event);
+@@ -26,9 +29,10 @@
+ 		ret = charger_process_event_irq(noti_data);
+ 		break;
+ 	case BATTMNGR_EVENT_THERMAL:
+-		g_xm_charger->system_temp_level = noti_data->misc_msg.thermal_level;
+-		pr_err("%s: thermal level: %d\n", __func__, g_xm_charger->system_temp_level);
+-		ret = xm_charger_thermal(g_xm_charger);
++		previous = manager->charger.system_temp_level;
++		manager->charger.system_temp_level = noti_data->misc_msg.thermal_level;
++		ret = xm_charger_thermal(&manager->charger);
++		if (ret < 0) manager->charger.system_temp_level = previous;
+ 		break;
+ 	default:
+ 		break;
+@@ -41,40 +45,48 @@
+ {
+  struct xm_battmngr *manager;
+  int ret;
+- if (!check_g_bcdev_ops()) return -EPROBE_DEFER;
++ mutex_lock(&manager_owner_lock);
++ if (g_battmngr) { ret = -EBUSY; goto unlock; }
++ if (!check_g_bcdev_ops()) { ret = -EPROBE_DEFER; goto unlock; }
+  manager = devm_kzalloc(&pdev->dev, sizeof(*manager), GFP_KERNEL);
+- if (!manager) return -ENOMEM;
++ if (!manager) { ret = -ENOMEM; goto unlock; }
+  manager->dev = &pdev->dev;
+  manager->charger.dev = &pdev->dev;
+  mutex_init(&manager->battmngr_noti.notify_lock);
+  ret = xm_charger_init(&manager->charger);
+- if (ret < 0) return ret;
++ if (ret < 0) goto unlock;
+  manager->battmngr_nb.notifier_call = battmngr_notifier_call;
+- ret = battmngr_notifier_register(&manager->battmngr_nb);
+- if (ret < 0) goto deinit;
+  g_xm_charger = &manager->charger;
+  g_battmngr = manager;
++ ret = battmngr_notifier_register(&manager->battmngr_nb);
++ if (ret < 0) goto clear;
+  ret = battmngr_notify_publish(&manager->battmngr_noti);
+  if (ret) goto unregister;
+  platform_set_drvdata(pdev, manager);
+- return 0;
++ goto unlock;
+ unregister:
++ battmngr_notifier_unregister(&manager->battmngr_nb);
++clear:
+  g_xm_charger = NULL; g_battmngr = NULL;
+- battmngr_notifier_unregister(&manager->battmngr_nb);
+-deinit:
+  xm_charger_deinit(&manager->charger);
++unlock:
++ mutex_unlock(&manager_owner_lock);
+  return ret;
+ }
+ 
+ static void xm_battmngr_remove(struct platform_device *pdev)
+ {
+- struct xm_battmngr *manager = platform_get_drvdata(pdev);
+- if (!manager) return;
++ struct xm_battmngr *manager;
++ mutex_lock(&manager_owner_lock);
++ manager = platform_get_drvdata(pdev);
++ if (!manager) goto unlock;
+  battmngr_notify_unpublish(&manager->battmngr_noti);
+  battmngr_notifier_unregister(&manager->battmngr_nb);
+  g_xm_charger = NULL; g_battmngr = NULL;
+  xm_charger_deinit(&manager->charger);
+  platform_set_drvdata(pdev, NULL);
++unlock:
++ mutex_unlock(&manager_owner_lock);
+ }
+ 
+ static void xm_battmngr_shutdown(struct platform_device *pdev)

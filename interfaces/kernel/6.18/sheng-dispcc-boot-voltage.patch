@@ -1,0 +1,72 @@
+--- a/soc/drivers/clk/qcom/dispcc-kalama.c
++++ b/soc/drivers/clk/qcom/dispcc-kalama.c
+@@ -1974,6 +1974,34 @@
+ 				stage, regs[i], value);
+ }
+ 
++/* Runtime resume votes the lowest corner before CCF has registered the
++ * firmware's live clocks. Hold each supply's existing proxy corner across
++ * that window, then release this extra vote once CCF owns the clock votes.
++ * Use the clock framework's aggregation, never force regulator voltages. */
++static int sheng_dispcc_boot_voltage(bool enable)
++{
++	struct clk_vdd_class_data data = {0};
++	int i, ret, result = 0;
++
++	for (i = 0; i < ARRAY_SIZE(disp_cc_kalama_regulators); i++) {
++		data.vdd_class = disp_cc_kalama_regulators[i];
++		if (enable)
++			ret = clk_vote_vdd_level(&data, data.vdd_class->num_levels - 1);
++		else
++			ret = clk_unvote_vdd_level(&data, data.vdd_class->num_levels - 1);
++		if (ret && !result)
++			result = ret;
++		if (ret && enable) {
++			while (--i >= 0) {
++				data.vdd_class = disp_cc_kalama_regulators[i];
++				clk_unvote_vdd_level(&data, data.vdd_class->num_levels - 1);
++			}
++			return ret;
++		}
++	}
++	return result;
++}
++
+ static int disp_cc_kalama_probe(struct platform_device *pdev)
+ {
+ 	struct regmap *regmap;
+@@ -1987,9 +2015,19 @@
+ 	if (ret)
+ 		return ret;
+ 
+-	ret = pm_runtime_get_sync(&pdev->dev);
++	dev_info(&pdev->dev, "sheng_dispcc: before first resume mm=%d mxa=%d\n",
++		vdd_mm.cur_level, vdd_mxa.cur_level);
++	ret = sheng_dispcc_boot_voltage(true);
+ 	if (ret)
+ 		return ret;
++	ret = pm_runtime_get_sync(&pdev->dev);
++	if (ret < 0) {
++		pm_runtime_put_noidle(&pdev->dev);
++		sheng_dispcc_boot_voltage(false);
++		return ret;
++	}
++	dev_info(&pdev->dev, "sheng_dispcc: first resume protected mm=%d mxa=%d\n",
++		vdd_mm.cur_level, vdd_mxa.cur_level);
+ 
+ 	sheng_dispcc_trace(&pdev->dev, "firmware");
+ 	clk_lucid_ole_pll_configure(&disp_cc_pll0, regmap, &disp_cc_pll0_config);
+@@ -2010,10 +2048,12 @@
+ 	ret = qcom_cc_really_probe(&pdev->dev, &disp_cc_kalama_desc, regmap);
+ 	if (ret) {
+ 		dev_err(&pdev->dev, "Failed to register DISP CC clocks\n");
+-		return ret;
++		goto put_runtime;
+ 	}
+ 
+ 	sheng_dispcc_trace(&pdev->dev, "registered");
++put_runtime:
++	sheng_dispcc_boot_voltage(false);
+ 	pm_runtime_put_sync(&pdev->dev);
+ 	dev_info(&pdev->dev, "Registered DISP CC clocks\n");
+ 

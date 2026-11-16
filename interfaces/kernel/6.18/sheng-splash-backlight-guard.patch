@@ -1,0 +1,108 @@
+--- a/vendor/qcom/opensource/display-drivers/msm/sheng_ktz8866.c
++++ b/vendor/qcom/opensource/display-drivers/msm/sheng_ktz8866.c
+@@ -27,6 +27,9 @@
+ 
+ static LIST_HEAD(ktz8866_dev_list);
+ static DEFINE_MUTEX(ktz8866_dev_list_mutex);
++static bool sheng_splash_backlight_guard = true;
++module_param(sheng_splash_backlight_guard, bool, 0600);
++MODULE_PARM_DESC(sheng_splash_backlight_guard, "Keep N81A dark during early display takeover");
+ #define NORMAL_MAX_DVB 1630
+ 
+ static const struct regmap_config ktz8866_i2c_regmap_config = {
+@@ -71,6 +74,8 @@
+ 
+ 	if (level > BL_LEVEL_MAX_HBM)
+ 		return -EINVAL;
++	/* A normal brightness request supersedes the saved bootloader state. */
++	ktz->boot_guard_held = false;
+ 	if (level <= BL_LEVEL_MAX)
+ 		scaled = level * NORMAL_MAX_DVB / BL_LEVEL_MAX;
+ 	else
+@@ -197,14 +202,49 @@
+ 	pdata->dev = &i2c->dev;
+ 	i2c_set_clientdata(i2c, pdata);
+ 	pdata->ops = &ops;
+-	/* Probe must preserve the bootloader image. The actual panel reset
+-	 * path darkens these LEDs before invalidating scanout. */
++	/* Clock, PHY and SDE ownership changes precede panel_reset during
++	 * continuous splash. Only gate the LEDs; keep bias and brightness. */
++	if (sheng_splash_backlight_guard && pdata->ktz8866_status) {
++		ret = regmap_write(pdata->regmap, KTZ8866_DISP_BL_ENABLE,
++			enable & ~KTZ8866_backlight_EN_MASK);
++		if (ret)
++			return ret;
++		pdata->boot_enable = enable;
++		pdata->boot_guard_held = true;
++		pdata->ktz8866_status = false;
++		dev_info(&i2c->dev, "sheng splash LEDs held; LCD bias preserved\n");
++	}
+ 
+ 	mutex_lock(&ktz8866_dev_list_mutex);
+ 	list_add(&pdata->entry, &ktz8866_dev_list);
+ 	mutex_unlock(&ktz8866_dev_list_mutex);
+ 	dev_info(&i2c->dev, "probe sucess end\n");
+ 	return ret;
++}
++
++/* Called after continuous-splash setup and DRM registration, in process
++ * context. Re-enable the saved LEDs without remapping bootloader brightness.
++ * Normal brightness updates or a reset cancel the saved-state restoration. */
++void sheng_ktz8866_splash_ready(void)
++{
++	struct ktz8866_led *ktz;
++	int ret;
++
++	mutex_lock(&ktz8866_dev_list_mutex);
++	list_for_each_entry(ktz, &ktz8866_dev_list, entry) {
++		if (!ktz->boot_guard_held)
++			continue;
++		ret = regmap_write(ktz->regmap, KTZ8866_DISP_BL_ENABLE,
++			ktz->boot_enable);
++		if (ret) {
++			dev_warn(ktz->dev, "splash LED restoration failed: %d\n", ret);
++			continue;
++		}
++		ktz->boot_guard_held = false;
++		ktz->ktz8866_status = !!(ktz->boot_enable & KTZ8866_backlight_EN_MASK);
++		dev_info(ktz->dev, "sheng splash LEDs restored\n");
++	}
++	mutex_unlock(&ktz8866_dev_list_mutex);
+ }
+ 
+ static void ktz8866_remove(struct i2c_client *i2c)
+--- a/vendor/qcom/opensource/display-drivers/msm/sheng_ktz8866.h
++++ b/vendor/qcom/opensource/display-drivers/msm/sheng_ktz8866.h
+@@ -60,6 +60,8 @@
+ 		int level;
+ 		bool ktz8866_status;
+ 		bool dimming_status;
++		bool boot_guard_held;
++		unsigned int boot_enable;
+ 		struct regmap *regmap;
+ 		struct list_head entry;
+ 		const struct ktz_ops *ops;
+@@ -279,4 +281,5 @@
+ 
+ int sheng_ktz8866_init(void);
+ void sheng_ktz8866_exit(void);
++void sheng_ktz8866_splash_ready(void);
+ int ktz8866_backlight_update_status(unsigned int level);
+--- a/vendor/qcom/opensource/display-drivers/msm/msm_drv.c
++++ b/vendor/qcom/opensource/display-drivers/msm/msm_drv.c
+@@ -71,6 +71,7 @@
+ #endif /* OPLUS_FEATURE_DISPLAY */
+ #include "hfi_msm_drv.h"
+ #include "sheng_boot_trace.h"
++#include "sheng_ktz8866.h"
+ 
+ unsigned int sheng_probe_delay_ms;
+ module_param(sheng_probe_delay_ms, uint, 0600);
+@@ -1128,6 +1129,7 @@
+ 	if (ret)
+ 		goto fail;
+ 	priv->registered = true;
++	sheng_ktz8866_splash_ready();
+ 
+ #if IS_ENABLED(CONFIG_DRM_FBDEV_EMULATION)
+ 	if (fbdev)

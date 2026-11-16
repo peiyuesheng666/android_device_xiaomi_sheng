@@ -1,0 +1,67 @@
+--- a/kernel/reboot.c
++++ b/kernel/reboot.c
+@@ -14,6 +14,7 @@
+ #include <linux/kmod.h>
+ #include <linux/kmsg_dump.h>
+ #include <linux/reboot.h>
++#include <linux/sheng_bootlog.h>
+ #include <linux/suspend.h>
+ #include <linux/syscalls.h>
+ #include <linux/syscore_ops.h>
+@@ -96,7 +97,10 @@
+ {
+ 	kmsg_dump(KMSG_DUMP_EMERG);
+ 	system_state = SYSTEM_RESTART;
+-	machine_emergency_restart();
++	if (sheng_bootlog_test_mode())
++		machine_restart("bootloader");
++	else
++		machine_emergency_restart();
+ }
+ EXPORT_SYMBOL_GPL(emergency_restart);
+ 
+@@ -289,6 +293,8 @@
+  */
+ void kernel_restart(char *cmd)
+ {
++	if (sheng_bootlog_test_mode())
++		cmd = "bootloader";
+ 	kernel_restart_prepare(cmd);
+ 	do_kernel_restart_prepare();
+ 	migrate_to_reboot_cpu();
+--- a/kernel/panic.c
++++ b/kernel/panic.c
+@@ -21,6 +21,7 @@
+ #include <linux/random.h>
+ #include <linux/ftrace.h>
+ #include <linux/reboot.h>
++#include <linux/sheng_bootlog.h>
+ #include <linux/delay.h>
+ #include <linux/kexec.h>
+ #include <linux/panic_notifier.h>
+@@ -496,6 +497,7 @@
+ 	 * the other CPUs or else we won't be able to debug processes left
+ 	 * running on them.
+ 	 */
++	sheng_bootlog_panic_pause();
+ 	kgdb_panic(buf);
+ 
+ 	/*
+--- a/arch/arm64/kernel/traps.c
++++ b/arch/arm64/kernel/traps.c
+@@ -15,6 +15,7 @@
+ #include <linux/uaccess.h>
+ #include <linux/hardirq.h>
+ #include <linux/kdebug.h>
++#include <linux/sheng_bootlog.h>
+ #include <linux/module.h>
+ #include <linux/kexec.h>
+ #include <linux/delay.h>
+@@ -196,6 +197,7 @@
+ 		return ret;
+ 
+ 	dump_kernel_instr(addr);
++	sheng_bootlog_fault_pause();
+ 
+ 	return ret;
+ }

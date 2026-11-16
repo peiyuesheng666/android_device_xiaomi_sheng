@@ -1,0 +1,117 @@
+// SPDX-License-Identifier: Apache-2.0
+// Candidate service modules; product inclusion follows policy/lifecycle validation.
+java_library {
+    name: "ShengStylusSupport",
+    srcs: ["src/**/*.java"],
+    static_libs: ["ShengPenChargeSupport"],
+    installable: false,
+    product_specific: true,
+}
+
+android_app {
+    name: "ShengStylus",
+    product_specific: true,
+    privileged: true,
+    certificate: "platform",
+    platform_apis: true,
+    min_sdk_version: "35",
+    target_sdk_version: "37",
+    srcs: ["app/**/*.java"],
+    static_libs: [
+        "ShengStylusSupport",
+        "ShengPenChargeSupport",
+        "vendor.lineage.sheng.stylus-V1-java",
+    ],
+    required: ["privapp-permissions-org.lineageos.sheng.stylus.xml"],
+}
+
+prebuilt_etc {
+    name: "privapp-permissions-org.lineageos.sheng.stylus.xml",
+    product_specific: true,
+    sub_dir: "permissions",
+    src: "privapp-permissions-org.lineageos.sheng.stylus.xml",
+}
+
+cc_library_static {
+    name: "libsheng_stylus_control",
+    vendor_available: true,
+    host_supported: true,
+    srcs: [
+        "native/PenController.cpp",
+        "native/PenHardware.cpp",
+        "native/PenHidEndpoint.cpp",
+        "native/PenLeaseJournal.cpp",
+    ],
+    export_include_dirs: ["native"],
+    cflags: [
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+    ],
+}
+
+aidl_interface {
+    name: "vendor.lineage.sheng.stylus",
+    srcs: ["aidl/vendor/lineage/sheng/stylus/*.aidl"],
+    local_include_dir: "aidl",
+    vendor_available: true,
+    stability: "vintf",
+    owner: "lineage",
+    min_sdk_version: "35",
+    frozen: true,
+    backend: {
+        cpp: {
+            enabled: false,
+        },
+        java: {
+            enabled: true,
+        },
+        ndk: {
+            enabled: true,
+        },
+        rust: {
+            enabled: false,
+        },
+    },
+    versions_with_info: [
+        {
+            version: "1",
+            imports: [],
+        },
+    ],
+
+}
+
+cc_binary {
+    name: "vendor.lineage.sheng.stylus-service",
+    min_sdk_version: "35",
+    vendor: true,
+    relative_install_path: "hw",
+    srcs: ["native/PenControllerService.cpp"],
+    static_libs: ["libsheng_stylus_control"],
+    shared_libs: [
+        "libbase",
+        "liblog",
+        "libbinder_ndk",
+        "vendor.lineage.sheng.stylus-V1-ndk",
+    ],
+    init_rc: ["native/vendor.lineage.sheng.stylus-service.rc"],
+    vintf_fragments: ["native/vendor.lineage.sheng.stylus-service.xml"],
+    cflags: [
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+    ],
+}
+
+cc_test_host {
+    name: "sheng_stylus_control_test",
+    srcs: ["tests/PenControllerTest.cpp"],
+    static_libs: ["libsheng_stylus_control"],
+    gtest: false,
+    cflags: [
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+    ],
+}

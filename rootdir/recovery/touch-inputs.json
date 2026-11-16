@@ -1,0 +1,48 @@
+{
+  "stock_firmware": "OS3.0.303.0.WNXCNXM",
+  "accepted_recovery": "r59",
+  "entries": [
+    {
+      "source": "odm/bin/touch_report_debug",
+      "installed": "system/bin/touch_report_debug",
+      "sha256": "7707a312a7629e675820487765735991b16c0f16d14e3c37002590ce0a97aa95",
+      "bytes": 743472
+    },
+    {
+      "source": "odm/lib64/libtouchsensor.so",
+      "installed": "system/lib64/libtouchsensor.so",
+      "sha256": "5172f25ff1bac6230b463cb039f1f450533608c1595ce70247bd941eb3cd7534",
+      "bytes": 354560
+    },
+    {
+      "source": "odm/lib64/libtensorflowlite_touch_c.so",
+      "installed": "system/lib64/libtensorflowlite_touch_c.so",
+      "sha256": "587da20ed5dfb899eaeaad155524a7f58545a581ca32d5ba929ceaf0ab70e5c2",
+      "bytes": 2907160
+    },
+    {
+      "source": "odm/firmware/n81a_nova_thp_config.ini",
+      "installed": "vendor/firmware/n81a_nova_thp_config.ini",
+      "sha256": "cb75e8cf9128f9ea6177d8276d440dc16f55db8f068f7644e94668cfc8f6e2c5",
+      "bytes": 35117
+    },
+    {
+      "source": "odm/firmware/film_model.tflite",
+      "installed": "vendor/odm/firmware/film_model.tflite",
+      "sha256": "ebde241859f559c6fe994feb2fe73e659060863fa0533e01b41ac60c414953a0",
+      "bytes": 41472
+    },
+    {
+      "source": "odm/firmware/water_check.tflite",
+      "installed": "vendor/odm/firmware/water_check.tflite",
+      "sha256": "2fd977535eda59e5d8b980d1724b12f205356a7f5a3e8114926307ed52ff5575",
+      "bytes": 12200
+    },
+    {
+      "source": "odm/firmware/glove_model.tflite",
+      "installed": "vendor/odm/firmware/glove_model.tflite",
+      "sha256": "85a320b73f31b5650a48629ba75f986b3db2cce4f3ef2d1ae18f3c304a789de2",
+      "bytes": 10768
+    }
+  ]
+}

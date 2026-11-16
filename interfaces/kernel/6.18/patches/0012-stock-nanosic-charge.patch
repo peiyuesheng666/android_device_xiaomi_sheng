@@ -1,0 +1,1511 @@
+--- /dev/null
++++ b/sheng-ports/pogo/nanosic_platform.c
+@@ -0,0 +1,1120 @@
++/** ***************************************************************************
++ * @file nanosic_platform.c
++ *
++ * @brief provided interface of initialza and release nanosic driver .
++ *
++ * <em>Copyright (C) 2010, Nanosic, Inc.  All rights reserved.</em>
++ * Author : Bin.yuan bin.yuan@nanosic.com
++ * */
++
++/*
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ */
++
++#include <linux/init.h>
++#include <linux/module.h>
++#include <linux/pm.h>
++#include <linux/pm_runtime.h>
++#include <linux/acpi.h>
++#include <linux/of.h>
++#include <linux/i2c.h>
++#include <linux/platform_device.h>
++#include <linux/of_irq.h>
++#include <linux/notifier.h>
++#include <linux/kernel.h>
++#include <asm/processor.h>
++#include <linux/kthread.h>
++#include <linux/sched.h>
++#include <linux/spinlock.h>
++#include "sheng_nano_charge_protocol.h"
++#include "sheng_keyboard_charger.h"
++#include "inc/nano_macro.h"
++
++
++static ADSP_read_cb g_ADSP_read_cb = NULL;
++
++static DEFINE_MUTEX(rwlock);
++static DEFINE_MUTEX(nano_api_lock);
++
++static u8 buf_tmp[I2C_DATA_LENGTH_READ];
++static int length;
++
++#define DEV_TYPE_KEYBOARD       (0x1)
++#define DEV_TYPE_ZHIJIA         (0x2)
++
++/*0x38:???  */
++#define DEV_KEYBOARD_OBJECT  (0x38)
++#define DEV_ZHIJIA_OBJECT    (0x3B)
++#define DEV_UNKOWN_OBJECT     (0x0)
++#define PROBE_CNT_MAX	100
++
++static u8 gObject = DEV_UNKOWN_OBJECT;
++
++enum bq2589x_vbus_type {
++	BQ2589X_VBUS_NONE,
++	BQ2589X_VBUS_USB_FLOAT = 4,
++	BQ2589X_VBUS_USB_SDP = 6,
++	BQ2589X_VBUS_USB_CDP = 9, /*CDP for bq25890, Adapter for bq25892*/
++	BQ2589X_VBUS_USB_DCP = 10,
++	BQ2589X_VBUS_USB_QC_5v = 16,
++	BQ2589X_VBUS_USB_QC2,
++	BQ2589X_VBUS_USB_QC2_12v,
++    BQ2589X_VBUS_USB_QC3 = 20,
++	BQ2589X_VBUS_UNKNOWN,
++	BQ2589X_VBUS_NONSTAND,
++	BQ2589X_VBUS_OTG,
++	BQ2589X_VBUS_TYPE_NUM,
++};
++
++#define USER_VOTER			"USER_VOTER"
++struct nanochg* g_nodev;
++
++/* The exported charge struct keeps the original field order. Private queue and
++ * device lifetime state live outside that ABI. No global packet overwrite. */
++#define NANO_PENDING_SLOTS 16
++struct nano_platform {
++	struct nanochg charge;
++	struct battmngr_device *battmgr;
++	spinlock_t pending_lock;
++	unsigned int head, tail, count;
++	bool stopping;
++	struct { size_t len; u8 data[I2C_DATA_LENGTH_READ]; } packets[NANO_PENDING_SLOTS];
++};
++EXPORT_SYMBOL(g_nodev);
++
++/** ************************************************************************
++ *  @func rawdata_show
++ */
++static inline void rawdata_show(const char* descp, const u8* buf , size_t size)
++{
++    int i=0;
++    char display[300]={0};
++
++    if(!descp) {
++        dbgprint(DEBUG_LEVEL,"descp is null.\n");
++        return;
++    }
++
++    for (i = 0; i < (size > 35 ? 35 : size); i++) {
++        char str[4]={0};
++        char str1[5] = {0};
++
++        snprintf(str1,sizeof(str1),"%s%d%s", "[", i, "]");
++        strcat(display, str1);
++
++        snprintf(str,sizeof(str),"%02X%s",buf[i], " ");
++        strcat(display,str);
++    }
++
++    dbgprint(DEBUG_LEVEL,"%s -> %s\n",descp,display);
++}
++
++int Nanosic_vendor_raw_data_inject(void *buf, size_t len)
++{
++	struct nano_platform *platform;
++	unsigned long flags;
++	int ret = sheng_nano_charge_validate(buf, len);
++
++	if (ret)
++		return ret;
++	mutex_lock(&nano_api_lock);
++	if (!g_nodev) {
++		ret = -ENODEV;
++		goto out;
++	}
++	platform = container_of(g_nodev, struct nano_platform, charge);
++	if (platform->stopping) {
++		ret = -ENODEV;
++		goto out;
++	}
++	spin_lock_irqsave(&platform->pending_lock, flags);
++	if (platform->count == NANO_PENDING_SLOTS) {
++		ret = -ENOSPC;
++	} else {
++		memcpy(platform->packets[platform->tail].data, buf, len);
++		platform->packets[platform->tail].len = len;
++		platform->tail = (platform->tail + 1) % NANO_PENDING_SLOTS;
++		platform->count++;
++	}
++	spin_unlock_irqrestore(&platform->pending_lock, flags);
++	if (!ret)
++		schedule_delayed_work(&g_nodev->analyse_rawdata_work, 0);
++out:
++	mutex_unlock(&nano_api_lock);
++	return ret;
++}
++EXPORT_SYMBOL_GPL(Nanosic_vendor_raw_data_inject);
++
++int Nanosic_charge_i2c_write_callback_register_locked(i2c_write_cb cb)
++{
++    struct nanochg *nodev = g_nodev;
++    int ret = 0;
++
++    if (IS_ERR_OR_NULL(nodev))
++    {
++        dbgprint(ERROR_LEVEL, "nodev ERROR");
++        ret = -ENODEV;
++        return ret;
++    }
++
++    if (IS_ERR_OR_NULL(cb))
++    {
++        dbgprint(ERROR_LEVEL, "cb ERROR");
++        ret = -EINVAL;
++        return ret;
++    }
++
++    mutex_lock(&nodev->nano_i2c_write_mutex);
++
++    if (!nodev->pogo_charge_i2c_write)
++    {
++        nodev->pogo_charge_i2c_write = cb;
++    }
++    else
++    {
++        dbgprint(ERROR_LEVEL, "charge_i2c_write already registered");
++        ret = -EINVAL;
++        goto _out;
++    }
++
++    dbgprint(INFO_LEVEL, "charge_i2c_write registered");
++
++_out:
++    mutex_unlock(&nodev->nano_i2c_write_mutex);
++
++    return ret;
++}
++EXPORT_SYMBOL_GPL(Nanosic_charge_i2c_write_callback_register);
++
++int Nanosic_charge_i2c_write_callback_unregister_locked(void)
++{
++    struct nanochg *nodev = g_nodev;
++    int ret = 0;
++
++    if (IS_ERR_OR_NULL(nodev))
++    {
++        dbgprint(ERROR_LEVEL, "nodev ERROR");
++        ret = -ENODEV;
++        return ret;
++    }
++
++    mutex_lock(&nodev->nano_i2c_write_mutex);
++    if (nodev->pogo_charge_i2c_write)
++    {
++        nodev->pogo_charge_i2c_write = NULL;
++    }
++    else
++    {
++        dbgprint(ERROR_LEVEL, "pogo_charge_i2c_write already unregistered");
++        ret = -ENODEV;
++        goto _out;
++    }
++
++    dbgprint(INFO_LEVEL, "charge_i2c_write unregistered");
++
++_out:
++    mutex_unlock(&nodev->nano_i2c_write_mutex);
++
++    return ret;
++}
++EXPORT_SYMBOL_GPL(Nanosic_charge_i2c_write_callback_unregister);
++
++
++/**
++ * @brief This function will call Nanosic_charge_i2c_write_callback
++ *        in nanosic_driver.c
++ *
++ * @param buf Data buf
++ * @param len Data length
++ *
++ * @return Result num of bytes success or failure mode
++ */
++__attribute__((unused)) static int Nanosic_charge_i2c_write(void *buf, size_t len)
++{
++    struct nanochg *nodev = g_nodev;
++    int ret = 0;
++
++    if (IS_ERR_OR_NULL(nodev))
++    {
++        dbgprint(ERROR_LEVEL, "nodev ERROR");
++        ret = -ENODEV;
++        return ret;
++    }
++
++    mutex_lock(&nodev->nano_i2c_write_mutex);
++    if (!IS_ERR_OR_NULL(nodev->pogo_charge_i2c_write))
++    {
++        ret = nodev->pogo_charge_i2c_write(buf, len);
++    }
++    else
++    {
++        dbgprint(ERROR_LEVEL, "pogo_charge_i2c_write ERROR");
++        ret = -ENODEV;
++        goto _out;
++    }
++
++_out:
++    mutex_unlock(&nodev->nano_i2c_write_mutex);
++
++    return ret;
++}
++
++
++static int nano_send_charge(u8 cmd, u8 addr, u8 count, const u8 *data,
++			    size_t len, u8 power)
++{
++	u8 frame[I2C_DATA_LENGTH_WRITE];
++	int ret;
++
++	mutex_lock(&nano_api_lock);
++	if (!g_nodev || container_of(g_nodev, struct nano_platform, charge)->stopping) {
++		ret = -ENODEV;
++	} else {
++		mutex_lock(&rwlock);
++		ret = sheng_nano_charge_command(frame, gObject, cmd, addr, count, data, len, power);
++		mutex_unlock(&rwlock);
++	}
++	if (!ret) {
++		ret = Nanosic_charge_i2c_write(frame, sizeof(frame));
++		if (ret >= 0 && ret != sizeof(frame))
++			ret = -EIO;
++	}
++	mutex_unlock(&nano_api_lock);
++	return ret;
++}
++static void assign_mcu_data(struct read_mcu_data* mcuData, const u8* buf)
++{
++    if (mcuData) {
++        mcuData->input_volt = (int)(buf[11] * 100);
++        mcuData->input_watt = buf[12];
++        mcuData->vbat_set = buf[13];
++        mcuData->ibat_set = buf[14];
++        mcuData->work_state = buf[15];
++        mcuData->typec_state = buf[16];
++        mcuData->dpdm_in_state = buf[17];
++        mcuData->protocol_volt = (int)(buf[18] * 100);
++        mcuData->protocol_curr = (int)(buf[19] * 50);
++        mcuData->vbus_pwr = (int)(buf[20] * 100);
++        mcuData->vbus_mon = (int)(buf[21] * 100);
++        mcuData->typec_curr = (int)(buf[22] * 50);
++        mcuData->ntc_l = buf[23];
++        mcuData->ntc_h = buf[24];
++        mcuData->dpdm0_state = buf[25];
++        mcuData->sink_comm = buf[26];
++        dbgprint(DEBUG_LEVEL,"Address:%02x, RegLength:%02x, input_volt:%d, input_watt:%02x, vbat_set:%02x, ibat_set:%02x\n",
++                                buf[9], buf[10], mcuData->input_volt, mcuData->input_watt, mcuData->vbat_set, mcuData->ibat_set);
++
++        dbgprint(DEBUG_LEVEL, "work_state:%02x, typec_state:%02x, dpdm_in_state:%02x, protocol_volt:%d\n",
++                                mcuData->work_state, mcuData->typec_state, mcuData->dpdm_in_state, mcuData->protocol_volt);
++        dbgprint(DEBUG_LEVEL, "protocol_curr:%d, vbus_pwr:%d, vbus_mon:%d, typec_curr:%d\n",
++                                mcuData->protocol_curr, mcuData->vbus_pwr, mcuData->vbus_mon, mcuData->typec_curr);
++        dbgprint(DEBUG_LEVEL, "ntc_l:%02x, ntc_h:%02x, dpdm0_state:%02x, sink_comm:%02x\n",
++                                mcuData->ntc_l, mcuData->ntc_h, mcuData->dpdm0_state, mcuData->sink_comm);
++    }
++}
++
++static u8 vin_low;
++static u8 vin_high;
++static u8 i_low;
++static u8 i_high;
++static void assign_holder_mcu_data(struct read_mcu_data* mcuData, const u8* buf)
++{
++    int vin = 0, curr = 0;
++    if (mcuData) {
++        mcuData->addr = buf[9];
++        switch (mcuData->addr)
++        {
++        case 0x01:
++        dbgprint(DEBUG_LEVEL,"ctrl-1 Address:%02x, RegLength:%02x, data:%02x\n",
++                                 buf[9], buf[10], buf[11]);
++        break;
++        case 0x10:
++            mcuData->typec_state = buf[11];
++            break;
++        case 0x11:
++            mcuData->code = buf[11];
++            break;
++        case 0x13:
++            mcuData->vout_low = buf[11];
++            vin_low = buf[11];
++            break;
++        case 0x14:
++            mcuData->vout_high = buf[11];
++            vin_high = buf[11];
++            vin = (int)((vin_high << 8) | vin_low);
++            dbgprint(DEBUG_LEVEL,"Volt-Curr Address:%02x, vin:%d\n", buf[9], vin);
++            break;
++        case 0x1e:
++            mcuData->vout_low = buf[11];
++            i_low = buf[11];
++            break;
++        case 0x1f:
++            mcuData->vout_high = buf[11];
++            i_high = buf[11];
++            curr = (int)((i_high << 8) | i_low);
++            dbgprint(DEBUG_LEVEL,"Volt-Curr Address:%02x, curr_in:%d\n", buf[9], curr);
++            break;
++        default:
++            break;
++        }
++
++        dbgprint(DEBUG_LEVEL,"Address:%02x, RegLength:%02x, data:%02x\n",
++                                 buf[9], buf[10], buf[11]);
++    }
++}
++
++static int nano_get_chg_real_type_locked(int* real_type)
++{
++	int type;
++
++    if (!g_nodev || !g_battmngr_noti) {
++        dbgprint(ERROR_LEVEL, "%s g_nodev or g_battmngr_noti is null\n", __func__);
++        return -1;
++    }
++
++    if (gObject != DEV_KEYBOARD_OBJECT) {
++
++        if (g_battmngr_noti->irq_msg.value) {
++            g_battmngr_noti->pd_msg.pd_active = 1;
++            dbgprint(ERROR_LEVEL, "%s holder detect pd type. \n", __func__);
++            *real_type = POWER_SUPPLY_USB_TYPE_PD;
++        } else
++            *real_type = POWER_SUPPLY_USB_TYPE_UNKNOWN;
++
++        goto result;
++    }
++
++	type = (int)g_nodev->dpdm;
++
++	dbgprint(ERROR_LEVEL, "%s type=%d, old_type=%d \n", __func__, type);
++
++	if (g_nodev->pd_flag) {
++        g_battmngr_noti->pd_msg.pd_active = 1;
++		dbgprint(ERROR_LEVEL, "%s detect pd type. \n", __func__);
++		*real_type = POWER_SUPPLY_USB_TYPE_PD;
++		goto result;
++	}
++
++	switch (type)
++	{
++	case BQ2589X_VBUS_NONSTAND:
++	case BQ2589X_VBUS_UNKNOWN:
++	case BQ2589X_VBUS_USB_FLOAT:
++		*real_type = POWER_SUPPLY_TYPE_USB_FLOAT;
++		break;
++	case BQ2589X_VBUS_USB_SDP:
++		*real_type = POWER_SUPPLY_USB_TYPE_SDP;
++		break;
++	case BQ2589X_VBUS_USB_CDP:
++		*real_type = POWER_SUPPLY_USB_TYPE_CDP;
++		break;
++	case BQ2589X_VBUS_USB_DCP:
++		*real_type = POWER_SUPPLY_USB_TYPE_DCP;
++		break;
++	case BQ2589X_VBUS_USB_QC2:
++		*real_type = POWER_SUPPLY_TYPE_USB_HVDCP;
++		break;
++	 case BQ2589X_VBUS_USB_QC3:
++	 	*real_type = POWER_SUPPLY_TYPE_USB_HVDCP_3;
++	 	break;
++	default:
++		*real_type = POWER_SUPPLY_USB_TYPE_UNKNOWN;
++		break;
++	}
++
++result:
++	g_nodev->charge_type = *real_type;
++	dbgprint(ERROR_LEVEL, "%s bc1.2 type=%d\n", __func__, *real_type);
++
++	return 0;
++}
++
++static int nano_get_chg_usb_type_locked(int* usb_type)
++{
++	int type;
++
++    if (!g_nodev || !g_battmngr_noti) {
++        dbgprint(ERROR_LEVEL, "%s g_nodev or g_battmngr_noti is null\n", __func__);
++        return -1;
++    }
++
++    if (gObject != DEV_KEYBOARD_OBJECT) {
++
++        if (g_battmngr_noti->irq_msg.value) {
++            g_battmngr_noti->pd_msg.pd_active = 1;
++            dbgprint(ERROR_LEVEL, "%s holder detect pd type. \n", __func__);
++            *usb_type = POWER_SUPPLY_USB_TYPE_PD;
++        } else
++            *usb_type = POWER_SUPPLY_USB_TYPE_UNKNOWN;
++
++        goto result;
++    }
++
++	type = (int)g_nodev->dpdm;
++
++	dbgprint(ERROR_LEVEL, "%s type=%d, old_type=%d \n", __func__, type);
++
++	if (g_nodev->pd_flag) {
++        g_battmngr_noti->pd_msg.pd_active = 1;
++		dbgprint(ERROR_LEVEL, "%s detect pd type. \n", __func__);
++		*usb_type = POWER_SUPPLY_USB_TYPE_PD;
++		goto result;
++	}
++
++	switch (type)
++	{
++	case BQ2589X_VBUS_NONSTAND:
++	case BQ2589X_VBUS_UNKNOWN:
++	case BQ2589X_VBUS_USB_FLOAT:
++		*usb_type = POWER_SUPPLY_TYPE_USB_FLOAT;
++		break;
++	case BQ2589X_VBUS_USB_SDP:
++		*usb_type = POWER_SUPPLY_USB_TYPE_SDP;
++		break;
++	case BQ2589X_VBUS_USB_CDP:
++		*usb_type = POWER_SUPPLY_USB_TYPE_CDP;
++		break;
++	case BQ2589X_VBUS_USB_DCP:
++    case BQ2589X_VBUS_USB_QC2:
++    case BQ2589X_VBUS_USB_QC3:
++		*usb_type = POWER_SUPPLY_USB_TYPE_DCP;
++		break;
++	default:
++		*usb_type = POWER_SUPPLY_USB_TYPE_UNKNOWN;
++		break;
++	}
++
++result:
++	dbgprint(ERROR_LEVEL, "%s bc1.2 type=%d\n", __func__, *usb_type);
++
++	return 0;
++}
++
++static int nano_is_charge_online_locked(u8* online)
++{
++    if (g_nodev) {
++        if (!g_nodev->usb_icl_votable)
++            g_nodev->usb_icl_votable = find_votable("ICL");
++
++        if (!g_nodev->usb_icl_votable || !g_battmngr_noti)
++            return -ENODEV;
++
++        if (get_client_vote_locked(g_nodev->usb_icl_votable, USER_VOTER) == 0) {
++            *online = false;
++            return 1;
++        }
++		 if (g_battmngr_noti)
++            *online = g_battmngr_noti->irq_msg.value;
++        return 1;
++    } else {
++        dbgprint(ERROR_LEVEL,"%s g_nodev is null\n", __func__);
++    }
++
++	return -1;
++}
++
++static int nano_input_curr_limit_locked(int* curr_limit)
++{
++    if (g_nodev) {
++        if (!g_nodev->usb_icl_votable)
++            g_nodev->usb_icl_votable = find_votable("ICL");
++        if (!g_nodev->usb_icl_votable)
++            return -ENODEV;
++        *curr_limit = get_effective_result(g_nodev->usb_icl_votable);
++        if (*curr_limit >= 0)
++            return 1;
++
++    } else {
++        dbgprint(ERROR_LEVEL,"%s g_nodev is null\n", __func__);
++    }
++
++	return -1;
++}
++
++static int nano_get_power_max_locked(int* powr_max)
++{
++    if (g_nodev) {
++        if (gObject == DEV_KEYBOARD_OBJECT)
++            *powr_max = ((g_nodev->protocol_volt / 1000) * (g_nodev->protocol_curr / 1000));
++        else if (gObject == DEV_ZHIJIA_OBJECT)
++            *powr_max = 22;
++        else
++            *powr_max = 0;
++
++        if (*powr_max >= 0)
++            return 1;
++
++    } else {
++        dbgprint(ERROR_LEVEL,"%s g_nodev is null\n", __func__);
++    }
++
++	return -1;
++}
++
++static void deal_report_event(const u8* buf)
++{
++    static int last_online;
++
++    if (buf && g_nodev) {
++        if (gObject == DEV_KEYBOARD_OBJECT) {
++            g_nodev->online = buf[16] & 0x01;
++
++            g_nodev->pd_flag = (buf[16] & 0x04) >> 2;
++
++            g_nodev->dpdm_in_state = (buf[17] & 0x80);
++            g_nodev->dpdm = buf[25];
++            g_nodev->protocol_volt = (int)(buf[18] * 100);
++            g_nodev->protocol_curr = (int)(buf[19] * 50);
++        } else if (g_battmngr_noti){
++            g_nodev->online = g_battmngr_noti->irq_msg.value;
++        }
++
++        dbgprint(ERROR_LEVEL, "ENTER -1 last_online:%d, %d.\n", last_online, g_nodev->online);
++        // send notify
++        if (last_online != g_nodev->online) {
++            dbgprint(ERROR_LEVEL, "Send report info.\n");
++            //g_battmngr_noti->mcu_msg.msg_type = BATTMNGR_MSG_MCU_TYPE;
++            battmngr_notifier_call_chain(BATTMNGR_EVENT_REPORT, g_battmngr_noti);
++        }
++        last_online = g_nodev->online;
++
++    }
++}
++
++static int nano_get_chg_real_type(int *real_type)
++{
++	int ret;
++	if (!real_type)
++		return -EINVAL;
++	mutex_lock(&nano_api_lock);
++	ret = g_nodev ? nano_get_chg_real_type_locked(real_type) : -ENODEV;
++	mutex_unlock(&nano_api_lock);
++	return ret;
++}
++
++static int nano_get_chg_usb_type(int *usb_type)
++{
++	int ret;
++	if (!usb_type)
++		return -EINVAL;
++	mutex_lock(&nano_api_lock);
++	ret = g_nodev ? nano_get_chg_usb_type_locked(usb_type) : -ENODEV;
++	mutex_unlock(&nano_api_lock);
++	return ret;
++}
++
++static int nano_is_charge_online(u8 *online)
++{
++	int ret;
++	if (!online)
++		return -EINVAL;
++	mutex_lock(&nano_api_lock);
++	ret = g_nodev ? nano_is_charge_online_locked(online) : -ENODEV;
++	mutex_unlock(&nano_api_lock);
++	return ret;
++}
++
++static int nano_input_curr_limit(int *curr_limit)
++{
++	int ret;
++	if (!curr_limit)
++		return -EINVAL;
++	mutex_lock(&nano_api_lock);
++	ret = g_nodev ? nano_input_curr_limit_locked(curr_limit) : -ENODEV;
++	mutex_unlock(&nano_api_lock);
++	return ret;
++}
++
++static int nano_get_power_max(int *powr_max)
++{
++	int ret;
++	if (!powr_max)
++		return -EINVAL;
++	mutex_lock(&nano_api_lock);
++	ret = g_nodev ? nano_get_power_max_locked(powr_max) : -ENODEV;
++	mutex_unlock(&nano_api_lock);
++	return ret;
++}
++
++static const struct battmngr_ops nano_op = {
++    .online = nano_is_charge_online,
++    .real_type = nano_get_chg_real_type,
++    .usb_type = nano_get_chg_usb_type,
++    .input_curr_limit = nano_input_curr_limit,
++    .power_max = nano_get_power_max,
++};
++
++/** ************************************************************************
++ *  @func Nanosic_Calculate_crc
++ *
++ *  @brief calculate sum
++ *
++ ** */
++static __maybe_unused
++uint8_t Nanosic_Calculate_crc(uint8_t* data,uint32_t datalen)
++{
++    uint8_t i=0;
++    uint8_t crc = 0;
++
++    for(i=2;i<datalen;i++) /*fixed bug in 2023.6.15*/
++        crc += data[i];
++
++    return crc;
++}
++
++/** ************************************************************************
++ *  @func Nanosic_ADSP_Set_Charge_Status
++ *
++ *  B0     B1    B2    B3    B4    B5    B6    B7......B32     B33  B34  .......B65
++ *  0x32   0x00  0x4E  0x31  0x81  0x38  0x42  DATA0...DATA25  crc   0  .......  0
++ *
++ *  @brief send command to i2c device driver , Called by adsp device driver
++ *  write i2c fail when return < 0 or succee return 66
++ ** */
++int  Nanosic_ADSP_Set_Charge_Status(uint8_t* data,uint32_t datalen)
++{
++	if (!data)
++		return -EINVAL;
++	return nano_send_charge(0x42, 0, 0, data, datalen, 1);
++}
++
++/** ************************************************************************
++ *  @func Nanosic_ADSP_Read_Charge_Status
++ *
++ *  B0     B1    B2    B3    B4    B5    B6    B7    B8    B9........B65
++ *  0x32   0x00  0x4E  0x31  0x81  0x38  0x40  0x00  crc   0.......  0
++ *
++ *  @brief send command to i2c device driver , Called by adsp device driver
++ *  write i2c fail when return < 0 or succee return 66
++ ** */
++int  Nanosic_ADSP_Read_Charge_Status(void)
++{
++	return nano_send_charge(0x40, 0, 0, NULL, 0, 0);
++}
++EXPORT_SYMBOL(Nanosic_ADSP_Read_Charge_Status);
++
++/** ************************************************************************
++ *  @func Nanosic_ADSP_Read_Charge_Status_Single
++ *
++ *  B0     B1    B2    B3    B4    B5    B6    B7    B8    B9........B65
++ *  0x32   0x00  0x4E  0x31  0x81  0x38  0x40  0x00  crc   0.......  0
++ *
++ *  @brief send command to i2c device driver , Called by adsp device driver
++ *  write i2c fail when return < 0 or succee return 66
++ ** */
++int Nanosic_ADSP_Read_Charge_Status_Single(uint8_t addr)
++{
++	return nano_send_charge(0x40, addr, 1, NULL, 0, 0);
++}
++EXPORT_SYMBOL(Nanosic_ADSP_Read_Charge_Status_Single);
++
++/** ************************************************************************
++ *  @func Nanosic_ADSP_Set_Charge_Status_Single
++ *
++ *  B0     B1    B2    B3    B4    B5    B6    B7......B32     B33  B34  .......B65
++ *  0x32   0x00  0x4E  0x31  0x81  0x38  0x42  DATA0...DATA25  crc   0  .......  0
++ *
++ *  @brief send command to i2c device driver , Called by adsp device driver
++ *  write i2c fail when return < 0 or succee return 66
++ ** */
++int  Nanosic_ADSP_Set_Charge_Status_Single(uint8_t addr, uint8_t addrlen, uint8_t* data, uint32_t datalen)
++{
++	if (!addr)
++		return -EINVAL;
++	return nano_send_charge(0x42, addr, addrlen, data, datalen, 1);
++}
++
++/** ************************************************************************
++ *  @func Nanosic_ADSP_Control_Charge_Power
++ *  
++ *  B0     B1    B2    B3    B4    B5    B6    B7......B32     B33  B34  .......B65
++ *  0x32   0x00  0x4E  0x31  0x81  0x38  0x42  DATA0...DATA25  crc   0  .......  0
++ *
++ *  @brief send command to i2c device driver , Called by adsp device driver
++ *  write i2c fail when return < 0 or succee return 66
++ ** */
++int  Nanosic_ADSP_Control_Charge_Power(bool on)
++{
++	return nano_send_charge(0x42, 0, 0, NULL, 0, on);
++}
++EXPORT_SYMBOL(Nanosic_ADSP_Control_Charge_Power);
++
++/** ************************************************************************
++ *  @func Nanosic_ADSP_Read_803_Version
++ *
++ *  B0     B1    B2    B3    B4    B5    B6    B7    B8    B9.............B65
++ *  0x32   0x00  0x4E  0x30  0x80  0x38  0x1   0x0   crc   0............  0
++ *
++ *  @brief send command to i2c device driver , Called by adsp device driver
++ *  write i2c fail when return < 0 or succee return 66
++ ** */
++int  Nanosic_ADSP_Read_803_Version(void)
++{
++    int ret = -1;
++    uint8_t read_803_vers_cmd[I2C_DATA_LENGTH_WRITE]={0x32,0x00,0x4F,0x30,FIELD_HOST,FIELD_803X,0x01,0x00,0x00};
++
++    read_803_vers_cmd[8] = Nanosic_Calculate_crc(read_803_vers_cmd,sizeof(read_803_vers_cmd));
++
++    rawdata_show("request 803 version",read_803_vers_cmd,sizeof(read_803_vers_cmd));
++
++    ret = Nanosic_charge_i2c_write(read_803_vers_cmd, sizeof(read_803_vers_cmd));
++    if (ret < 0)
++    {
++        dbgprint(ERROR_LEVEL, "i2c write fail, ret = %d, size = %d", ret, sizeof(read_803_vers_cmd));
++    }
++
++    return ret;
++}
++
++/** ************************************************************************
++ *  @func Nanosic_ADSP_register_cb
++ *
++ *  @brief register read callback function for adsp , Called by adsp device driver
++ *
++ ** */
++int  Nanosic_ADSP_register_cb(ADSP_read_cb cb)
++{
++	int ret = 0;
++	if (IS_ERR_OR_NULL(cb))
++		return -EINVAL;
++	mutex_lock(&nano_api_lock);
++	if (!g_nodev)
++		ret = -ENODEV;
++	else if (g_ADSP_read_cb)
++		ret = -EBUSY;
++	else
++		g_ADSP_read_cb = cb;
++	mutex_unlock(&nano_api_lock);
++	return ret;
++}
++
++static void Nanosic_analyse_packet(struct work_struct *work)
++{
++    struct nanochg *nodev = container_of(work, struct nanochg, analyse_rawdata_work.work);
++
++    char    report_id;
++    char    protocol;
++    char    source;
++    char    object;
++    char    command;
++    int  retval = 0;
++    u8 *rawdata_buf;
++    char len, subcmd, cmd_state, rev,keyboard_state, dev_type, subcmd_status;
++    bool connected = false;
++    char *dev_name = "unknown";
++    char pswitch,reserve,ic_type,reg_addr,reg_len,reg_data[19];
++
++    u16     mcu_version;
++    u16     dev_version;
++    u8      colour;
++    u16     pid;
++
++    if (IS_ERR_OR_NULL(nodev))
++    {
++        dbgprint(ERROR_LEVEL, "nodev ERROR");
++        retval = -ENODEV;
++        return;
++    }
++	rawdata_buf = buf_tmp;
++
++    STREAM_TO_UINT8(report_id, rawdata_buf);
++    STREAM_TO_UINT8(protocol, rawdata_buf);
++    STREAM_TO_UINT8(source, rawdata_buf);
++    STREAM_TO_UINT8(object, rawdata_buf);
++    STREAM_TO_UINT8(command, rawdata_buf);
++
++    rawdata_show("recv data1", buf_tmp, length);
++
++    switch(command) {
++        case CMD_KEYBOARD_CONN_STATUS_RSP:
++        {
++            mutex_lock(&rwlock);
++            gObject = DEV_UNKOWN_OBJECT;
++
++            STREAM_TO_UINT8(len, rawdata_buf);
++            STREAM_TO_UINT8(subcmd, rawdata_buf);
++            STREAM_TO_UINT8(cmd_state, rawdata_buf);
++            STREAM_TO_UINT8(rev, rawdata_buf);
++            STREAM_TO_UINT8(keyboard_state, rawdata_buf);
++            STREAM_TO_UINT8(dev_type, rawdata_buf);  /*1:keyboard  2:zhijia*/
++
++            if (cmd_state == 0) {
++                if (((keyboard_state & 0x3) == 0x3) || ((keyboard_state & 0x3) == 0x1)) {
++                    dev_name = "keyboard";
++                    if ((keyboard_state & 0x60) == 0x20) {
++                        connected = true;
++                        gObject = DEV_KEYBOARD_OBJECT;
++                    } else {
++                        dbgprint(ERROR_LEVEL, "fail to connect keyboard device because no data\n");
++                    }
++                } else if ((keyboard_state & 0x3) == 0x0) {
++                    if ((keyboard_state & 0x68) == 0x28) {
++                        connected = true;
++                        gObject = DEV_ZHIJIA_OBJECT;
++                        dev_name = "zhijia";
++                    } else {
++                        dbgprint(ERROR_LEVEL, "fail to connect zhijia device\n");
++                    }
++                }
++                g_nodev->gObject = gObject;
++                dbgprint(DEBUG_LEVEL, "%s attach_detect connected %s\n", dev_name, connected ? "true" : "fasle");
++            }
++
++            mutex_unlock(&rwlock);
++
++            if (g_battmngr_noti && (gObject == DEV_ZHIJIA_OBJECT)) {
++                mutex_lock(&g_battmngr_noti->notify_lock);
++                dbgprint(ERROR_LEVEL, "Send zhijia connect info.\n");
++
++                g_battmngr_noti->mcu_msg.kb_attach = connected;
++                g_battmngr_noti->mcu_msg.object_type = gObject;
++                g_battmngr_noti->mcu_msg.msg_type = BATTMNGR_MSG_MCU_TYPE;
++                battmngr_notifier_call_chain(BATTMNGR_EVENT_MCU, g_battmngr_noti);
++                mutex_unlock(&g_battmngr_noti->notify_lock);
++            } else {
++                dbgprint(ERROR_LEVEL, "ADSP read cb is null\n");
++            }
++        }
++        break;
++        case CMD_KEYBOARD_READ_VERSION_RSP:
++        {
++            STREAM_TO_UINT8(len, rawdata_buf);
++            STREAM_TO_UINT16(mcu_version, rawdata_buf);
++            STREAM_TO_UINT16(dev_version, rawdata_buf);
++            STREAM_TO_UINT8(colour, rawdata_buf);
++            STREAM_TO_UINT16(pid, rawdata_buf);
++            STREAM_TO_UINT8(dev_type, rawdata_buf);
++            dbgprint(DEBUG_LEVEL,"dev_type %d dev_version %d\n",dev_type,dev_version);
++            break;
++        }
++        case CMD_MCU_RSP:
++        {
++            STREAM_TO_UINT8(len, rawdata_buf);
++            STREAM_TO_UINT8(subcmd, rawdata_buf);
++            STREAM_TO_UINT8(subcmd_status, rawdata_buf);
++
++            //rawdata_show("got mcu rsp event", rawdata_buf, sizeof(rawdata_buf));
++        }
++        break;
++        case CMD_READ_CHARGE_STATUS_RSP:
++        {
++            STREAM_TO_UINT8(len, rawdata_buf);
++            STREAM_TO_UINT8(pswitch, rawdata_buf);
++            STREAM_TO_UINT8(reserve, rawdata_buf);
++            STREAM_TO_UINT8(ic_type, rawdata_buf);
++            STREAM_TO_UINT8(reg_addr, rawdata_buf);
++            STREAM_TO_UINT8(reg_len, rawdata_buf);
++            memcpy(reg_data, rawdata_buf, reg_len);
++
++            //rawdata_show("got read charge event", rawdata_buf, sizeof(rawdata_buf));
++            if (g_battmngr_noti && (gObject == DEV_ZHIJIA_OBJECT)) {
++                mutex_lock(&g_battmngr_noti->notify_lock);
++                dbgprint(ERROR_LEVEL, "Send charge info.\n");
++                if (gObject == DEV_KEYBOARD_OBJECT)
++                    assign_mcu_data(&g_battmngr_noti->mcu_msg.mcu_data, buf_tmp);
++                else
++                    assign_holder_mcu_data(&g_battmngr_noti->mcu_msg.mcu_data, buf_tmp);
++                deal_report_event(buf_tmp);
++                g_battmngr_noti->mcu_msg.object_type = gObject;
++                g_battmngr_noti->mcu_msg.msg_type = BATTMNGR_MSG_MCU_TYPE;
++                battmngr_notifier_call_chain(BATTMNGR_EVENT_MCU, g_battmngr_noti);
++                mutex_unlock(&g_battmngr_noti->notify_lock);
++            } else {
++                dbgprint(ERROR_LEVEL, "ADSP read cb is null\n");
++            }
++        }
++        break;
++        case CMD_SET_CHARGE_REG_RSP:
++        {
++            STREAM_TO_UINT8(len,rawdata_buf);
++            STREAM_TO_UINT8(subcmd_status,rawdata_buf);
++            //rawdata_show("got set charge cmd rsp event", rawdata_buf, sizeof(rawdata_buf));
++        }
++        break;
++        default:
++            dbgprint(ERROR_LEVEL, "unkown cmd rsp code\n");
++        break;
++    }
++
++
++    return;
++}
++
++
++static void Nanosic_Analyse_RawData_work(struct work_struct *work)
++{
++	struct nanochg *nodev = container_of(work, struct nanochg, analyse_rawdata_work.work);
++	struct nano_platform *platform = container_of(nodev, struct nano_platform, charge);
++	unsigned long flags;
++
++	mutex_lock(&nano_api_lock);
++	while (g_nodev == nodev && !platform->stopping) {
++		spin_lock_irqsave(&platform->pending_lock, flags);
++		if (!platform->count) {
++			spin_unlock_irqrestore(&platform->pending_lock, flags);
++			break;
++		}
++		length = platform->packets[platform->head].len;
++		memset(buf_tmp, 0, sizeof(buf_tmp));
++		memcpy(buf_tmp, platform->packets[platform->head].data, length);
++		platform->head = (platform->head + 1) % NANO_PENDING_SLOTS;
++		platform->count--;
++		spin_unlock_irqrestore(&platform->pending_lock, flags);
++		/* A notifier may call an ADSP command synchronously. Remove keeps
++		 * nodev alive until cancel_delayed_work_sync has joined this worker. */
++		mutex_unlock(&nano_api_lock);
++		Nanosic_analyse_packet(work);
++		mutex_lock(&nano_api_lock);
++	}
++	mutex_unlock(&nano_api_lock);
++}
++/** ************************************************************************
++ *  @func Nanosic_platform_probe
++ *
++ *  @brief
++ *
++ ** */
++static int
++Nanosic_platform_probe(struct platform_device *pdev)
++{
++	struct nano_platform *platform;
++	struct nanochg *nodev;
++	int ret = 0;
++
++	platform = devm_kzalloc(&pdev->dev, sizeof(*platform), GFP_KERNEL);
++	if (!platform)
++		return -ENOMEM;
++	nodev = &platform->charge;
++	nodev->dev = &pdev->dev;
++	mutex_init(&nodev->nano_i2c_write_mutex);
++	spin_lock_init(&platform->pending_lock);
++	INIT_DELAYED_WORK(&nodev->analyse_rawdata_work, Nanosic_Analyse_RawData_work);
++	platform->battmgr = battmngr_device_register("nano_ops", nodev->dev, nodev, &nano_op, NULL);
++	if (IS_ERR_OR_NULL(platform->battmgr))
++		return platform->battmgr ? PTR_ERR(platform->battmgr) : -ENOMEM;
++	mutex_lock(&nano_api_lock);
++	if (g_nodev) {
++		ret = -EBUSY;
++	} else {
++		gObject = DEV_UNKOWN_OBJECT;
++		g_nodev = nodev;
++		platform_set_drvdata(pdev, platform);
++	}
++	mutex_unlock(&nano_api_lock);
++	if (ret)
++		battmngr_device_unregister(platform->battmgr);
++	return ret;
++}
++
++/** ************************************************************************
++ *  @func nanosic_platform_remove
++ *
++ *  @brief
++ *
++ ** */
++static void Nanosic_platform_remove(struct platform_device *pdev)
++{
++	struct nano_platform *platform = platform_get_drvdata(pdev);
++	mutex_lock(&nano_api_lock);
++	platform->stopping = true;
++	platform->charge.pogo_charge_i2c_write = NULL;
++	mutex_unlock(&nano_api_lock);
++	cancel_delayed_work_sync(&platform->charge.analyse_rawdata_work);
++	mutex_lock(&nano_api_lock);
++	g_nodev = NULL;
++	gObject = DEV_UNKOWN_OBJECT;
++	g_ADSP_read_cb = NULL;
++	mutex_unlock(&nano_api_lock);
++	battmngr_device_unregister(platform->battmgr);
++	platform_set_drvdata(pdev, NULL);
++}
++
++static int Nanosic_platform_suspend(struct device *dev)
++{
++	struct nano_platform *platform = dev_get_drvdata(dev);
++	flush_delayed_work(&platform->charge.analyse_rawdata_work);
++	return 0;
++}
++static DEFINE_SIMPLE_DEV_PM_OPS(nano_platform_pm, Nanosic_platform_suspend, NULL);
++
++static const struct of_device_id nanosic_platform_ids[] = {
++	{ .compatible = "nanosic,platform" },
++	{ /* Sentinel */ }
++};
++
++static struct platform_driver nanosic_platform_driver = {
++	.probe = Nanosic_platform_probe,
++	.remove = Nanosic_platform_remove,
++	.driver	= {
++		.owner	= THIS_MODULE,
++		.name = "nanosic,platform",
++		.pm = pm_sleep_ptr(&nano_platform_pm),
++		.of_match_table	= nanosic_platform_ids,
++	},
++};
++
++/** ************************************************************************
++ *  @func nanosic_platform_init
++ *
++ *  @brief
++ *
++ ** */
++static int __init Nanosic_platform_init(void)
++{
++    int retval = 0;
++
++    retval = platform_driver_register(&nanosic_platform_driver);
++    if(retval < 0)
++        dbgprint(ERROR_LEVEL,"platform init %d\n",retval);
++
++    return retval;
++
++}
++
++/** ************************************************************************
++ *  @func nanosic_platform_exit
++ *
++ *  @brief
++ *
++ ** */
++static void __exit Nanosic_platform_exit(void)
++{
++    platform_driver_unregister(&nanosic_platform_driver);
++}
++
++module_init(Nanosic_platform_init);
++module_exit(Nanosic_platform_exit);
++
++EXPORT_SYMBOL_GPL(Nanosic_ADSP_register_cb);
++EXPORT_SYMBOL_GPL(Nanosic_ADSP_Set_Charge_Status);
++EXPORT_SYMBOL_GPL(Nanosic_ADSP_Set_Charge_Status_Single);
++
++MODULE_DEVICE_TABLE(of, nanosic_platform_ids);
++MODULE_DESCRIPTION("Nanosic platform Driver");
++MODULE_LICENSE("GPL");
++
++
++int Nanosic_charge_i2c_write_callback_register(i2c_write_cb cb)
++{
++	int ret;
++	mutex_lock(&nano_api_lock);
++	ret = Nanosic_charge_i2c_write_callback_register_locked(cb);
++	mutex_unlock(&nano_api_lock);
++	return ret;
++}
++int Nanosic_charge_i2c_write_callback_unregister(void)
++{
++	int ret;
++	mutex_lock(&nano_api_lock);
++	ret = Nanosic_charge_i2c_write_callback_unregister_locked();
++	mutex_unlock(&nano_api_lock);
++	return ret;
++}
+--- /dev/null
++++ b/sheng-ports/pogo/inc/nano_macro.h
+@@ -0,0 +1,201 @@
++/** ***************************************************************************
++ * @file nano_macro.h
++ *
++ */
++#ifndef _NANO_MACRO_H_
++#define _NANO_MACRO_H_
++
++#include <linux/device.h>
++#include <linux/sched.h>
++#include <linux/slab.h>
++#include <linux/version.h>
++#include <linux/delay.h>
++#include <linux/gpio.h>
++#include <linux/i2c.h>
++#include <linux/interrupt.h>
++#include <linux/input.h>
++#include <linux/timer.h>
++#include <linux/timex.h>
++#include <linux/rtc.h>
++#include <linux/types.h>
++#include <linux/notifier.h>
++#include <linux/module.h>
++#include <linux/kernel.h>
++#include <linux/workqueue.h>
++#include <linux/battmngr/battmngr_notifier.h>
++#include <linux/power_supply.h>
++#include <linux/battmngr/battmngr_voter.h>
++#include <linux/battmngr/platform_class.h>
++
++#define DRV_VERSION  "1.0.16"
++
++#define DRV_TOKEN    "nano_charge"
++
++#define DEBUG_LEVEL	            (7)
++#define INFO_LEVEL	            (5)
++#define ERROR_LEVEL	            (3)
++#define ALERT_LEVEL	            (1)
++
++#define I2C_DATA_LENGTH_WRITE   (66)
++
++#define I2C_DATA_LENGTH_READ    (68)
++
++#define FIELD_HOST              (0x80)
++#define FIELD_803X              (0x18)
++#define FIELD_176X              (0x38)
++#define FIELD_CHARGE            (0x81)
++
++#define SET_CHARGE_POWER_OFF    (6)
++#define SET_CHARGE_REG_ADDR_OFF (8)
++#define SET_CHARGE_REG_LENG_OFF (9)
++#define SET_CHARGE_REG_DATA_OFF (10)
++
++#define CMD_OK                  (0)
++
++#define CMD_MCU_RSP                  (0xF0)
++
++#define CMD_DEVICE_CONN_STATUS_RSP   (0x52)
++
++#define CMD_KEYBOARD_CONN_STATUS_RSP (0xA2)
++#define CMD_KEYBOARD_READ_VERSION_RSP (0x1)
++
++#define CMD_READ_CHARGE_STATUS       (0x40)
++#define CMD_READ_CHARGE_STATUS_RSP   (0x41)
++
++#define CMD_SET_CHARGE_REG           (0x42)
++#define CMD_SET_CHARGE_REG_RSP       (0x43)
++
++
++typedef int (*IIC_write_cb)(uint8_t* data,uint32_t datalen);
++typedef int (*ADSP_read_cb)(uint8_t* data,uint32_t datalen);
++typedef int (*i2c_write_cb)(void *buf, size_t len);
++
++/*
++ * Logging and Debugging
++ */ 
++    /* The main debug macro.  Uncomment to enable debug messages */
++#define DEBUG
++
++    /* Make sure we have a per-module token */
++#ifndef DRV_TOKEN
++#error Module must #define DRV_TOKEN to be a short nickname of the module.
++#endif
++    /* Error messages -- always sent to log */
++#undef errprint
++#undef errmsg
++#define errprint(__format_and_args...) \
++    printk(DRV_TOKEN ": ERROR: " __format_and_args)
++
++#define errmsg(__msg...) errprint(DRV_TOKEN,##__msg)
++
++static int debuglevel = 7;
++
++#undef dbgprint
++#undef dbgmsg
++#define dbgprint(__level, __format,__args...)   \
++do {                                            \
++    if ((int)debuglevel >= (int)__level) {      \
++        struct timespec64 ts;                   \
++        struct rtc_time tm;                     \
++        ktime_get_real_ts64(&ts);               \
++        rtc_time64_to_tm(ts.tv_sec,&tm);        \
++        switch((int)debuglevel) {               \
++            case 0: \
++            case 1: \
++            case 2:  printk("[%02d:%02d:%02d.%03zu] <2>" DRV_TOKEN ": " __format , tm.tm_hour, tm.tm_min, tm.tm_sec, ts.tv_nsec/1000000, ##__args); break; \
++            case 3:  printk("[%02d:%02d:%02d.%03zu] <3>" DRV_TOKEN ": " __format , tm.tm_hour, tm.tm_min, tm.tm_sec, ts.tv_nsec/1000000, ##__args); break; \
++            case 4:  printk("[%02d:%02d:%02d.%03zu] <4>" DRV_TOKEN ": " __format , tm.tm_hour, tm.tm_min, tm.tm_sec, ts.tv_nsec/1000000, ##__args); break; \
++            case 5:  printk("[%02d:%02d:%02d.%03zu] <5>" DRV_TOKEN ": " __format , tm.tm_hour, tm.tm_min, tm.tm_sec, ts.tv_nsec/1000000, ##__args); break; \
++            case 6:  printk("[%02d:%02d:%02d.%03zu] <6>" DRV_TOKEN ": " __format , tm.tm_hour, tm.tm_min, tm.tm_sec, ts.tv_nsec/1000000, ##__args); break; \
++            default: printk("[%02d:%02d:%02d.%03zu] <7>" DRV_TOKEN ": " __format , tm.tm_hour, tm.tm_min, tm.tm_sec, ts.tv_nsec/1000000, ##__args); break; \
++        } \
++    }\
++} while (0)
++
++#ifdef DEBUG
++    /**
++     * @brief Send a debug message to the log facility.
++     * @ingroup albrxdoc_util
++     * @details This macro sends a message to the logging facility with a
++     * simple token prefix.  This message is delivered iff the __level
++     * parameter is not greater than the value of the \c debug static variable.
++     * @note If \c DEBUG is undefined (i.e. the \#define is not active), no
++     * debug messages are sent to the logging facility, regardless of level.
++     */
++#define dbgmsg(__level,__msg...) dbgprint(__level,DRV_TOKEN,##__msg)
++#else /* !DEBUG */
++#define dbgmsg(__level,__msg...)
++#endif
++    /* Assertions -- only checked if DEBUG is defined */
++#undef ASSERT
++#ifdef DEBUG
++#define ASSERT(__condition,__fail_action) \
++    do { \
++        if (!(__condition)) { \
++            errmsg("ASSERT(%s:%d): %s\n",__FILE__,__LINE__,#__condition); \
++            __fail_action ; \
++        } \
++    } while (0)
++#else
++#define ASSERT(__c,__f)
++#endif
++
++#define STREAM_TO_UINT8(u8, p)   {u8 = (unsigned char)(*(p)); (p) += 1;}
++#define STREAM_TO_UINT16(u16, p) {u16 = ((unsigned short)(*(p)) + (((unsigned short)(*((p) + 1))) << 8)); (p) += 2;}
++
++struct nanochg {
++    struct device *dev;
++	unsigned int    status;
++	int		vbus_type;
++	int		charge_type;
++    u8    online;
++    u8      pd_flag;
++    u8      dpdm_in_state;
++    u8      dpdm;
++    int     protocol_volt;
++    int     protocol_curr;
++
++	bool	enabled;
++
++	int		vbus_volt;
++	int		vbat_volt;
++
++	struct power_supply *batt_psy;
++	struct power_supply *usb_psy;
++
++	struct votable *fcc_votable;
++	struct votable *usb_icl_votable;
++
++	int old_type;
++	int curr_flag;
++	bool force_exit_flag;
++	int count;
++	int input_suspend;
++	int dpdm_enabled;
++	u8 vbus_state;
++	u8 power_state;
++	u8 gObject;
++
++    struct mutex nano_i2c_write_mutex;
++    i2c_write_cb pogo_charge_i2c_write;
++
++    struct delayed_work	analyse_rawdata_work;
++};
++
++int Nanosic_Analysis_RawData(void *buf);
++
++extern struct nanochg* g_nodev;
++
++extern int  Nanosic_ADSP_Set_Charge_Status_Single(uint8_t addr, uint8_t addrlen, uint8_t* data, uint32_t datalen);
++extern int  Nanosic_ADSP_Set_Charge_Status(uint8_t* data,uint32_t datalen);
++extern int  Nanosic_ADSP_Read_Charge_Status(void);
++extern int  Nanosic_ADSP_Control_Charge_Power(bool on);
++extern int Nanosic_ADSP_Read_Charge_Status_Single(uint8_t addr);
++
++#endif /* _ALBRX_H_ */
++
++
++int Nanosic_vendor_raw_data_inject(void *buf, size_t len);
++int Nanosic_charge_i2c_write_callback_register(i2c_write_cb cb);
++int Nanosic_charge_i2c_write_callback_unregister(void);
++int Nanosic_ADSP_register_cb(ADSP_read_cb cb);
+--- /dev/null
++++ b/sheng-ports/pogo/sheng_nano_charge_protocol.h
+@@ -0,0 +1,100 @@
++/* SPDX-License-Identifier: GPL-2.0-only */
++/* Bounds for the original sheng-u-oss nano charge protocol, not HID reports. */
++#ifndef SHENG_NANO_CHARGE_PROTOCOL_H
++#define SHENG_NANO_CHARGE_PROTOCOL_H
++#ifdef SHENG_NANO_CHARGE_HOST_TEST
++#include <errno.h>
++#include <stddef.h>
++#include <stdint.h>
++#include <string.h>
++typedef uint8_t u8;
++#else
++#include <linux/errno.h>
++#include <linux/string.h>
++#include <linux/types.h>
++#endif
++
++#define SHENG_NANO_CHARGE_READ 68
++#define SHENG_NANO_CHARGE_WRITE 66
++#define SHENG_NANO_CHARGE_PAYLOAD 26
++#define SHENG_NANO_CHARGE_REG_DATA 6
++
++static inline int sheng_nano_charge_validate(const u8 *buf, size_t len)
++{
++	size_t minimum;
++
++	if (!buf || len < 5 || len > SHENG_NANO_CHARGE_READ)
++		return -EINVAL;
++	switch (buf[4]) {
++	case 0xa2: minimum = 11; break;
++	case 0x01: minimum = 14; break;
++	case 0xf0: minimum = 8; break;
++	case 0x43: minimum = 7; break;
++	case 0x41:
++		if (len < 11 || buf[10] > 19)
++			return -EMSGSIZE;
++		minimum = 11 + buf[10];
++		break;
++	default: return -EOPNOTSUPP;
++	}
++	return len < minimum ? -EMSGSIZE : 0;
++}
++
++static inline u8 sheng_nano_charge_crc(const u8 *buf, size_t end)
++{
++	u8 crc = 0;
++	size_t i;
++
++	for (i = 2; i < end; i++)
++		crc += buf[i];
++	return crc;
++}
++
++/* Construct exactly the original 66-byte command and sum header+payload. */
++static inline int sheng_nano_charge_command(u8 *out, u8 object, u8 command,
++					   u8 address, u8 count,
++					   const u8 *data, size_t len, u8 power)
++{
++	size_t checksum;
++
++	if (!out || (object != 0x38 && object != 0x3b))
++		return -ENODEV;
++	if (command == 0x42) {
++		if (count && !address)
++			return -EINVAL;
++		if (address) {
++			if (!data || !count || count > SHENG_NANO_CHARGE_REG_DATA ||
++			    len > SHENG_NANO_CHARGE_REG_DATA || count > len)
++				return -EINVAL;
++		} else if (len > SHENG_NANO_CHARGE_PAYLOAD || (len && !data)) {
++			return -EINVAL;
++		}
++	} else if (command != 0x40 || len || count > 1) {
++		return -EINVAL;
++	}
++	memset(out, 0, SHENG_NANO_CHARGE_WRITE);
++	out[0] = 0x32; out[2] = 0x4e; out[3] = 0x31;
++	out[4] = 0x81; out[5] = object; out[6] = command;
++	if (command == 0x40) {
++		checksum = count ? 10 : 8;
++		if (count) {
++			out[7] = 2; out[8] = address; out[9] = 1;
++		}
++	} else {
++		checksum = 33;
++		out[8] = power;
++		if (address) {
++			out[7] = 25; out[8] = power;
++			out[10] = address; out[11] = count;
++			memcpy(out + 12, data, len);
++		} else if (data) {
++			/* The full original payload starts at byte 7. */
++			memcpy(out + 7, data, len);
++		} else {
++			out[7] = 25; out[8] = power;
++		}
++	}
++	out[checksum] = sheng_nano_charge_crc(out, checksum);
++	return 0;
++}
++#endif
+--- /dev/null
++++ b/sheng-ports/pogo/sheng_keyboard_charger.h
+@@ -0,0 +1,5 @@
++/* SPDX-License-Identifier: GPL-2.0-only */
++#ifndef SHENG_KEYBOARD_CHARGER_H
++#define SHENG_KEYBOARD_CHARGER_H
++int qti_set_keyboard_plugin(int plugin);
++#endif
+--- a/sheng-ports/pogo/Kbuild
++++ b/sheng-ports/pogo/Kbuild
+@@ -2,3 +2,5 @@
+ ccflags-y += -I$(src)/include
+ obj-m += xm_utils.o
+ xm_utils-y := battmngr_voter.o battmngr_notifier.o platform_class.o
++
++obj-m += nanosic_platform.o
+--- a/sheng-ports/keyboard/sheng_nanosic.c
++++ b/sheng-ports/keyboard/sheng_nanosic.c
+@@ -72,6 +72,26 @@
+ #include "sheng_nanosic_bridge.h"
+ #include "sheng_nanosic_power.h"
+ #include "sheng_nanosic_connection.h"
++extern int Nanosic_vendor_raw_data_inject(void *buf, size_t len);
++extern int Nanosic_charge_i2c_write_callback_register(int (*cb)(void *, size_t));
++extern int Nanosic_charge_i2c_write_callback_unregister(void);
++static struct nanosic_wn8030 *charge_nano;
++
++/* Unregister waits for this callback before remove frees the client. */
++static int sheng_nano_charge_write(void *buf, size_t len)
++{
++	struct nanosic_wn8030 *nano = READ_ONCE(charge_nano);
++	int ret;
++	if (!nano || !buf || len != XM_WN8030_I2C_WRITE)
++		return -EINVAL;
++	mutex_lock(&nano->io_lock);
++	ret = nano->removing ? -ENODEV : !nano->ready ? -EAGAIN :
++		sheng_nano_wake_locked(nano);
++	if (!ret)
++		ret = regmap_bulk_write(nano->regmap, 0x5c, buf, len);
++	mutex_unlock(&nano->io_lock);
++	return ret ? ret : len;
++}
+ #include "sheng_keyboard_charger.h"
+ 
+ static const struct regmap_config nanosic_wn8030_regmap_config = {
+@@ -552,6 +572,9 @@
+ 		else if (*p == 0x19 && nano->hid_touchpad)
+ 			hid_input_report(nano->hid_touchpad, HID_INPUT_REPORT, p, len, 0);
+ 		else if (*p >= 0x22) {
++			int charge_ret = Nanosic_vendor_raw_data_inject((void *)p, len);
++			if (charge_ret && charge_ret != -EOPNOTSUPP)
++				dev_warn_ratelimited(nano->dev, "Charge MCU packet rejected: %d\n", charge_ret);
+ 			sheng_nano_broadcast(nano, p, len);
+ 			if (*p == 0x22 || *p == 0x23 || *p == 0x24) {
+ 				u8 vendor[XM_WN8030_I2C_READ] = {0};
+@@ -965,6 +988,16 @@
+ 		misc_deregister(&nano->raw_misc);
+ 		goto free_irq;
+ 	}
++	WRITE_ONCE(charge_nano, nano);
++	ret = Nanosic_charge_i2c_write_callback_register(sheng_nano_charge_write);
++	if (ret) {
++		WRITE_ONCE(charge_nano, NULL);
++		device_init_wakeup(dev, false);
++		misc_deregister(&nano->raw_misc);
++		if (ret == -ENODEV)
++			ret = -EPROBE_DEFER;
++		goto free_irq;
++	}
+ 	schedule_delayed_work(&nano->fw_worker, HZ);
+ 	return 0;
+ 
+@@ -988,6 +1021,8 @@
+ 	ready = nano->ready;
+ 	nano->ready = false;
+ 	mutex_unlock(&nano->io_lock);
++	Nanosic_charge_i2c_write_callback_unregister();
++	WRITE_ONCE(charge_nano, NULL);
+ 	misc_deregister(&nano->raw_misc);
+ 	cancel_delayed_work_sync(&nano->fw_worker);
+ 	if (ready && !nano->suspended)

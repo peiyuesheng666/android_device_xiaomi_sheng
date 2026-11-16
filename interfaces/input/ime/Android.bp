@@ -1,0 +1,22 @@
+// SPDX-License-Identifier: Apache-2.0
+license {
+    name: "sheng_sogou_ime_proprietary_license",
+    visibility: [":__subpackages__"],
+    license_kinds: ["legacy_proprietary"],
+    license_text: ["NOTICE"],
+}
+
+android_app_import {
+    name: "ShengSogouIme",
+    licenses: ["sheng_sogou_ime_proprietary_license"],
+    apk: "proprietary/SogouIme.apk",
+    product_specific: true,
+    presigned: true,
+    preprocessed: true,
+    dex_preopt: { enabled: false },
+    optional_uses_libs: [
+        "org.apache.http.legacy",
+        "androidx.window.extensions",
+        "androidx.window.sidecar",
+    ],
+}

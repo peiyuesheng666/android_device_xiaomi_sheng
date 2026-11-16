@@ -1,0 +1,85 @@
+--- a/components/dp/core/src/wlan_dp_rx_thread.c
++++ b/components/dp/core/src/wlan_dp_rx_thread.c
+@@ -886,16 +886,24 @@
+  *
+  * Return: None
+  */
+-static void dp_rx_tm_thread_napi_init(struct dp_rx_thread *rx_thread)
++static QDF_STATUS dp_rx_tm_thread_napi_init(struct dp_rx_thread *rx_thread)
+ {
+ 	struct net_device *dummy_nd;
++	QDF_STATUS status;
+ 
+ 	dummy_nd = dp_rx_thread_get_dummy_netdev_ptr(rx_thread);
+ 	/* Todo - optimize to use only one dummy netdev for all thread napis */
+-	qdf_net_if_create_dummy_if((struct qdf_net_if **)&dummy_nd);
++	status = qdf_net_if_create_dummy_if((struct qdf_net_if **)&dummy_nd);
++	if (!QDF_IS_STATUS_SUCCESS(status))
++		return status;
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 13, 0))
++	rx_thread->netdev = dummy_nd;
++#endif
+ 	qdf_netif_napi_add(dummy_nd, &rx_thread->napi,
+ 			   dp_rx_tm_thread_napi_poll, 64);
+ 	qdf_napi_enable(&rx_thread->napi);
++	rx_thread->napi_initialized = true;
++	return QDF_STATUS_SUCCESS;
+ }
+ 
+ /**
+@@ -908,10 +916,17 @@
+ {
+ 	struct net_device *dummy_nd;
+ 
++	if (!rx_thread->napi_initialized)
++		return;
+ 	dummy_nd = dp_rx_thread_get_dummy_netdev_ptr(rx_thread);
++	/* The RX thread has stopped; quiesce NAPI before deleting it. */
++	qdf_napi_disable(&rx_thread->napi);
++	qdf_netif_napi_del(&rx_thread->napi);
+ 	qdf_net_if_destroy_dummy_if((struct qdf_net_if *)dummy_nd);
+-
+-	qdf_netif_napi_del(&rx_thread->napi);
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 13, 0))
++	rx_thread->netdev = NULL;
++#endif
++	rx_thread->napi_initialized = false;
+ }
+ 
+ /*
+@@ -952,8 +967,11 @@
+ 	dp_info("%s %u", thread_name, id);
+ 
+ 	if (cdp_cfg_get(dp_rx_tm_get_soc_handle(rx_thread->rtm_handle_cmn),
+-			cfg_dp_gro_enable))
+-		dp_rx_tm_thread_napi_init(rx_thread);
++			cfg_dp_gro_enable)) {
++		qdf_status = dp_rx_tm_thread_napi_init(rx_thread);
++		if (!QDF_IS_STATUS_SUCCESS(qdf_status))
++			return qdf_status;
++	}
+ 
+ 	rx_thread->task = qdf_create_thread(dp_rx_thread_loop,
+ 					    rx_thread, thread_name);
+@@ -991,9 +1009,8 @@
+ 	for (i = 0; i < WLAN_PDEV_MAX_VDEVS; i++)
+ 		qdf_event_destroy(&rx_thread->vdev_del_event[i]);
+ 
+-	if (cdp_cfg_get(dp_rx_tm_get_soc_handle(rx_thread->rtm_handle_cmn),
+-			cfg_dp_gro_enable))
+-		dp_rx_tm_thread_napi_deinit(rx_thread);
++	/* Pair teardown with successful NAPI initialization. */
++	dp_rx_tm_thread_napi_deinit(rx_thread);
+ 
+ 	return QDF_STATUS_SUCCESS;
+ }
+--- a/components/dp/core/inc/wlan_dp_rx_thread.h
++++ b/components/dp/core/inc/wlan_dp_rx_thread.h
+@@ -142,6 +142,7 @@
+ 	struct dp_rx_thread_stats stats;
+ 	struct dp_rx_tm_handle_cmn *rtm_handle_cmn;
+ 	qdf_napi_struct napi;
++	bool napi_initialized;
+ 	qdf_wait_queue_head_t wait_q;
+ #if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 13, 0))
+ 	qdf_dummy_netdev_t *netdev;

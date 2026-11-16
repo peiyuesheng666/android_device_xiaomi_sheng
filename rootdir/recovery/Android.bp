@@ -1,0 +1,68 @@
+// SPDX-License-Identifier: Apache-2.0
+cc_library_static {
+    name: "librecovery_ui_sheng",
+    recovery_available: true,
+    defaults: ["recovery_defaults"],
+    srcs: ["ShengRecoveryUI.cpp"],
+    shared_libs: ["librecovery_ui"],
+}
+
+// The stock NVT processor is required to turn this board's touch frames into
+// input events. Its unchanged ELF comes from the standard blob extraction.
+cc_prebuilt_binary {
+    name: "sheng-recovery-touch-runtime",
+    stem: "touch_report_debug",
+    recovery: true,
+    compile_multilib: "64",
+    srcs: [":sheng_recovery_touch_executable"],
+    init_rc: ["init.recovery.sheng-touch.rc"],
+    strip: {
+        none: true,
+    },
+    stl: "none",
+    shared_libs: [
+        "libsheng_recovery_touchsensor",
+        "libsheng_recovery_tensorflowlite_touch",
+        "libdl",
+        "liblog",
+        "libc",
+        "libm",
+    ],
+}
+
+cc_prebuilt_library_shared {
+    name: "libsheng_recovery_touchsensor",
+    stem: "libtouchsensor",
+    recovery: true,
+    compile_multilib: "64",
+    srcs: [":sheng_recovery_touchsensor_blob"],
+    strip: {
+        none: true,
+    },
+    stl: "none",
+    shared_libs: [
+        "libsheng_recovery_tensorflowlite_touch",
+        "libdl",
+        "liblog",
+        "libc",
+        "libm",
+    ],
+}
+
+cc_prebuilt_library_shared {
+    name: "libsheng_recovery_tensorflowlite_touch",
+    stem: "libtensorflowlite_touch_c",
+    recovery: true,
+    compile_multilib: "64",
+    srcs: [":sheng_recovery_tensorflowlite_touch_blob"],
+    strip: {
+        none: true,
+    },
+    stl: "none",
+    shared_libs: [
+        "libdl",
+        "liblog",
+        "libc",
+        "libm",
+    ],
+}

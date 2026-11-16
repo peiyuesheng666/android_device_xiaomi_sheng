@@ -1,0 +1,5 @@
+<permissions>
+    <privapp-permissions package="com.xiaomi.sheng.touch">
+        <permission name="android.permission.INTERACT_ACROSS_USERS_FULL" />
+    </privapp-permissions>
+</permissions>

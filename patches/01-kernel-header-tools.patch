@@ -1,0 +1,16 @@
+diff --git a/libc/Android.bp b/libc/Android.bp
+index 73cda9a..a0a49ff 100644
+--- a/libc/Android.bp
++++ b/libc/Android.bp
+@@ -18,6 +18,11 @@ license {
+     ],
+ }
+ 
++filegroup {
++    name: "bionic_kernel_clean_header_tools",
++    srcs: ["kernel/tools/*.py"],
++}
++
+ libc_common_flags = [
+     "-D_LIBC=1",
+     "-Wall",

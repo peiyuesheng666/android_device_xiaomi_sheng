@@ -1,0 +1,14 @@
+--- a/vendor/qcom/opensource/display-drivers/msm/dsi/dsi_drm.c
++++ b/vendor/qcom/opensource/display-drivers/msm/dsi/dsi_drm.c
+@@ -1034,6 +1034,11 @@ void dsi_conn_set_submode_blob_info(struct drm_connector *conn,
+ 			continue;
+ 
+ 		sde_kms_info_add_keyint(info, "submode_idx", i);
++		/* Sheng's burst-video resource clock differs from DRM timing clock.
++		 * Export the clock calculated for this actual panel submode.
++		 */
++		sde_kms_info_add_keyint(info, "pixel_clk_khz",
++				dsi_mode->pixel_clk_khz);
+ 
+ 		if (dsi_mode->is_preferred)
+ 			preferred_submode_idx = i;

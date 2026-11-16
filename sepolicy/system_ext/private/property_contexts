@@ -1,0 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
+sys.sheng.face.test_request u:object_r:sheng_face_test_prop:s0 exact int
+sys.sheng.face.test_result u:object_r:sheng_face_test_prop:s0 exact string
+persist.sys.sheng.indicator u:object_r:sheng_indicator_prop:s0 exact bool

@@ -1,0 +1,13 @@
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="org.lineageos.sheng.faceunlock" android:sharedUserId="android.uid.system"
+    android:versionCode="4" android:versionName="0.2.2-native">
+    <uses-sdk android:minSdkVersion="30" android:targetSdkVersion="37" />
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.ACCESS_KEYGUARD_SECURE_STORAGE" />
+    <uses-permission android:name="android.permission.OBSERVE_SENSOR_PRIVACY" />
+    <uses-feature android:name="android.hardware.camera.front" android:required="false" />
+    <application android:label="FaceUnlock" android:icon="@drawable/ic_face"
+        android:allowBackup="false" android:fullBackupContent="false"
+        android:usesCleartextTraffic="false" android:hasCode="true" />
+</manifest>

@@ -1,0 +1,59 @@
+--- a/soc/drivers/clk/qcom/dispcc-kalama.c
++++ b/soc/drivers/clk/qcom/dispcc-kalama.c
+@@ -1951,6 +1951,29 @@
+ };
+ MODULE_DEVICE_TABLE(of, disp_cc_kalama_match_table);
+ 
++/* Read only control/configuration registers while the iface clock is on.
++ * None of these registers clears status on read. No panel or timing writes. */
++static void sheng_dispcc_trace(struct device *dev, const char *stage)
++{
++	static const unsigned int regs[] = {
++		0x0, 0x4, 0x10, 0x18, 0x1000, 0x1004, 0x1010, 0x1018,
++		0x8004, 0x8008, 0x800c, 0x8018, 0x8024,
++		0x8028, 0x802c, 0x8030, 0x8034, 0x80a4,
++		0x80a8, 0x80ac, 0x80c0, 0x80c4, 0x80d8, 0x80dc,
++		0x8108, 0x810c, 0x8124, 0x8128, 0x9000, 0xf000,
++	};
++	struct regmap *map = dev_get_regmap(dev, NULL);
++	unsigned int value;
++	int i;
++
++	if (!map)
++		return;
++	for (i = 0; i < ARRAY_SIZE(regs); i++)
++		if (!regmap_read(map, regs[i], &value))
++			dev_info(dev, "sheng_dispcc: %s %04x=%08x\n",
++				stage, regs[i], value);
++}
++
+ static int disp_cc_kalama_probe(struct platform_device *pdev)
+ {
+ 	struct regmap *regmap;
+@@ -1968,8 +1991,11 @@
+ 	if (ret)
+ 		return ret;
+ 
++	sheng_dispcc_trace(&pdev->dev, "firmware");
+ 	clk_lucid_ole_pll_configure(&disp_cc_pll0, regmap, &disp_cc_pll0_config);
+ 	clk_lucid_ole_pll_configure(&disp_cc_pll1, regmap, &disp_cc_pll1_config);
++
++	sheng_dispcc_trace(&pdev->dev, "after-pll");
+ 
+ 	/* Enable clock gating for MDP clocks */
+ 	regmap_update_bits(regmap, DISP_CC_MISC_CMD, 0x10, 0x10);
+@@ -1980,12 +2006,14 @@
+ 	 */
+ 	regmap_update_bits(regmap, 0xe054, BIT(0), BIT(0));
+ 
++	sheng_dispcc_trace(&pdev->dev, "before-register");
+ 	ret = qcom_cc_really_probe(&pdev->dev, &disp_cc_kalama_desc, regmap);
+ 	if (ret) {
+ 		dev_err(&pdev->dev, "Failed to register DISP CC clocks\n");
+ 		return ret;
+ 	}
+ 
++	sheng_dispcc_trace(&pdev->dev, "registered");
+ 	pm_runtime_put_sync(&pdev->dev);
+ 	dev_info(&pdev->dev, "Registered DISP CC clocks\n");
+ 

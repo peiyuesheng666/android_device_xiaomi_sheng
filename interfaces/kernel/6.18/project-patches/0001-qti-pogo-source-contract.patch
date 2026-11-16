@@ -1,0 +1,89 @@
+--- a/scripts/apply-charging-fix.py
++++ b/scripts/apply-charging-fix.py
+@@ -14,7 +14,21 @@
+     if not path.exists():
+         return False
+     item = json.loads(path.read_text())['files'].get(name)
+-    return bool(item and item['after'] == got)
++    return bool(item and item['after'] == got) or android_interface_matches(name, got)
++
++
++# Exact device-owned Android downstream source, following the factory overlay.
++# Never accept an arbitrary source edit or disable inherited hash checks.
++def android_interface_matches(name, got):
++    expected = {'k618/soc/drivers/power/supply/qti_battery_charger.c': 'ceb3f39530b927fe95a326ff5e89d620762061da1dfb511f1bb8205acf3eb532', 'k618/soc/drivers/power/supply/sheng_qti_pogo.h': '1954ddf5023d1093776406dd073d0fc6cdf2b808ce8ec58aa24a731878c3ef8b', 'k618/soc/drivers/power/supply/sheng_qti_pogo_wire.h': '2a5162795fbb50098762720cb5c3492d77b78ed3bbf67e8e6b61bad0a053c8af', 'k618/soc/drivers/power/supply/sheng_qti_pogo_api.h': '45ae1c8129628d56fd20b8c43c1ca346bab11c832ff8f8d22fc14e47c1f4c739', 'k618/soc/drivers/power/supply/sheng_keyboard_charger_api.h': '365e124b828dcdea8bc80df0025a7d61359f42c9dd588a1d1352208b05459f9f'}
++    if name not in expected or got != expected[name]:
++        return False
++    build_root = Path(os.environ['BUILD_ROOT']).resolve()
++    for relative, digest in expected.items():
++        path = build_root / relative
++        assert path.resolve().is_relative_to(build_root), relative
++        assert hashlib.sha256(path.read_bytes()).hexdigest() == digest, relative
++    return True
+ 
+ 
+ project = Path(os.environ['PROJECT_ROOT']).resolve()
+--- a/scripts/apply-repair-r85.py
++++ b/scripts/apply-repair-r85.py
+@@ -13,7 +13,21 @@
+     if not path.exists():
+         return False
+     item = json.loads(path.read_text())['files'].get(name)
+-    return bool(item and item['after'] == got)
++    return bool(item and item['after'] == got) or android_interface_matches(name, got)
++
++
++# Exact device-owned Android downstream source, following the factory overlay.
++# Never accept an arbitrary source edit or disable inherited hash checks.
++def android_interface_matches(name, got):
++    expected = {'k618/soc/drivers/power/supply/qti_battery_charger.c': 'ceb3f39530b927fe95a326ff5e89d620762061da1dfb511f1bb8205acf3eb532', 'k618/soc/drivers/power/supply/sheng_qti_pogo.h': '1954ddf5023d1093776406dd073d0fc6cdf2b808ce8ec58aa24a731878c3ef8b', 'k618/soc/drivers/power/supply/sheng_qti_pogo_wire.h': '2a5162795fbb50098762720cb5c3492d77b78ed3bbf67e8e6b61bad0a053c8af', 'k618/soc/drivers/power/supply/sheng_qti_pogo_api.h': '45ae1c8129628d56fd20b8c43c1ca346bab11c832ff8f8d22fc14e47c1f4c739', 'k618/soc/drivers/power/supply/sheng_keyboard_charger_api.h': '365e124b828dcdea8bc80df0025a7d61359f42c9dd588a1d1352208b05459f9f'}
++    if name not in expected or got != expected[name]:
++        return False
++    build_root = Path(os.environ['BUILD_ROOT']).resolve()
++    for relative, digest in expected.items():
++        path = build_root / relative
++        assert path.resolve().is_relative_to(build_root), relative
++        assert hashlib.sha256(path.read_bytes()).hexdigest() == digest, relative
++    return True
+ 
+ 
+ project=Path(os.environ['PROJECT_ROOT']).resolve()
+--- a/scripts/apply-factory-interfaces.py
++++ b/scripts/apply-factory-interfaces.py
+@@ -6,6 +6,20 @@
+ from pathlib import Path
+ import subprocess
+ import sys
++
++# Exact device-owned Android downstream source, following the factory overlay.
++# Never accept an arbitrary source edit or disable inherited hash checks.
++def android_interface_matches(name, got):
++    expected = {'k618/soc/drivers/power/supply/qti_battery_charger.c': 'ceb3f39530b927fe95a326ff5e89d620762061da1dfb511f1bb8205acf3eb532', 'k618/soc/drivers/power/supply/sheng_qti_pogo.h': '1954ddf5023d1093776406dd073d0fc6cdf2b808ce8ec58aa24a731878c3ef8b', 'k618/soc/drivers/power/supply/sheng_qti_pogo_wire.h': '2a5162795fbb50098762720cb5c3492d77b78ed3bbf67e8e6b61bad0a053c8af', 'k618/soc/drivers/power/supply/sheng_qti_pogo_api.h': '45ae1c8129628d56fd20b8c43c1ca346bab11c832ff8f8d22fc14e47c1f4c739', 'k618/soc/drivers/power/supply/sheng_keyboard_charger_api.h': '365e124b828dcdea8bc80df0025a7d61359f42c9dd588a1d1352208b05459f9f'}
++    if name not in expected or got != expected[name]:
++        return False
++    build_root = Path(os.environ['BUILD_ROOT']).resolve()
++    for relative, digest in expected.items():
++        path = build_root / relative
++        assert path.resolve().is_relative_to(build_root), relative
++        assert hashlib.sha256(path.read_bytes()).hexdigest() == digest, relative
++    return True
++
+ 
+ project = Path(os.environ['PROJECT_ROOT']).resolve()
+ root = Path(os.environ['BUILD_ROOT']).resolve()
+@@ -29,7 +43,7 @@
+ for name, record in receipt['files'].items():
+     assert expected.get(name) == record['before'], 'Overlay base mismatch: ' + name
+     got = sha(root / name)
+-    if got == record['after']:
++    if got == record['after'] or android_interface_matches(name, got):
+         states.add('after')
+     elif got == record['before']:
+         states.add('before')
+@@ -42,5 +56,5 @@
+     subprocess.run(['patch', '--batch', '--forward', '--fuzz=0', '-p1', '-i', str(patch)],
+                    cwd=root, check=True)
+ for name, record in receipt['files'].items():
+-    assert sha(root / name) == record['after'], name
++    assert sha(root / name) == record['after'] or android_interface_matches(name, sha(root / name)), name
+ print('Verified factory interface overlay: ' + receipt['revision'])

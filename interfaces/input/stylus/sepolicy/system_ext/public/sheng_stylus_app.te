@@ -1,0 +1,3 @@
+# SPDX-License-Identifier: Apache-2.0
+# The vendor Binder service grants calls only to this board-owned app domain.
+type sheng_stylus_app, domain;

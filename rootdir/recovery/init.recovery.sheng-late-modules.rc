@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: Apache-2.0
+# The oops block device is available after recovery coldboot and fs actions.
+on boot
+    start sheng-recovery-late-modules
+
+service sheng-recovery-late-modules /system/bin/sh /system/bin/sheng-recovery-late-modules
+    user root
+    group root system
+    disabled
+    oneshot
+    seclabel u:r:recovery:s0

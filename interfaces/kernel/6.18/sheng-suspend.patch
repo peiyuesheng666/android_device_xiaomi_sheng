@@ -1,0 +1,194 @@
+--- a/drivers/input/misc/pm8941-pwrkey.c
++++ b/drivers/input/misc/pm8941-pwrkey.c
+@@ -309,7 +309,7 @@
+ {
+ 	struct pm8941_pwrkey *pwrkey = dev_get_drvdata(dev);
+ 
+-	if (pm_suspend_target_state == PM_SUSPEND_MEM)
++	if (pm_suspend_via_firmware())
+ 		return pm8941_pwrkey_freeze(dev);
+ 
+ 	if (device_may_wakeup(dev))
+@@ -322,7 +322,7 @@
+ {
+ 	struct pm8941_pwrkey *pwrkey = dev_get_drvdata(dev);
+ 
+-	if (pm_suspend_target_state == PM_SUSPEND_MEM)
++	if (pm_suspend_via_firmware())
+ 		return pm8941_pwrkey_restore(dev);
+ 
+ 	if (device_may_wakeup(dev))
+--- a/drivers/pinctrl/qcom/pinctrl-spmi-gpio.c
++++ b/drivers/pinctrl/qcom/pinctrl-spmi-gpio.c
+@@ -842,7 +842,7 @@
+ 
+ static int pmic_gpio_resume(struct device *dev)
+ {
+-	if (pm_suspend_target_state == PM_SUSPEND_MEM)
++	if (pm_suspend_via_firmware())
+ 		return pmic_gpio_restore(dev);
+ 
+ 	return 0;
+--- a/drivers/thermal/qcom/qcom-spmi-temp-alarm.c
++++ b/drivers/thermal/qcom/qcom-spmi-temp-alarm.c
+@@ -872,7 +872,7 @@
+ 
+ static int qpnp_tm_suspend(struct device *dev)
+ {
+-	if (pm_suspend_target_state == PM_SUSPEND_MEM)
++	if (pm_suspend_via_firmware())
+ 		return qpnp_tm_freeze(dev);
+ 
+ 	return 0;
+@@ -880,7 +880,7 @@
+ 
+ static int qpnp_tm_resume(struct device *dev)
+ {
+-	if (pm_suspend_target_state == PM_SUSPEND_MEM)
++	if (pm_suspend_via_firmware())
+ 		return qpnp_tm_restore(dev);
+ 
+ 	return 0;
+--- a/drivers/iio/adc/qcom-spmi-adc5-gen3.c
++++ b/drivers/iio/adc/qcom-spmi-adc5-gen3.c
+@@ -2075,14 +2075,14 @@
+ 
+ static int adc5_gen3_suspend(struct device *dev)
+ {
+-	if (pm_suspend_target_state == PM_SUSPEND_MEM)
++	if (pm_suspend_via_firmware())
+ 		return adc5_gen3_freeze(dev);
+ 	return 0;
+ }
+ 
+ static int adc5_gen3_resume(struct device *dev)
+ {
+-	if (pm_suspend_target_state == PM_SUSPEND_MEM)
++	if (pm_suspend_via_firmware())
+ 		return adc5_gen3_restore(dev);
+ 	return 0;
+ }
+--- a/drivers/rtc/rtc-pm8xxx.c
++++ b/drivers/rtc/rtc-pm8xxx.c
+@@ -578,7 +578,7 @@
+ {
+ 	struct pm8xxx_rtc *rtc_dd = dev_get_drvdata(dev);
+ 
+-	if (pm_suspend_target_state == PM_SUSPEND_MEM)
++	if (pm_suspend_via_firmware())
+ 		return pm8xxx_rtc_restore(dev);
+ 
+ 	if (device_may_wakeup(dev))
+@@ -591,7 +591,7 @@
+ {
+ 	struct pm8xxx_rtc *rtc_dd = dev_get_drvdata(dev);
+ 
+-	if (pm_suspend_target_state == PM_SUSPEND_MEM)
++	if (pm_suspend_via_firmware())
+ 		return pm8xxx_rtc_freeze(dev);
+ 
+ 	if (device_may_wakeup(dev))
+--- a/drivers/mailbox/msm_qmp.c
++++ b/drivers/mailbox/msm_qmp.c
+@@ -1227,7 +1227,7 @@
+ {
+ 	struct qmp_device *mdev = dev_get_drvdata(dev);
+ 
+-	if (pm_suspend_target_state == PM_SUSPEND_MEM) {
++	if (pm_suspend_via_firmware()) {
+ 		mdev->ds_entry = true;
+ 		dev_dbg(dev, "QMP: Deep sleep entry\n");
+ 	}
+@@ -1239,7 +1239,7 @@
+ {
+ 	int ret = 0;
+ 
+-	if (pm_suspend_target_state == PM_SUSPEND_MEM) {
++	if (pm_suspend_via_firmware()) {
+ 		ret = qmp_mbox_restore(dev);
+ 		dev_dbg(dev, "QMP: Deep sleep exit\n");
+ 	}
+--- a/drivers/clk/qcom/clk-pm.c
++++ b/drivers/clk/qcom/clk-pm.c
+@@ -25,7 +25,7 @@
+ /* Restores the clocks configuration while coming out of DeepSleep */
+ static int clock_pm_resume_early(struct device *dev)
+ {
+-	if (pm_suspend_target_state == PM_SUSPEND_MEM) {
++	if (pm_suspend_via_firmware()) {
+ 		if (pm_runtime_enabled(dev)) {
+ 			int ret;
+ 
+--- a/drivers/clk/qcom/gdsc-regulator.c
++++ b/drivers/clk/qcom/gdsc-regulator.c
+@@ -1035,7 +1035,7 @@
+ 
+ static int gdsc_pm_resume_early(struct device *dev)
+ {
+-	if (pm_suspend_target_state == PM_SUSPEND_MEM)
++	if (pm_suspend_via_firmware())
+ 		return restore_hw_trig_clk_dis(dev);
+ 	return 0;
+ }
+--- a/drivers/i2c/busses/i2c-msm-geni.c
++++ b/drivers/i2c/busses/i2c-msm-geni.c
+@@ -3463,7 +3463,7 @@
+ 	I2C_LOG_DBG(gi2c->ipcl, false, gi2c->dev, "%s ret=%d\n", __func__, true);
+ 
+ #ifdef CONFIG_DEEPSLEEP
+-	if (pm_suspend_target_state == PM_SUSPEND_MEM) {
++	if (pm_suspend_via_firmware()) {
+ 		gi2c->se_mode = UNINITIALIZED;
+ 		gi2c->is_deep_sleep = true;
+ 	}
+--- a/drivers/spi/spi-msm-geni.c
++++ b/drivers/spi/spi-msm-geni.c
+@@ -3637,7 +3637,7 @@
+ 			       geni_mas->spi_kpi, start_time, 0, 0);
+ 
+ #ifdef CONFIG_DEEPSLEEP
+-	if (pm_suspend_target_state == PM_SUSPEND_MEM) {
++	if (pm_suspend_via_firmware()) {
+ 		SPI_LOG_ERR(geni_mas->ipc, true, dev, "%s:DEEP SLEEP EXIT", __func__);
+ 		geni_mas->is_deep_sleep = true;
+ 	}
+--- a/drivers/soc/qcom/qcom_aoss.c
++++ b/drivers/soc/qcom/qcom_aoss.c
+@@ -776,7 +776,7 @@
+ {
+ 	struct qmp *qmp = dev_get_drvdata(dev);
+ 
+-	if (pm_suspend_target_state == PM_SUSPEND_MEM) {
++	if (pm_suspend_via_firmware()) {
+ 		qmp->ds_entry = true;
+ 		dev_info(dev, "AOSS: Deep sleep entry\n");
+ 	}
+@@ -789,7 +789,7 @@
+ 	struct qmp *qmp = dev_get_drvdata(dev);
+ 	int ret = 0;
+ 
+-	if (pm_suspend_target_state == PM_SUSPEND_MEM) {
++	if (pm_suspend_via_firmware()) {
+ 		ret = qmp_open(qmp);
+ 
+ 		if (ret < 0)
+--- a/drivers/soc/qcom/qti-pmic-lpm.c
++++ b/drivers/soc/qcom/qti-pmic-lpm.c
+@@ -389,7 +389,7 @@
+ 	struct qti_pmic_lpm *chip = dev_get_drvdata(dev);
+ 
+ 	/* mem_sleep_current = PM_SUSPEND_MEM in DeepSleep */
+-	if (pm_suspend_target_state == PM_SUSPEND_MEM) {
++	if (pm_suspend_via_firmware()) {
+ 		rc = qti_pmic_handle_lpm(chip, true);
+ 		if (rc < 0)
+ 			dev_err(dev, "Failed to handle suspend_late(), rc:%d\n",
+@@ -405,7 +405,7 @@
+ 	struct qti_pmic_lpm *chip = dev_get_drvdata(dev);
+ 
+ 	/* mem_sleep_current = PM_SUSPEND_MEM in DeepSleep */
+-	if (pm_suspend_target_state == PM_SUSPEND_MEM) {
++	if (pm_suspend_via_firmware()) {
+ 		rc = qti_pmic_handle_lpm(chip, false);
+ 		if (rc < 0) {
+ 			dev_err(dev, "Failed to handle resume_early(), rc:%d\n",

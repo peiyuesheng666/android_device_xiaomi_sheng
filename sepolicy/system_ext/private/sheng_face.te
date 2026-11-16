@@ -1,0 +1,44 @@
+# SPDX-License-Identifier: Apache-2.0
+type sheng_face, domain, coredomain;
+type sheng_face_exec, exec_type, system_file_type, file_type;
+type sheng_face_data_file, file_type, data_file_type, core_data_file_type;
+type sheng_face_tmpfs, file_type;
+init_daemon_domain(sheng_face)
+hal_server_domain(sheng_face, hal_face)
+hal_client_domain(sheng_face, hal_keymint)
+binder_use(sheng_face)
+binder_call(sheng_face, system_server)
+binder_call(system_server, sheng_face)
+binder_call(sheng_face, cameraserver)
+binder_call(cameraserver, sheng_face)
+binder_call(sheng_face, gatekeeperd)
+use_keystore(sheng_face)
+
+# Hardware encryption keys have a dedicated SELinux namespace, independent of
+# other packages sharing system UID. No access to the default app namespace.
+type sheng_face_key, keystore2_key_type;
+allow sheng_face sheng_face_key:keystore2_key { delete get_info rebind use };
+neverallow { domain -sheng_face -keystore } sheng_face_key:keystore2_key *;
+
+allow sheng_face { app_api_service system_api_service gatekeeper_service cameraserver_service }:service_manager find;
+allow sheng_face self:process execmem;
+tmpfs_domain(sheng_face)
+userfaultfd_use(sheng_face)
+allow sheng_face self:memfd_file { create read write getattr map execute };
+allow sheng_face dalvikcache_data_file:file r_file_perms;
+allow sheng_face dalvikcache_data_file:dir r_dir_perms;
+
+# System UID owns all /data/system_{ce,de}/<user> parents. Only the named child
+# can acquire our private type; ordinary apps receive no access to that type.
+allow sheng_face system_userdir_file:dir r_dir_perms;
+allow sheng_face system_data_file:dir { search getattr write add_name };
+type_transition sheng_face system_data_file:dir sheng_face_data_file "sheng_face";
+allow sheng_face sheng_face_data_file:dir create_dir_perms;
+allow sheng_face sheng_face_data_file:file create_file_perms;
+
+system_internal_prop(sheng_face_test_prop)
+set_prop(sheng_face, sheng_face_test_prop)
+userdebug_or_eng(`
+  set_prop(shell, sheng_face_test_prop)
+  get_prop(shell, sheng_face_test_prop)
+')

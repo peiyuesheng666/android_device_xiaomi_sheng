@@ -1,0 +1,6 @@
+# SPDX-License-Identifier: Apache-2.0
+# One cached state file, never driver control/GPIO/firmware nodes.
+type sysfs_sheng_keyboard_state, fs_type, sysfs_type;
+allow platform_app sysfs_sheng_keyboard_state:file { getattr open read };
+allow init sysfs_sheng_keyboard_state:file setattr;
+

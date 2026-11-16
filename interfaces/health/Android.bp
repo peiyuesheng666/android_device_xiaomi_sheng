@@ -1,0 +1,17 @@
+// SPDX-License-Identifier: BSD-3-Clause-Clear
+// Use the retained QTI module's VINTF declaration and replace its init services.
+cc_binary {
+    name: "android.hardware.health-service.sheng",
+    relative_install_path: "hw",
+    vendor: true,
+    defaults: ["libhealth_aidl_impl_user"],
+    static_libs: ["libhealth_aidl_impl"],
+    srcs: ["main.cpp"],
+    include_dirs: [
+        "system/core/healthd",
+        "system/core/healthd/include",
+        "system/core/healthd/include_charger",
+    ],
+    cflags: ["-Wall", "-Werror"],
+    init_rc: ["android.hardware.health-service.sheng.rc"],
+}

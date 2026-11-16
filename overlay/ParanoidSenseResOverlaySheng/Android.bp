@@ -1,0 +1,10 @@
+// SPDX-License-Identifier: Apache-2.0
+runtime_resource_overlay {
+    name: "ParanoidSenseResOverlaySheng",
+    resource_libs: ["ParanoidSense"],
+    resource_dirs: ["res"],
+    certificate: "platform",
+    // Layout references retain the target package's IDs.
+    aaptflags: ["--package-id", "0x80"],
+    device_specific: true,
+}

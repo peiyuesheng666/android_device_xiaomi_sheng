@@ -1,0 +1,126 @@
+--- a/k618/sheng-ports/hall/sheng_hall.c
++++ b/k618/sheng-ports/hall/sheng_hall.c
+@@ -1,7 +1,8 @@
+ // SPDX-License-Identifier: GPL-2.0-only
+ /* Native input switches for sheng's original GPIO + ADSP SMP2P hall binding.
+- * The GPIO is used only for initial/resume state. Actual open/close events
+- * arrive through the DT's distinct named SMP2P interrupts, as on stock sheng.
++ * Report the lid directly from its wake-capable TLMM GPIO. ADSP delays close
++ * notifications; treat those as a request to sample, never as a stale state.
++ * Tablet-mode events retain the original named SMP2P interrupts.
+  */
+ #include <linux/gpio.h>
+ #include <linux/input.h>
+@@ -12,6 +13,7 @@
+ #include <linux/of_irq.h>
+ #include <linux/platform_device.h>
+ #include <linux/pm_wakeup.h>
++#include <linux/pm_wakeirq.h>
+ #include <dt-bindings/gpio/gpio.h>
+ 
+ struct sheng_hall_switch {
+@@ -21,6 +23,7 @@
+ 	unsigned int code;
+ 	int gpio;
+ 	int open_irq, close_irq;
++	int gpio_irq;
+ 	bool active_low;
+ };
+ 
+@@ -37,20 +40,33 @@
+ 
+ static void sheng_hall_sample(struct sheng_hall_switch *hall)
+ {
+-	int value = gpio_get_value_cansleep(hall->gpio);
+-
+-	if (value < 0)
+-		return;
++	int value;
++
+ 	mutex_lock(hall->lock);
+-	input_report_switch(hall->input, hall->code, !!value ^ hall->active_low);
+-	input_sync(hall->input);
++	value = gpio_get_value_cansleep(hall->gpio);
++	if (value >= 0) {
++		input_report_switch(hall->input, hall->code, !!value ^ hall->active_low);
++		input_sync(hall->input);
++	}
+ 	mutex_unlock(hall->lock);
++}
++
++static irqreturn_t sheng_hall_gpio_irq(int irq, void *data)
++{
++	struct sheng_hall_switch *hall = data;
++
++	pm_wakeup_event(hall->dev, 500);
++	sheng_hall_sample(hall);
++	return IRQ_HANDLED;
+ }
+ 
+ static irqreturn_t sheng_hall_irq(int irq, void *data)
+ {
+ 	struct sheng_hall_switch *hall = data;
+ 	bool value = irq == hall->close_irq ? hall->active_low : !hall->active_low;
++
++	if (hall->code == SW_LID)
++		return sheng_hall_gpio_irq(irq, data);
+ 
+ 	pm_wakeup_event(hall->dev, 500);
+ 	mutex_lock(hall->lock);
+@@ -122,6 +138,18 @@
+ 		struct sheng_hall_switch *hall = &halls->switches[index];
+ 
+ 		sheng_hall_sample(hall);
++		if (hall->code == SW_LID) {
++			hall->gpio_irq = gpio_to_irq(hall->gpio);
++			if (hall->gpio_irq < 0)
++				return dev_err_probe(dev, hall->gpio_irq, "lid GPIO IRQ unavailable\n");
++			ret = devm_request_threaded_irq(dev, hall->gpio_irq, NULL,
++				sheng_hall_gpio_irq, IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING |
++				IRQF_ONESHOT, "sheng-hall-lid-gpio", hall);
++			if (ret)
++				return dev_err_probe(dev, ret, "lid GPIO IRQ request failed\n");
++			/* Reconcile a level change between the initial sample and IRQ setup. */
++			sheng_hall_sample(hall);
++		}
+ 		ret = devm_request_threaded_irq(dev, hall->open_irq, NULL, sheng_hall_irq,
+ 			IRQF_TRIGGER_RISING | IRQF_ONESHOT, "sheng-hall-open", hall);
+ 		if (ret)
+@@ -130,13 +158,27 @@
+ 			IRQF_TRIGGER_RISING | IRQF_ONESHOT, "sheng-hall-close", hall);
+ 		if (ret)
+ 			return dev_err_probe(dev, ret, "hall close IRQ request failed\n");
+-		dev_info(dev, "switch %u GPIO=%d active_low=%d SMP2P=%d/%d\n",
+-			hall->code, hall->gpio, hall->active_low, hall->open_irq, hall->close_irq);
++		dev_info(dev, "switch %u GPIO=%d active_low=%d SMP2P=%d/%d direct_irq=%d\n",
++			hall->code, hall->gpio, hall->active_low, hall->open_irq, hall->close_irq,
++			hall->gpio_irq);
+ 	}
+ 	ret = device_init_wakeup(dev, true);
+ 	if (ret)
+ 		return ret;
+-	return devm_add_action_or_reset(dev, sheng_hall_wakeup_disable, dev);
++	ret = devm_add_action_or_reset(dev, sheng_hall_wakeup_disable, dev);
++	if (ret)
++		return ret;
++	for (index = 0; index < count; index++) {
++		struct sheng_hall_switch *hall = &halls->switches[index];
++
++		if (hall->code == SW_LID) {
++			/* TLMM GPIO 171 is mapped to SM8550 PDC wake interrupt 120. */
++			ret = devm_pm_set_wake_irq(dev, hall->gpio_irq);
++			if (ret)
++				return dev_err_probe(dev, ret, "lid wake IRQ setup failed\n");
++		}
++	}
++	return 0;
+ }
+ 
+ static int sheng_hall_resume(struct device *dev)
+@@ -165,5 +207,5 @@
+ 	},
+ };
+ module_platform_driver(sheng_hall_driver);
+-MODULE_DESCRIPTION("Sheng lid and tablet switches using original SMP2P binding");
++MODULE_DESCRIPTION("Sheng GPIO lid and SMP2P tablet switches");
+ MODULE_LICENSE("GPL");

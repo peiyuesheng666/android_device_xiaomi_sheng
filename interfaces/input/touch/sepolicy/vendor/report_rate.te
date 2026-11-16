@@ -1,0 +1,8 @@
+# SPDX-License-Identifier: Apache-2.0
+vendor_restricted_prop(vendor_sheng_touch_report_high_prop)
+set_prop(hal_lineage_touch_default, vendor_sheng_touch_report_high_prop)
+
+# Fixed mode-202 client. The stock report server is not restarted or replaced.
+allow hal_lineage_touch_default vendor_sheng_touch_report:unix_stream_socket connectto;
+allow hal_lineage_touch_default vendor_sysfs_sheng_touch_dpms:file r_file_perms;
+allow hal_lineage_touch_default sysfs:dir search;

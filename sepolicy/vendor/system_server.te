@@ -1,0 +1,4 @@
+# EventHub reads HID identity and country metadata when enumerating input devices.
+allow system_server vendor_sysfs_sheng_hid:dir { getattr open read search };
+allow system_server vendor_sysfs_sheng_hid:file { getattr open read };
+allow system_server vendor_sysfs_sheng_hid:lnk_file { getattr read };

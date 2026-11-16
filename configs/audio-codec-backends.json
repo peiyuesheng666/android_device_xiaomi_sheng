@@ -1,0 +1,21 @@
+{
+  "partition": "vendor",
+  "architecture": "arm64",
+  "libraries": [
+    {
+      "module": "libAlacSwDec",
+      "path": "lib64/libAlacSwDec.so",
+      "sha256": "b42a94dcda1aa581be9f2a5e41ab881f52da6104321b19fa96f46b2a639d0eec"
+    },
+    {
+      "module": "libApeSwDec",
+      "path": "lib64/libApeSwDec.so",
+      "sha256": "d48bf3d0d571b90f2e3d3b0aa71229ea1fb065f553a0d8a95fd2d964a8117be7"
+    },
+    {
+      "module": "libFlacSwDec",
+      "path": "lib64/libFlacSwDec.so",
+      "sha256": "7aa66f6c0ff3ab801dba3f1d2a4e83d8294323dab0ec9d8e81e20ba01267d44f"
+    }
+  ]
+}

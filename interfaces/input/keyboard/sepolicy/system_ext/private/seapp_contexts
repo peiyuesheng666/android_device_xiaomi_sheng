@@ -1,0 +1,2 @@
+user=_app seinfo=platform name=org.lineageos.sheng.keyboard domain=sheng_keyboard_app type=app_data_file levelFrom=all
+user=_app seinfo=sheng_devauth name=com.xiaomi.devauth domain=sheng_devauth_app type=app_data_file levelFrom=all

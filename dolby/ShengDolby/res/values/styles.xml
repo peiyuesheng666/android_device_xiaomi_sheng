@@ -1,0 +1,4 @@
+<resources>
+    <!-- Only API 1 resources occur in the fallback theme. -->
+    <style name="ShengDolbyTheme" parent="@android:style/Theme" />
+</resources>

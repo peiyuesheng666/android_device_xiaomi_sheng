@@ -1,0 +1,4 @@
+;; This device app has no counterpart in the older system_ext public policy.
+(type new_objects)
+(typeattribute new_objects)
+(typeattributeset new_objects (new_objects sheng_touch_app))

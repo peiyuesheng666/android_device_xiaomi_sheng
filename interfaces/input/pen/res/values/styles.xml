@@ -1,0 +1,4 @@
+<resources>
+    <!-- Only API 1 platform resources occur in the fallback theme. -->
+    <style name="ShengPenTheme" parent="@android:style/Theme" />
+</resources>

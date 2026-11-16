@@ -1,0 +1,76 @@
+--- a/sheng-ports/pogo/nanosic_platform.c
++++ b/sheng-ports/pogo/nanosic_platform.c
+@@ -35,7 +35,7 @@
+ #include <linux/sched.h>
+ #include <linux/spinlock.h>
+ #include "sheng_nano_charge_protocol.h"
+-#include "sheng_keyboard_charger.h"
++#include "sheng_nano_charge_supply.h"
+ #include "inc/nano_macro.h"
+ 
+ 
+@@ -153,7 +153,7 @@
+ }
+ EXPORT_SYMBOL_GPL(Nanosic_vendor_raw_data_inject);
+ 
+-int Nanosic_charge_i2c_write_callback_register_locked(i2c_write_cb cb)
++static int Nanosic_charge_i2c_write_callback_register_locked(i2c_write_cb cb)
+ {
+     struct nanochg *nodev = g_nodev;
+     int ret = 0;
+@@ -194,7 +194,7 @@
+ }
+ EXPORT_SYMBOL_GPL(Nanosic_charge_i2c_write_callback_register);
+ 
+-int Nanosic_charge_i2c_write_callback_unregister_locked(void)
++static int Nanosic_charge_i2c_write_callback_unregister_locked(void)
+ {
+     struct nanochg *nodev = g_nodev;
+     int ret = 0;
+@@ -394,7 +394,7 @@
+ 
+ 	type = (int)g_nodev->dpdm;
+ 
+-	dbgprint(ERROR_LEVEL, "%s type=%d, old_type=%d \n", __func__, type);
++	dbgprint(ERROR_LEVEL, "%s type=%d, old_type=%d \n", __func__, type, g_nodev->old_type);
+ 
+ 	if (g_nodev->pd_flag) {
+         g_battmngr_noti->pd_msg.pd_active = 1;
+@@ -460,7 +460,7 @@
+ 
+ 	type = (int)g_nodev->dpdm;
+ 
+-	dbgprint(ERROR_LEVEL, "%s type=%d, old_type=%d \n", __func__, type);
++	dbgprint(ERROR_LEVEL, "%s type=%d, old_type=%d \n", __func__, type, g_nodev->old_type);
+ 
+ 	if (g_nodev->pd_flag) {
+         g_battmngr_noti->pd_msg.pd_active = 1;
+@@ -768,7 +768,7 @@
+     ret = Nanosic_charge_i2c_write(read_803_vers_cmd, sizeof(read_803_vers_cmd));
+     if (ret < 0)
+     {
+-        dbgprint(ERROR_LEVEL, "i2c write fail, ret = %d, size = %d", ret, sizeof(read_803_vers_cmd));
++        dbgprint(ERROR_LEVEL, "i2c write fail, ret = %d, size = %zu", ret, sizeof(read_803_vers_cmd));
+     }
+ 
+     return ret;
+--- a/sheng-ports/pogo/inc/nano_macro.h
++++ b/sheng-ports/pogo/inc/nano_macro.h
+@@ -199,3 +199,5 @@
+ int Nanosic_charge_i2c_write_callback_register(i2c_write_cb cb);
+ int Nanosic_charge_i2c_write_callback_unregister(void);
+ int Nanosic_ADSP_register_cb(ADSP_read_cb cb);
++
++int Nanosic_ADSP_Read_803_Version(void);
+--- /dev/null
++++ b/sheng-ports/pogo/sheng_nano_charge_supply.h
+@@ -0,0 +1,9 @@
++/* SPDX-License-Identifier: GPL-2.0-only */
++/* Original xm_charger_core.h charger type ABI. Preserve QC and floating types. */
++#ifndef SHENG_NANO_CHARGE_SUPPLY_H
++#define SHENG_NANO_CHARGE_SUPPLY_H
++#define POWER_SUPPLY_TYPE_USB_HVDCP		20
++#define POWER_SUPPLY_TYPE_USB_HVDCP_3		21
++#define POWER_SUPPLY_TYPE_USB_HVDCP_3P5		22
++#define POWER_SUPPLY_TYPE_USB_FLOAT		23
++#endif

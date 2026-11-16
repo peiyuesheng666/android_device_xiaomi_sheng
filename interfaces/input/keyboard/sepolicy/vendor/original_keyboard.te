@@ -1,0 +1,50 @@
+# SPDX-License-Identifier: Apache-2.0
+# Preserve the domain explicitly selected by the original keyboard service RC.
+type nanoapp, domain;
+type nanoapp_exec, exec_type, vendor_file_type, file_type;
+type sheng_nano_device, dev_type;
+type sheng_keyboard_hwservice, hwservice_manager_type, protected_hwservice;
+init_daemon_domain(nanoapp)
+hwbinder_use(nanoapp)
+get_prop(nanoapp, hwservicemanager_prop)
+add_hwservice(nanoapp, sheng_keyboard_hwservice)
+hwbinder_use(sheng_keyboard_app)
+binder_call(sheng_keyboard_app, nanoapp)
+binder_call(nanoapp, sheng_keyboard_app)
+allow sheng_keyboard_app sheng_keyboard_hwservice:hwservice_manager find;
+allow sheng_keyboard_app sysfs:dir search;
+allow sheng_keyboard_app sysfs_sheng_keyboard_state:file r_file_perms;
+allow vendor_init sysfs_sheng_keyboard_state:file setattr;
+allow nanoapp sheng_nano_device:chr_file rw_file_perms;
+
+type sheng_midevauth, domain;
+type sheng_midevauth_exec, exec_type, vendor_file_type, file_type;
+type sheng_midevauth_hwservice, hwservice_manager_type, protected_hwservice;
+init_daemon_domain(sheng_midevauth)
+hwbinder_use(sheng_midevauth)
+get_prop(sheng_midevauth, hwservicemanager_prop)
+add_hwservice(sheng_midevauth, sheng_midevauth_hwservice)
+
+type sheng_mtdservice, domain;
+type sheng_mtdservice_exec, exec_type, vendor_file_type, file_type;
+type sheng_mtd_hwservice, hwservice_manager_type, protected_hwservice;
+init_daemon_domain(sheng_mtdservice)
+hwbinder_use(sheng_mtdservice)
+get_prop(sheng_mtdservice, hwservicemanager_prop)
+add_hwservice(sheng_mtdservice, sheng_mtd_hwservice)
+
+hwbinder_use(sheng_devauth_app)
+binder_call(sheng_devauth_app, sheng_midevauth)
+binder_call(sheng_devauth_app, sheng_mtdservice)
+allow sheng_devauth_app { sheng_midevauth_hwservice sheng_mtd_hwservice }:hwservice_manager find;
+
+# The original libraries perform real TEE operations through QSEECom.
+allow { sheng_midevauth sheng_mtdservice } tee_device:chr_file rw_file_perms;
+allow { sheng_midevauth sheng_mtdservice } ion_device:chr_file rw_file_perms;
+allow { sheng_midevauth sheng_mtdservice } { vendor_dmabuf_qseecom_heap_device vendor_dmabuf_qseecom_ta_heap_device }:chr_file r_file_perms;
+r_dir_file(sheng_midevauth, firmware_file)
+r_dir_file(sheng_mtdservice, firmware_file)
+r_dir_file(sheng_midevauth, mnt_vendor_file)
+r_dir_file(sheng_mtdservice, mnt_vendor_file)
+get_prop(sheng_midevauth, vendor_tee_listener_prop)
+get_prop(sheng_mtdservice, vendor_tee_listener_prop)

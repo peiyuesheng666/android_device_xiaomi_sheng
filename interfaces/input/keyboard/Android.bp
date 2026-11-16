@@ -1,0 +1,17 @@
+// SPDX-License-Identifier: Apache-2.0
+android_app {
+    name: "ShengKeyboardPresence",
+    srcs: ["src/**/*.java"],
+    certificate: "platform",
+    platform_apis: true,
+    privileged: true,
+    product_specific: true,
+    required: ["init.sheng-keyboard-presence.rc"],
+}
+
+prebuilt_etc {
+    name: "init.sheng-keyboard-presence.rc",
+    src: "init.sheng-keyboard-presence.rc",
+    sub_dir: "init",
+    product_specific: true,
+}

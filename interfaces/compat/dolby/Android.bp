@@ -1,0 +1,30 @@
+// Private AHandler ABI, isolated from other foundation clients.
+cc_prebuilt_library_shared {
+    name: "libshgdolby_foundation",
+    srcs: ["libshgdolby_foundation.so"],
+    compile_multilib: "64",
+    vendor: true,
+    relative_install_path: "hw",
+    strip: { none: true },
+    shared_libs: ["libutils", "libcutils", "liblog", "libc++", "libc", "libm", "libdl"],
+}
+
+filegroup {
+    name: "sheng_dolby_dms_compat",
+    srcs: ["libdlbdsservice.so"],
+}
+
+filegroup {
+    name: "sheng_dolby_effect_compat",
+    srcs: ["libhwdap.so"],
+}
+
+filegroup {
+    name: "sheng_dolby_pregain_compat",
+    srcs: ["libdlbpreg.so"],
+}
+
+filegroup {
+    name: "sheng_dolby_volume_compat",
+    srcs: ["libdlbvol.so"],
+}

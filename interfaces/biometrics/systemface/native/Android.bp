@@ -1,0 +1,71 @@
+// SPDX-License-Identifier: Apache-2.0
+package {
+    default_applicable_licenses: ["sheng_face_lab_license"],
+}
+
+// Native-interface prerequisite. Deliberately not a PRODUCT_PACKAGES entry
+// until credential verification, callback transport and the capture backend pass.
+java_library {
+    name: "ShengNativeFaceProtocol",
+    srcs: ["src/**/*.java", ":sheng-native-face-math-sources", ":sheng-native-face-match-source"],
+    static_libs: [
+        "android.hardware.biometrics.face-V5-java",
+        "android.hardware.security.keymint-V5-java",
+    ],
+    system_ext_specific: true,
+    installable: true,
+    compile_dex: true,
+}
+
+java_library {
+    name: "ShengNativeFaceBootstrap",
+    srcs: ["bootstrap/**/*.java"],
+    system_ext_specific: true,
+    installable: true,
+    compile_dex: true,
+}
+
+cc_binary {
+    name: "sheng-face",
+    srcs: ["NativeFaceLauncher.cpp"],
+    compile_multilib: "64",
+    shared_libs: ["sheng-native-art-signal-link", "libandroid_runtime", "libbinder",
+                  "liblog", "libutils", "libwilhelm"],
+    ldflags: ["-Wl,--no-as-needed"],
+    version_script: "version-script.txt",
+    cflags: ["-Wall", "-Werror"],
+    system_ext_specific: true,
+    init_rc: ["sheng-face.rc"],
+}
+
+// Link-only SONAME declaration. The executable has no direct sigchain calls;
+// ART requires the genuine system library before libc in its DT_NEEDED list.
+// The real implementation is owned by the signed ART APEX. This declaration
+// never installs a library and must never be packaged as a runtime replacement.
+cc_library_shared {
+    name: "sheng-native-art-signal-link",
+    stem: "libsigchain",
+    srcs: ["ArtSignalLinkOnly.cpp"],
+    compile_multilib: "64",
+    installable: false,
+    system_ext_specific: true,
+    ldflags: ["-Wl,-z,global"],
+    stl: "none",
+}
+
+vintf_fragment {
+    name: "sheng-face-native-fragment",
+    src: "face-native.xml",
+    // IFace is a device HAL even though its executable lives in system_ext.
+    // libvintf rejects device manifests in system/system_ext framework metadata.
+    device_specific: true,
+}
+
+java_library {
+    name: "ShengNativeFaceProtocolProbe",
+    srcs: ["tests/NativeFaceProtocolProbe.java", "tests/NativeFaceSessionProbe.java"],
+    static_libs: ["ShengNativeFaceProtocol"],
+    system_ext_specific: true,
+    installable: true,
+    compile_dex: true,
+}

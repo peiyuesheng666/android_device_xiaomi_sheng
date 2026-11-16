@@ -1,0 +1,11 @@
+--- a/k618/ws/common/mm/vmscan.c
++++ b/k618/ws/common/mm/vmscan.c
+@@ -2484,7 +2484,7 @@
+ 	nr = shrink_folio_list(written, lruvec_pgdat(lruvec), sc, &stat, false,
+ 			       lruvec_memcg(lruvec));
+ 	spin_lock_irq(&lruvec->lru_lock);
+-	move_folios_to_lru(lruvec, written);
++	move_folios_to_lru(lruvec, written, true);
+ 	if (!cgroup_reclaim(sc))
+ 		__count_vm_events(PGSTEAL_KSWAPD, nr);
+ 	count_memcg_events(lruvec_memcg(lruvec), PGSTEAL_KSWAPD, nr);

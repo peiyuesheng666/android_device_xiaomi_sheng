@@ -1,0 +1,35 @@
+<resources>
+    <string name="charge_acquiring">Getting status…</string>
+    <string name="back">Back</string>
+    <string name="page_subtitle">Connection and charging, at a glance</string>
+    <string name="your_pen">YOUR STYLUS</string>
+    <string name="focus_pen">Focus Pen</string>
+    <string name="device_information">Device information</string>
+    <string name="charging">Charging</string>
+    <string name="fully_charged">Fully charged</string>
+    <string name="charge_attached">Attached · waiting to charge</string>
+    <string name="charge_detached">Not charging · detached</string>
+    <string name="not_charging">Not charging</string>
+    <string name="charge_unknown">Charging status unavailable</string>
+    <string name="charge_placement">Adjust the pen on its charger</string>
+    <string name="charge_hint">Attach your pen to the tablet to charge it.</string>
+    <string name="app_name">Stylus</string>
+    <string name="settings_summary">Focus Pen connection, battery and version information</string>
+    <string name="connection">Connection</string>
+    <string name="pen">Stylus</string>
+    <string name="not_paired">No Focus Pen paired</string>
+    <string name="connected">Connected</string>
+    <string name="paired">Paired, disconnected</string>
+    <string name="bluetooth_off">Bluetooth is off</string>
+    <string name="permission_needed">Bluetooth permission is required to read the pen status</string>
+    <string name="battery">Battery</string>
+    <string name="firmware">Firmware version</string>
+    <string name="software">Software version</string>
+    <string name="unknown">Not available</string>
+    <string name="reading">Reading…</string>
+    <string name="profile_unavailable">Pen connection status is not available</string>
+    <string name="identity_unverified">Unable to verify Focus Pen identity</string>
+    <string name="manage_connection">Manage Bluetooth connection</string>
+    <string name="refresh">Refresh status</string>
+    <string name="unsupported_platform">Focus Pen information is unavailable on this device or Android version.</string>
+</resources>

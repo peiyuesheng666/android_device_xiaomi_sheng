@@ -1,0 +1,454 @@
+--- a/ws/common/drivers/mtd/mtdoops.c
++++ b/ws/common/drivers/mtd/mtdoops.c
+@@ -23,7 +23,7 @@
+ #include <linux/kmsg_dump.h>
+ 
+ /* Maximum MTD partition size */
+-#define MTDOOPS_MAX_MTD_SIZE (8 * 1024 * 1024)
++#define MTDOOPS_MAX_MTD_SIZE (16 * 1024 * 1024)
+ 
+ static unsigned long record_size = 4096;
+ module_param(record_size, ulong, 0400);
+@@ -48,6 +48,15 @@
+ 	u32 magic;
+ 	ktime_t timestamp;
+ } __packed;
++
++/* Preserve the existing sheng on-disk records; still accept v1 and v2 on read. */
++static bool legacy_format = true;
++module_param(legacy_format, bool, 0400);
++
++static size_t mtdoops_header_size(void)
++{
++	return legacy_format ? sizeof(u32) * 2 : sizeof(struct mtdoops_hdr);
++}
+ 
+ static struct mtdoops_context {
+ 	struct kmsg_dumper dump;
+@@ -196,21 +205,20 @@
+ 	}
+ }
+ 
+-static void mtdoops_write(struct mtdoops_context *cxt, int panic)
++/* The caller owns oops_buf_busy through capture and storage. */
++static void mtdoops_write_locked(struct mtdoops_context *cxt, int panic)
+ {
+ 	struct mtd_info *mtd = cxt->mtd;
+ 	size_t retlen;
+ 	struct mtdoops_hdr *hdr;
+ 	int ret;
+ 
+-	if (test_and_set_bit(0, &cxt->oops_buf_busy))
+-		return;
+-
+ 	/* Add mtdoops header to the buffer */
+ 	hdr = (struct mtdoops_hdr *)cxt->oops_buf;
+ 	hdr->seq = cxt->nextcount;
+-	hdr->magic = MTDOOPS_KERNMSG_MAGIC_v2;
+-	hdr->timestamp = ktime_get_real();
++	hdr->magic = legacy_format ? MTDOOPS_KERNMSG_MAGIC_v1 : MTDOOPS_KERNMSG_MAGIC_v2;
++	if (!legacy_format)
++		hdr->timestamp = ktime_get_real();
+ 
+ 	if (panic) {
+ 		ret = mtd_panic_write(mtd, cxt->nextpage * record_size,
+@@ -239,7 +247,7 @@
+ 	struct mtdoops_context *cxt =
+ 			container_of(work, struct mtdoops_context, work_write);
+ 
+-	mtdoops_write(cxt, 0);
++	mtdoops_write_locked(cxt, 0);
+ }
+ 
+ static void find_next_position(struct mtdoops_context *cxt)
+@@ -313,18 +321,20 @@
+ 	if (test_and_set_bit(0, &cxt->oops_buf_busy))
+ 		return;
+ 	kmsg_dump_get_buffer(&iter, true,
+-			     cxt->oops_buf + sizeof(struct mtdoops_hdr),
+-			     record_size - sizeof(struct mtdoops_hdr), NULL);
+-	clear_bit(0, &cxt->oops_buf_busy);
++			     cxt->oops_buf + mtdoops_header_size(),
++			     record_size - mtdoops_header_size(), NULL);
++	/* Keep the capture locked until the synchronous write or work completes. */
+ 
+ 	if (detail->reason != KMSG_DUMP_OOPS) {
+ 		/* Panics must be written immediately */
+-		mtdoops_write(cxt, 1);
++		mtdoops_write_locked(cxt, 1);
+ 	} else {
+ 		/* For other cases, schedule work to write it "nicely" */
+ 		schedule_work(&cxt->work_write);
+ 	}
+ }
++
++#include "mtdoops-sheng.h"
+ 
+ static void mtdoops_notify_add(struct mtd_info *mtd)
+ {
+@@ -389,9 +399,9 @@
+ 	if (kmsg_dump_unregister(&cxt->dump) < 0)
+ 		pr_warn("could not unregister kmsg_dumper\n");
+ 
++	flush_work(&cxt->work_write);
++	flush_work(&cxt->work_erase);
+ 	cxt->mtd = NULL;
+-	flush_work(&cxt->work_erase);
+-	flush_work(&cxt->work_write);
+ }
+ 
+ 
+@@ -403,7 +413,7 @@
+ static int __init mtdoops_init(void)
+ {
+ 	struct mtdoops_context *cxt = &oops_cxt;
+-	int mtd_index;
++	int mtd_index, ret;
+ 	char *endp;
+ 
+ 	if (strlen(mtddev) == 0) {
+@@ -434,6 +444,11 @@
+ 	INIT_WORK(&cxt->work_erase, mtdoops_workfunc_erase);
+ 	INIT_WORK(&cxt->work_write, mtdoops_workfunc_write);
+ 
++	ret = mtdoops_sheng_init();
++	if (ret) {
++		vfree(cxt->oops_buf);
++		return ret;
++	}
+ 	register_mtd_user(&mtdoops_notifier);
+ 	return 0;
+ }
+@@ -442,6 +457,7 @@
+ {
+ 	struct mtdoops_context *cxt = &oops_cxt;
+ 
++	mtdoops_sheng_exit();
+ 	unregister_mtd_user(&mtdoops_notifier);
+ 	vfree(cxt->oops_buf);
+ 	vfree(cxt->oops_page_used);
+--- a/soc/drivers/input/misc/pm8941-pwrkey.c
++++ b/soc/drivers/input/misc/pm8941-pwrkey.c
+@@ -19,6 +19,15 @@
+ #include <linux/reboot.h>
+ #include <linux/regmap.h>
+ #include <linux/suspend.h>
++#include <linux/console.h>
++#include <linux/nmi.h>
++#include <linux/sched/debug.h>
++#include <linux/sched/signal.h>
++
++#if IS_ENABLED(CONFIG_MTD_OOPS)
++extern int g_long_press_reason;
++extern void mtdoops_do_dump_if(int reason);
++#endif
+ 
+ #define PON_REV2			0x01
+ 
+@@ -62,6 +71,7 @@
+ 	bool		supports_ps_hold_poff_config;
+ 	bool		supports_debounce_config;
+ 	bool		has_pon_pbs;
++	u8		bark; /* 1: persisted long-press log, 2: task diagnostic */
+ 	const char	*name;
+ 	const char	*phys;
+ };
+@@ -149,12 +159,48 @@
+ 	return NOTIFY_DONE;
+ }
+ 
++static void pm8941_show_tasks(unsigned int state)
++{
++	struct task_struct *group, *task;
++
++	rcu_read_lock();
++	for_each_process_thread(group, task) {
++		touch_nmi_watchdog();
++		if (READ_ONCE(task->__state) == state)
++			sched_show_task(task);
++	}
++	rcu_read_unlock();
++}
++
+ static irqreturn_t pm8941_pwrkey_irq(int irq, void *_data)
+ {
+ 	struct pm8941_pwrkey *pwrkey = _data;
+ 	unsigned int sts;
+ 	int err;
+ 
++	if (pwrkey->data->bark) {
++		err = regmap_read(pwrkey->regmap, pwrkey->baseaddr + PON_RT_STS, &sts);
++		if (err)
++			return IRQ_HANDLED;
++		if (sts & pwrkey->data->status_bit) {
++			if (pwrkey->data->bark == 1) {
++#if IS_ENABLED(CONFIG_MTD_OOPS)
++				mtdoops_do_dump_if(g_long_press_reason);
++#endif
++			} else {
++				int level = console_loglevel;
++
++				console_verbose();
++				pr_info("Long key combination: collecting D/R task state\n");
++				pm8941_show_tasks(TASK_UNINTERRUPTIBLE);
++				pm8941_show_tasks(TASK_RUNNING);
++				console_loglevel = level;
++			}
++		}
++		/* The dedicated dump IRQ is not an additional power-key press. */
++		if (pwrkey->data->bark == 1)
++			return IRQ_HANDLED;
++	}
+ 	if (pwrkey->sw_debounce_time_us) {
+ 		if (ktime_before(ktime_get(), pwrkey->sw_debounce_end_time)) {
+ 			dev_dbg(pwrkey->dev,
+@@ -528,7 +574,25 @@
+ 	.has_pon_pbs = true,
+ };
+ 
++static const struct pm8941_data pon_gen3_pwrkey_bark_data = {
++	.status_bit = PON_GEN3_KPDPWR_N_SET,
++	.name = "pmic_pwrkey_bark",
++	.phys = "pmic_pwrkey_bark/input0",
++	.has_pon_pbs = true,
++	.bark = 1,
++};
++
++static const struct pm8941_data pon_gen3_pwrkey_resin_bark_data = {
++	.status_bit = PON_GEN3_KPDPWR_N_SET,
++	.name = "pmic_pwrkey_resin_bark",
++	.phys = "pmic_pwrkey_resin_bark/input0",
++	.has_pon_pbs = true,
++	.bark = 2,
++};
++
+ static const struct of_device_id pm8941_pwr_key_id_table[] = {
++	{ .compatible = "qcom,pmk8350-pwrkey-bark", .data = &pon_gen3_pwrkey_bark_data },
++	{ .compatible = "qcom,pmk8350-pwrkey-resin-bark", .data = &pon_gen3_pwrkey_resin_bark_data },
+ 	{ .compatible = "qcom,pm8941-pwrkey", .data = &pwrkey_data },
+ 	{ .compatible = "qcom,pm8941-resin", .data = &resin_data },
+ 	{ .compatible = "qcom,pmk8350-pwrkey", .data = &pon_gen3_pwrkey_data },
+--- /dev/null
++++ b/ws/common/drivers/mtd/mtdoops-sheng.h
+@@ -0,0 +1,190 @@
++/* SPDX-License-Identifier: GPL-2.0-only */
++/* sheng OEM long-press/reboot records, using the actual MTD and pmsg buffers. */
++#include <linux/io.h>
++#include <linux/mm.h>
++#include <linux/of_address.h>
++#include <linux/reboot.h>
++#include <linux/slab.h>
++#include "mtdoops-sheng-ring.h"
++
++enum sheng_mtd_reason {
++	SHENG_MTD_UNDEFINED, SHENG_MTD_PANIC, SHENG_MTD_OOPS,
++	SHENG_MTD_EMERG, SHENG_MTD_SHUTDOWN, SHENG_MTD_RESTART,
++	SHENG_MTD_POWEROFF, SHENG_MTD_LONG_PRESS,
++};
++
++int g_long_press_reason = SHENG_MTD_LONG_PRESS;
++EXPORT_SYMBOL_GPL(g_long_press_reason);
++void mtdoops_do_dump_if(int reason);
++
++static const char * const sheng_mtd_reasons[] = {
++	"Unknown", "Kernel Panic", "Oops!", "Emerg", "Shut Down",
++	"Restart", "PowerOff", "Long Press",
++};
++static char build_fingerprint[64];
++module_param_string(fingerprint, build_fingerprint, sizeof(build_fingerprint), 0644);
++
++/* Same three 32-bit fields as persistent_ram_buffer; never modify them. */
++struct sheng_pmsg_header {
++	u32 sig;
++	u32 start;
++	u32 size;
++	u8 data[];
++};
++static struct sheng_pmsg_header *sheng_pmsg;
++static size_t sheng_pmsg_capacity;
++
++static size_t sheng_copy_pmsg(void *target, size_t limit)
++{
++	struct sheng_pmsg_chunks chunks;
++	u32 start, size;
++
++	if (!sheng_pmsg || READ_ONCE(sheng_pmsg->sig) != 0x43474244)
++		return 0;
++	start = READ_ONCE(sheng_pmsg->start);
++	size = READ_ONCE(sheng_pmsg->size);
++	if (!sheng_pmsg_chunks(sheng_pmsg_capacity, start, size, limit, &chunks)) {
++		pr_warn_ratelimited("Invalid pmsg ring bounds; preserving kernel log\n");
++		return 0;
++	}
++	memcpy(target, sheng_pmsg->data + chunks.offset, chunks.first);
++	memcpy(target + chunks.first, sheng_pmsg->data, chunks.second);
++	return chunks.first + chunks.second;
++}
++
++void mtdoops_do_dump_if(int reason)
++{
++	struct mtdoops_context *cxt = &oops_cxt;
++	struct kmsg_dump_iter iter;
++	struct timespec64 now;
++	struct tm tm;
++	size_t offset, used = 0, budget;
++	bool panic;
++
++	if (reason <= SHENG_MTD_UNDEFINED || reason > SHENG_MTD_LONG_PRESS)
++		return;
++	panic = reason == SHENG_MTD_PANIC || reason == SHENG_MTD_OOPS;
++	if (!panic && WARN_ON_ONCE(in_interrupt() || irqs_disabled()))
++		return;
++	if (!panic) {
++		flush_work(&cxt->work_write);
++		flush_work(&cxt->work_erase);
++	}
++	if (!cxt->mtd) {
++		pr_warn("MTD not attached; cannot persist %s record\n", sheng_mtd_reasons[reason]);
++		return;
++	}
++	if (test_and_set_bit(0, &cxt->oops_buf_busy))
++		return;
++	memset(cxt->oops_buf, 0xff, record_size);
++	ktime_get_coarse_real_ts64(&now);
++	time64_to_tm(now.tv_sec, 0, &tm);
++	offset = mtdoops_header_size();
++	offset += scnprintf(cxt->oops_buf + offset, record_size - offset,
++		"\n## Index: %d\n### Build: %s\n## REASON: %s\n"
++		"#### LOG TYPE: LAST KMSG\n##### %04ld-%02d-%02d %02d:%02d:%02d\n",
++		cxt->nextcount, build_fingerprint, sheng_mtd_reasons[reason],
++		tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
++	/* Preserve the OEM split: up to 512 KiB of kernel log, then pmsg. */
++	budget = min_t(size_t, record_size - offset, 512 * 1024);
++	kmsg_dump_rewind(&iter);
++	kmsg_dump_get_buffer(&iter, true, cxt->oops_buf + offset, budget, &used);
++	offset += used;
++	if (record_size - offset > 32) {
++		offset += scnprintf(cxt->oops_buf + offset, record_size - offset,
++				    "\n#### LOG TYPE: LAST LOGCAT\n");
++		sheng_copy_pmsg(cxt->oops_buf + offset, record_size - offset);
++	}
++	/* The threaded bark IRQ and reboot notifier must finish before UFS shutdown. */
++	mtdoops_write_locked(cxt, panic);
++}
++EXPORT_SYMBOL_GPL(mtdoops_do_dump_if);
++
++static int sheng_mtd_reboot(struct notifier_block *nb, unsigned long event, void *data)
++{
++	if (event == SYS_RESTART)
++		mtdoops_do_dump_if(SHENG_MTD_RESTART);
++	else if (event == SYS_POWER_OFF)
++		mtdoops_do_dump_if(SHENG_MTD_POWEROFF);
++	return NOTIFY_DONE;
++}
++static struct notifier_block sheng_mtd_reboot_nb = {
++	.notifier_call = sheng_mtd_reboot,
++};
++
++static int mtdoops_sheng_init(void)
++{
++	struct device_node *node, *ram;
++	struct resource resource, ram_resource;
++	struct page **pages;
++	phys_addr_t start;
++	u32 pmsg_size, mem_type = 0, ecc = 0;
++	unsigned int count, i;
++	pgprot_t protection;
++	bool matched = false;
++	int ret;
++
++	node = of_find_compatible_node(NULL, NULL, "mtdoops_pmsg");
++	if (!node)
++		return -ENODEV;
++	ret = of_address_to_resource(node, 0, &resource);
++	if (!ret)
++		ret = of_property_read_u32(node, "pmsg-size", &pmsg_size);
++	of_node_put(node);
++	if (ret)
++		return ret;
++	if (pmsg_size <= sizeof(*sheng_pmsg) || pmsg_size > resource_size(&resource) ||
++	    pmsg_size > MTDOOPS_MAX_MTD_SIZE)
++		return -EINVAL;
++	start = resource.end + 1 - pmsg_size;
++	if (!IS_ALIGNED(start, PAGE_SIZE) || !IS_ALIGNED(pmsg_size, PAGE_SIZE))
++		return -EINVAL;
++	/* Match the actual ramoops owner and its mapping attributes. */
++	for_each_compatible_node(ram, NULL, "ramoops") {
++		if (of_address_to_resource(ram, 0, &ram_resource) ||
++		    resource.start != ram_resource.start || resource.end != ram_resource.end)
++			continue;
++		mem_type = of_property_read_bool(ram, "unbuffered");
++		of_property_read_u32(ram, "mem-type", &mem_type);
++		of_property_read_u32(ram, "ecc-size", &ecc);
++		matched = true;
++		of_node_put(ram);
++		break;
++	}
++	if (!matched || ecc || mem_type > 2)
++		return -EINVAL;
++	protection = mem_type == 2 ? PAGE_KERNEL : mem_type == 1 ?
++		pgprot_noncached(PAGE_KERNEL) : pgprot_writecombine(PAGE_KERNEL);
++	count = pmsg_size >> PAGE_SHIFT;
++	pages = kmalloc_array(count, sizeof(*pages), GFP_KERNEL);
++	if (!pages)
++		return -ENOMEM;
++	for (i = 0; i < count; i++) {
++		unsigned long pfn = (start >> PAGE_SHIFT) + i;
++
++		if (!pfn_valid(pfn)) {
++			kfree(pages);
++			return -EINVAL;
++		}
++		pages[i] = pfn_to_page(pfn);
++	}
++	/* Same mapping as persistent_ram_vmap; this reader never resets the ring. */
++	sheng_pmsg = vmap(pages, count, VM_MAP | VM_IOREMAP, protection);
++	kfree(pages);
++	if (!sheng_pmsg)
++		return -ENOMEM;
++	sheng_pmsg_capacity = pmsg_size - sizeof(*sheng_pmsg);
++	ret = register_reboot_notifier(&sheng_mtd_reboot_nb);
++	if (ret) {
++		vunmap(sheng_pmsg);
++		sheng_pmsg = NULL;
++	}
++	return ret;
++}
++
++static void mtdoops_sheng_exit(void)
++{
++	unregister_reboot_notifier(&sheng_mtd_reboot_nb);
++	vunmap(sheng_pmsg);
++	sheng_pmsg = NULL;
++}
+--- /dev/null
++++ b/ws/common/drivers/mtd/mtdoops-sheng-ring.h
+@@ -0,0 +1,28 @@
++/* SPDX-License-Identifier: GPL-2.0-only */
++/* Bounds for the newest bytes of the original persistent pmsg ring. */
++#ifndef MTDOOPS_SHENG_RING_H
++#define MTDOOPS_SHENG_RING_H
++
++struct sheng_pmsg_chunks {
++	size_t offset;
++	size_t first;
++	size_t second;
++};
++
++static inline bool sheng_pmsg_chunks(size_t capacity, size_t start, size_t size,
++				    size_t limit, struct sheng_pmsg_chunks *out)
++{
++	size_t count, begin;
++
++	if (!capacity || start > capacity || size > capacity)
++		return false;
++	if (start == capacity)
++		start = 0;
++	count = size < limit ? size : limit;
++	begin = start >= count ? start - count : capacity - (count - start);
++	out->offset = begin;
++	out->first = count < capacity - begin ? count : capacity - begin;
++	out->second = count - out->first;
++	return true;
++}
++#endif

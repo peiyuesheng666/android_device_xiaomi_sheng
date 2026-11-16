@@ -1,0 +1,136 @@
+// SPDX-License-Identifier: Apache-2.0
+cc_defaults {
+    name: "sheng-dolby-codec2-service-defaults",
+    vendor: true,
+    installable: false,
+    compile_multilib: "64",
+    relative_install_path: "hw",
+    defaults: ["libcodec2-hidl-defaults@1.0"],
+    srcs: ["service.cpp"],
+    shared_libs: ["libbinder", "libhidlbase", "liblog", "libutils"],
+    cflags: ["-Wall", "-Wextra", "-Werror"],
+}
+
+cc_binary {
+    name: "sheng-dolbycodec2",
+    stem: "dolbycodec2",
+    defaults: ["sheng-dolby-codec2-service-defaults"],
+    shared_libs: ["c2.dolby.store"],
+    cflags: ["-DSHENG_CODEC2_INSTANCE=\"dolby\""],
+}
+
+cc_binary {
+    name: "sheng-vendor.dolby.media.c2@1.0-service",
+    stem: "vendor.dolby.media.c2@1.0-service",
+    defaults: ["sheng-dolby-codec2-service-defaults"],
+    shared_libs: ["libcodec2_store_dolby"],
+    cflags: ["-DSHENG_CODEC2_INSTANCE=\"default1\""],
+}
+
+// The vendor prebuilt remains the sole installer for the original service path.
+cc_binary {
+    name: "sheng-vendor.qti.media.c2@1.0-service",
+    stem: "vendor.qti.media.c2@1.0-service",
+    vendor: true,
+    installable: false,
+    compile_multilib: "64",
+    relative_install_path: "hw",
+    defaults: ["libcodec2-hidl-defaults@1.0"],
+    srcs: ["qti_service.cpp"],
+    shared_libs: [
+        "libavservices_minijail",
+        "libbinder",
+        "libdl",
+        "libhidlbase",
+        "liblog",
+        "libutils",
+    ],
+    cflags: ["-Wall", "-Wextra", "-Werror"],
+}
+
+// The original vendor module installs the lightweight bootstrap at its service
+// path and requires this separately loaded payload.
+cc_binary {
+    name: "sheng-qti-codec2-bootstrap",
+    vendor: true,
+    installable: false,
+    compile_multilib: "64",
+    min_sdk_version: "29",
+    relative_install_path: "hw",
+    srcs: ["qti_bootstrap.cpp"],
+    shared_libs: ["libavservices_minijail", "libdl", "liblog"],
+    cflags: ["-Wall", "-Wextra", "-Werror"],
+}
+
+cc_library_shared {
+    name: "libsheng_qti_codec2_service",
+    vendor: true,
+    installable: true,
+    compile_multilib: "64",
+    defaults: ["libcodec2-hidl-defaults@1.0"],
+    srcs: ["qti_payload.cpp"],
+    shared_libs: ["libbinder", "libdl", "libhidlbase", "liblog", "libutils"],
+    // These are dlopen roots, not direct bootstrap dependencies. Keep all
+    // registry plugins available even when product package pruning is enabled.
+    required: [
+        "libqcodec2_core",
+        "libcodec2_vndk",
+        "libqcodec2_v4l2codec",
+        "libqcodec2_filterbase",
+        "libqc2audio_basecodec",
+        "libqc2filter",
+        "libqc2colorconvertfilter",
+        "libqc2vppfilter",
+        "libqcodec2_imgtxrfilter",
+        "libqcodec2_cvpfilter",
+    ],
+    cflags: ["-Wall", "-Wextra", "-Werror"],
+}
+
+cc_binary {
+    name: "sheng-qti-audio-codec2-bootstrap",
+    vendor: true,
+    installable: false,
+    compile_multilib: "64",
+    min_sdk_version: "29",
+    relative_install_path: "hw",
+    srcs: ["qti_bootstrap.cpp"],
+    shared_libs: ["libavservices_minijail", "libdl", "liblog"],
+    cflags: ["-Wall", "-Wextra", "-Werror", "-DSHENG_QTI_AUDIO"],
+}
+
+cc_library_shared {
+    name: "libsheng_qti_audio_codec2_service",
+    vendor: true,
+    installable: true,
+    compile_multilib: "64",
+    defaults: ["libcodec2-hidl-defaults@1.0"],
+    srcs: ["qti_payload.cpp"],
+    shared_libs: ["libbinder", "libdl", "libhidlbase", "liblog", "libutils"],
+    required: [
+        "libqc2audio_core",
+        "libcodec2_vndk",
+        "libqc2audio_basecodec",
+        "libqc2audio_swaudiocodec",
+        "libqc2audio_hwaudiocodec",
+        "libAlacSwDec",
+        "libApeSwDec",
+        "libFlacSwDec",
+        "libEvrcSwCodec",
+        "libQcelp13SwCodec",
+        "libdsd2pcm",
+    ],
+    cflags: ["-Wall", "-Wextra", "-Werror", "-DSHENG_QTI_AUDIO"],
+}
+
+// Stock video handlers use the pre-delivery-status AHandler layout. Keep the
+// generated vendor installer identities and isolate only their foundation ABI.
+filegroup {
+    name: "sheng_dolby_video_decoder_legacy_handler_input",
+    srcs: ["video/c2.dolby.hevc.dec.so"],
+}
+
+filegroup {
+    name: "sheng_dolby_video_secure_decoder_legacy_handler_input",
+    srcs: ["video/c2.dolby.hevc.sec.dec.so"],
+}

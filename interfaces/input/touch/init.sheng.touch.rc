@@ -1,0 +1,6 @@
+# SPDX-License-Identifier: Apache-2.0
+# Configuration is sent by ShengTouch only after a stable display-ON event.
+# This file grants access; it does not change a controller mode at boot/suspend.
+on boot
+    chown system system /dev/xiaomi-touch
+    chmod 0660 /dev/xiaomi-touch

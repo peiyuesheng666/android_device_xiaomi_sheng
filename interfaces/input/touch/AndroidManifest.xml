@@ -1,0 +1,8 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.xiaomi.sheng.touch" android:sharedUserId="android.uid.system"
+    android:versionCode="2" android:versionName="2.0">
+    <uses-permission android:name="android.permission.INTERACT_ACROSS_USERS_FULL" />
+    <application android:name=".ShengTouchApplication" android:label="ShengTouch"
+        android:persistent="true" android:directBootAware="true"
+        android:allowBackup="false" android:hasCode="true" />
+</manifest>

@@ -1,0 +1,25 @@
+--- a/soc/Kbuild
++++ b/soc/Kbuild
+@@ -27,6 +27,10 @@
+ obj-m += mhi_dev_satellite.o
+ mhi_dev_satellite-y := drivers/bus/mhi/devices/mhi_satellite.o
+ CFLAGS_drivers/bus/mhi/devices/mhi_satellite.o += -I$(M)/drivers/bus/mhi/devices -I$(M)/drivers/bus/mhi -I$(M)/drivers/bus/mhi/host -I$(M)/drivers/remoteproc -I$(M)/drivers/rpmsg -I$(M)/kernel/trace -I$(M)/drivers/soc/qcom -I$(M)/drivers/dma-buf/heaps -I$(M)/drivers/dma-buf/heaps/aizerofs -I$(M)/drivers/soc/qcom/mem_buf -I$(M)/include/linux -I$(M)/drivers/firmware/qcom -I$(M)/drivers/virt/gunyah -I$(M)/arch/arm64/gunyah -I$(M)/include/linux/gunyah -I$(M)/drivers/pinctrl/qcom -I$(M)/drivers/clk/qcom
++
++obj-m += mhi_dev_dtr.o
++mhi_dev_dtr-y := drivers/bus/mhi/devices/mhi_dtr.o
++CFLAGS_drivers/bus/mhi/devices/mhi_dtr.o += -I$(M)/drivers/bus/mhi/devices -I$(M)/drivers/bus/mhi -I$(M)/drivers/bus/mhi/host -I$(M)/drivers/remoteproc -I$(M)/drivers/rpmsg -I$(M)/kernel/trace -I$(M)/drivers/soc/qcom -I$(M)/drivers/dma-buf/heaps -I$(M)/drivers/dma-buf/heaps/aizerofs -I$(M)/drivers/soc/qcom/mem_buf -I$(M)/include/linux -I$(M)/drivers/firmware/qcom -I$(M)/drivers/virt/gunyah -I$(M)/arch/arm64/gunyah -I$(M)/include/linux/gunyah -I$(M)/drivers/pinctrl/qcom -I$(M)/drivers/clk/qcom
+ 
+ obj-m += mhi_dev_uci.o
+ mhi_dev_uci-y := drivers/bus/mhi/devices/mhi_uci.o
+--- a/soc/gen/autoconf_vendor.h
++++ b/soc/gen/autoconf_vendor.h
+@@ -276,6 +276,9 @@
+ #ifndef CONFIG_MHI_SATELLITE_MODULE
+ #define CONFIG_MHI_SATELLITE_MODULE 1
+ #endif
++#ifndef CONFIG_MHI_DTR_MODULE
++#define CONFIG_MHI_DTR_MODULE 1
++#endif
+ #ifndef CONFIG_MHI_UCI_MODULE
+ #define CONFIG_MHI_UCI_MODULE 1
+ #endif

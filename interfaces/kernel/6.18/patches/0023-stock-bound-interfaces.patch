@@ -1,0 +1,1177 @@
+--- /dev/null
++++ b/sheng-ports/pogo/ipc/qcom_ipc_lite.c
+@@ -0,0 +1,127 @@
++// SPDX-License-Identifier: GPL-2.0-only
++/*
++ * Copyright (c) 2021, The Linux Foundation. All rights reserved.
++ * Copyright (c) 2022, Qualcomm Innovation Center, Inc. All rights reserved.
++ */
++
++#include <linux/kernel.h>
++#include <linux/module.h>
++#include <linux/rpmsg.h>
++#include <linux/unaligned.h>
++#include <dt-bindings/soc/qcom,ipcc.h>
++
++#include "qcom_ipc_lite.h"
++
++#define IPCLITE_GLINK_GUID      "ipcliteglink-apps-dsp"
++#define IPCC_CLIENT_CDSP        6
++
++static struct ipc_lite_channel channel_info;
++static struct ipc_lite_client ipc_client;
++static DEFINE_MUTEX(channel_lock);
++static DEFINE_MUTEX(client_lock);
++
++int ipc_lite_register_client(IPCC_Client cb_func_ptr, void *priv)
++{
++	int err = 0;
++
++	if (!cb_func_ptr)
++		return -EINVAL;
++
++	mutex_lock(&client_lock);
++	ipc_client.callback = cb_func_ptr;
++	ipc_client.priv_data = priv;
++	mutex_unlock(&client_lock);
++	pr_info("client callback registered with ipc_lite\n");
++	return err;
++}
++EXPORT_SYMBOL(ipc_lite_register_client);
++
++int ipc_lite_msg_send(int32_t client_id, uint64_t data, int allow_wait)
++{
++	int err = 0;
++
++	mutex_lock(&channel_lock);
++	VERIFY(err, !IS_ERR_OR_NULL(channel_info.rpdev));
++	if (err) {
++		err = -ENODEV;
++		goto bail;
++	}
++
++	if (allow_wait)
++		err = rpmsg_send(channel_info.rpdev->ept,
++				(void *)&data, sizeof(data));
++	else
++		err = rpmsg_trysend(channel_info.rpdev->ept,
++				(void *)&data, sizeof(data));
++bail:
++	mutex_unlock(&channel_lock);
++	return err;
++}
++EXPORT_SYMBOL(ipc_lite_msg_send);
++
++static int ipc_lite_rpmsg_callback(struct rpmsg_device *rpdev,
++	void *data, int len, void *priv, u32 addr)
++{
++	int err = 0;
++
++	if (!data || len != sizeof(uint64_t)) return -EINVAL;
++	mutex_lock(&client_lock);
++	if (ipc_client.callback)
++		err = ipc_client.callback(IPCC_CLIENT_CDSP,
++				get_unaligned((uint64_t *)data), ipc_client.priv_data);
++	mutex_unlock(&client_lock);
++
++	return err;
++}
++
++static int ipc_lite_rpmsg_probe(struct rpmsg_device *rpdev)
++{
++	int err = 0;
++
++	VERIFY(err, !IS_ERR_OR_NULL(rpdev));
++	if (err)
++		return -ENODEV;
++
++	mutex_lock(&channel_lock);
++	if (channel_info.rpdev) { mutex_unlock(&channel_lock); return -EBUSY; }
++	channel_info.rpdev = rpdev;
++	mutex_unlock(&channel_lock);
++	dev_info(&rpdev->dev, "rpmsg_probe for ipc_lite done\n");
++
++	return err;
++}
++
++static void ipc_lite_rpmsg_remove(struct rpmsg_device *rpdev)
++{
++	int err = 0;
++
++	VERIFY(err, !IS_ERR_OR_NULL(rpdev));
++	if (err) {
++		err = -ENODEV;
++		return;
++	}
++	mutex_lock(&channel_lock);
++	if (channel_info.rpdev == rpdev) channel_info.rpdev = NULL;
++	mutex_unlock(&channel_lock);
++}
++
++static const struct rpmsg_device_id ipc_lite_rpmsg_id_table[] = {
++	{ IPCLITE_GLINK_GUID },
++	{ },
++};
++
++MODULE_DEVICE_TABLE(rpmsg, ipc_lite_rpmsg_id_table);
++
++static struct rpmsg_driver ipc_lite_rpmsg_client = {
++	.id_table = ipc_lite_rpmsg_id_table,
++	.probe = ipc_lite_rpmsg_probe,
++	.remove = ipc_lite_rpmsg_remove,
++	.callback = ipc_lite_rpmsg_callback,
++	.drv = {
++		.name = "qcom,msm_ipclite_rpmsg",
++	},
++};
++
++module_rpmsg_driver(ipc_lite_rpmsg_client);
++
++MODULE_LICENSE("GPL v2");
+--- /dev/null
++++ b/sheng-ports/pogo/ipc/qcom_ipc_lite.h
+@@ -0,0 +1,96 @@
++/* SPDX-License-Identifier: GPL-2.0-only */
++/*
++ * Copyright (c) 2021, The Linux Foundation. All rights reserved.
++ * Copyright (c) 2022, Qualcomm Innovation Center, Inc. All rights reserved.
++ */
++
++#include <linux/module.h>
++#include <linux/platform_device.h>
++#include <dt-bindings/soc/qcom,ipcc.h>
++
++#ifdef VERIFY_PRINT_ERROR
++#define VERIFY_EPRINTF(format, ...) pr_err(format, ##__VA_ARGS__)
++#else
++#define VERIFY_EPRINTF(format, args) ((void)0)
++#endif
++
++#ifndef VERIFY_PRINT_INFO
++#define VERIFY_IPRINTF(args) ((void)0)
++#endif
++
++#ifndef VERIFY
++#define __STR__(x) #x ":"
++#define __TOSTR__(x) __STR__(x)
++#define __FILE_LINE__ __FILE__ ":" __TOSTR__(__LINE__)
++#define __IPC_LITE_LINE__ "adsprpc:" __TOSTR__(__LINE__)
++
++#define VERIFY(err, val)                                                     \
++	do {                                                                     \
++		VERIFY_IPRINTF(__FILE_LINE__"info: calling: " #val "\n");            \
++		if ((val) == 0) {                                                    \
++			(err) = (err) == 0 ? -1 : (err);                                 \
++			VERIFY_EPRINTF(__IPC_LITE_LINE__" error: %d: "#val "\n", (err)); \
++		} else {                                                             \
++			VERIFY_IPRINTF(__FILE_LINE__"info: passed: " #val "\n");         \
++		}                                                                    \
++	} while (0)
++#endif
++
++typedef int (*IPCC_Client)(uint32_t client_id,  uint64_t data,  void *priv);
++
++/**
++ * struct ipc_lite_client - depiction of each ipc_lite client
++ *
++ * @callback  : function pointer to client callback function
++ * @priv_data : pointer to client's private data
++ * @recv_lock : guard for callback
++ */
++struct ipc_lite_client {
++	IPCC_Client callback;
++	void *priv_data;
++	spinlock_t recv_lock;
++};
++
++/**
++ * struct ipc_lite_channel - depiction of each ipc_lite channel
++ *
++ * @rpdev       : rpdev reference
++ * @rpmsg_mutex : guard for rpdev
++ */
++struct ipc_lite_channel {
++	struct rpmsg_device *rpdev;
++	struct mutex rpmsg_mutex;
++};
++
++/**
++ * struct qcom_ipc_lite - ipc_lite context for each subsystem
++ *
++ * @channel : pointer to ipc_lite_channel
++ * @client  : pointer to ipc_lite_client
++ */
++struct qcom_ipc_lite {
++	struct ipc_lite_channel *channel;
++	struct ipc_lite_client *client;
++};
++
++/**
++ * ipc_lite_msg_send() - Sends message to remote client.
++ *
++ * @client_id  : Identifier for remote client or subsystem.
++ * @data       : 64 bit message value.
++ * @allow_wait : Whether or not to allow waiting for transport to be
++ *               available.
++ *
++ * @return Zero on successful registration, negative on failure.
++ */
++int ipc_lite_msg_send(int32_t client_id, uint64_t data, int allow_wait);
++
++/**
++ * ipc_lite_register_client() - Registers client callback with framework.
++ *
++ * @cb_func_ptr : Client callback function to be called on message receive.
++ * @priv        : Private data required by client for handling callback.
++ *
++ * @return Zero on successful registration, negative on failure.
++ */
++int ipc_lite_register_client(IPCC_Client cb_func_ptr, void *priv);
+--- /dev/null
++++ b/sheng-ports/pogo/ntag/ntag_common.c
+@@ -0,0 +1,277 @@
++
++#include <linux/of_gpio.h>
++#include <linux/pinctrl/consumer.h>
++#include <linux/of_device.h>
++#include <linux/delay.h>
++#include <linux/ioctl.h>
++
++#include "ntag_common.h"
++
++int nfc_parse_dt(struct device *dev, struct platform_configs *nfc_configs)
++{
++	int ret=0;
++	struct device_node *np = dev->of_node;
++	struct platform_gpio *nfc_gpio = &nfc_configs->gpio;
++	struct platform_ldo *ldo = &nfc_configs->ldo;
++
++	if (!np) {
++		pr_err("nfc of_node NULL\n");
++		return -EINVAL;
++	}
++
++	nfc_gpio->pu = -EINVAL;
++	nfc_gpio->hpd = -EINVAL;
++
++	nfc_gpio->pu = of_get_named_gpio(np, DTS_IRQ_GPIO_STR, 0);
++	if ((!gpio_is_valid(nfc_gpio->pu))) {
++		pr_err("nfc irq gpio invalid %d\n", nfc_gpio->pu);
++		return nfc_gpio->pu == -EPROBE_DEFER ? -EPROBE_DEFER : -EINVAL;
++	}
++	pr_info("%s: irq %d\n", __func__, nfc_gpio->pu);
++
++	nfc_gpio->hpd = of_get_named_gpio(np, DTS_HPD_GPIO_STR, 0);
++	if ((!gpio_is_valid(nfc_gpio->hpd))) {
++		pr_err("nfc ven gpio invalid %d\n", nfc_gpio->hpd);
++		return nfc_gpio->hpd == -EPROBE_DEFER ? -EPROBE_DEFER : -EINVAL;
++	}
++
++	pr_info("%s: hpd %d\n", __func__, nfc_gpio->hpd);
++
++	// optional property
++	ret = of_property_read_u32_array(np, NTAG5_LDO_VOL_DT_NAME,
++			(u32 *) ldo->vdd_levels,
++			ARRAY_SIZE(ldo->vdd_levels));
++	if (ret) {
++		dev_err(dev, "error reading NFC VDDIO min and max value\n");
++		// set default as per datasheet
++		ldo->vdd_levels[0] = NFC_VDDIO_MIN;
++		ldo->vdd_levels[1] = NFC_VDDIO_MAX;
++	}
++
++	// optional property
++	ret = of_property_read_u32(np, NTAG5_LDO_CUR_DT_NAME, &ldo->max_current);
++	if (ret) {
++		dev_err(dev, "error reading NFC current value\n");
++		// set default as per datasheet
++		ldo->max_current = NFC_CURRENT_MAX;
++	}
++
++	return 0;
++}
++
++
++int configure_gpio(unsigned int gpio, int flag)
++{
++	int ret = 0;
++
++	pr_info("%s: nfc gpio [%d] flag [%01x]\n", __func__, gpio, flag);
++
++	if (gpio_is_valid(gpio)) {
++		ret = gpio_request(gpio, "nfc_gpio");
++		if (ret) {
++			pr_err("%s: unable to request nfc gpio [%d]\n",  __func__, gpio);
++			return ret;
++		}
++
++		if (flag == GPIO_HPD) {
++			ret = gpio_direction_output(gpio, 0);
++			if (ret) {
++				pr_err("%s: unable to set direction for nfc gpio [%d]\n", __func__, gpio);
++				gpio_free(gpio);
++				return ret;
++			}
++
++			mdelay(5);
++			gpio_set_value(gpio, 1);
++			pr_err("%s: unable to set direction for nfc gpio [%d]\n", __func__, gpio_get_value(gpio));
++
++
++			mdelay(5);
++			gpio_set_value(gpio, 0);
++			pr_err("%s: unable to set direction for nfc gpio [%d]\n", __func__, gpio_get_value(gpio));
++		} else if (flag == GPIO_IRQ) {
++			ret = gpio_direction_input(gpio);
++			if (ret) {
++				pr_err("%s: unable to set direction for nfc gpio [%d]\n", __func__, gpio);
++				gpio_free(gpio);
++				return ret;
++			}
++
++			ret = gpio_to_irq(gpio);
++		}
++	} else {
++		pr_err("%s: invalid gpio\n", __func__);
++		ret = -EINVAL;
++	}
++	return ret;
++}
++
++int ntag5_gpio_init(struct ntag_dev *ntag5_dev)
++{
++	int ret=0;
++
++	ntag5_dev->ntag5_pinctrl = devm_pinctrl_get(ntag5_dev->nfc_device);
++	if(IS_ERR_OR_NULL(ntag5_dev->ntag5_pinctrl)) {
++		pr_err("%s: No pinctrl config specified\n", __func__);
++		ret = ntag5_dev->ntag5_pinctrl ? PTR_ERR(ntag5_dev->ntag5_pinctrl) : -ENODEV;
++		return ret;
++	}
++
++	// the default ED pinctrl state check
++	ntag5_dev->ntag5_pu_default =
++		pinctrl_lookup_state(ntag5_dev->ntag5_pinctrl, "ntag5_pu_default");
++	if(IS_ERR_OR_NULL(ntag5_dev->ntag5_pu_default)) {
++		pr_err("%s: ntag5_pu_default  \n", __func__);
++		ret = PTR_ERR(ntag5_dev->ntag5_pu_default);
++		return ret;
++	}
++
++	// the default HPD pinctrl state check
++	ntag5_dev->ntag5_hpd_default =
++		pinctrl_lookup_state(ntag5_dev->ntag5_pinctrl, "ntag5_hpd_default");
++	if (IS_ERR_OR_NULL(ntag5_dev->ntag5_hpd_default)) {
++		pr_err("%s: ntag5_hpd_default  \n", __func__);
++		ret = PTR_ERR(ntag5_dev->ntag5_hpd_default);
++		return ret;
++	}
++
++	// set the ED and HPD to the default state
++	ret = pinctrl_select_state(ntag5_dev->ntag5_pinctrl, ntag5_dev->ntag5_pu_default);
++	if (ret < 0) {
++		pr_err("%s: fail to select pinctrl pu default rc=%d\n", __func__, ret);
++		return ret;
++	}
++
++	ret = pinctrl_select_state(ntag5_dev->ntag5_pinctrl, ntag5_dev->ntag5_hpd_default);
++	if (ret < 0) {
++		pr_err("%s: fail to select pinctrl hpd default rc=%d\n", __func__, ret);
++		return ret;
++	}
++
++	return ret;
++}
++
++void nfc_misc_unregister(struct ntag_dev *nfc_dev, int count)
++{
++	pr_debug("%s: entry\n", __func__);
++	device_destroy(nfc_dev->nfc_class, nfc_dev->devno);
++	cdev_del(&nfc_dev->c_dev);
++	class_destroy(nfc_dev->nfc_class);
++	unregister_chrdev_region(nfc_dev->devno, count);
++}
++
++int nfc_misc_register(struct ntag_dev *nfc_dev,
++		      const struct file_operations *nfc_fops, int count,
++		      char *devname, char *classname)
++{
++	int ret = 0;
++
++	ret = alloc_chrdev_region(&nfc_dev->devno, 0, count, devname);
++	if (ret < 0) {
++		pr_err("%s: failed to alloc chrdev region ret %d\n",
++			__func__, ret);
++		return ret;
++	}
++
++	pr_info("%s: enter\n", "device starting registered!");
++
++	nfc_dev->nfc_class = class_create(classname);
++	if (IS_ERR(nfc_dev->nfc_class)) {
++		ret = PTR_ERR(nfc_dev->nfc_class);
++		pr_err("%s: failed to register device class ret %d\n",
++			__func__, ret);
++		unregister_chrdev_region(nfc_dev->devno, count);
++		return ret;
++	}
++
++	cdev_init(&nfc_dev->c_dev, nfc_fops);
++
++	ret = cdev_add(&nfc_dev->c_dev, nfc_dev->devno, count);
++	if (ret < 0) {
++		pr_err("%s: failed to add cdev ret %d\n", __func__, ret);
++		class_destroy(nfc_dev->nfc_class);
++		unregister_chrdev_region(nfc_dev->devno, count);
++		return ret;
++	}
++
++	nfc_dev->nfc_device = device_create(nfc_dev->nfc_class, NULL,
++					    nfc_dev->devno, nfc_dev, devname);
++	if (IS_ERR(nfc_dev->nfc_device)) {
++		ret = PTR_ERR(nfc_dev->nfc_device);
++		pr_err("%s: failed to create the device ret %d\n",
++			__func__, ret);
++		cdev_del(&nfc_dev->c_dev);
++		class_destroy(nfc_dev->nfc_class);
++		unregister_chrdev_region(nfc_dev->devno, count);
++		return ret;
++	}
++
++	return 0;
++}
++
++int nfc_ldo_vote(struct ntag_dev *nfc_dev)
++{
++	int ret;
++
++	ret =  regulator_set_voltage(nfc_dev->reg,
++			nfc_dev->configs.ldo.vdd_levels[0],
++			nfc_dev->configs.ldo.vdd_levels[1]);
++	if (ret < 0) {
++		pr_err("%s: set voltage failed\n", __func__);
++		return ret;
++	}
++
++	/* pass expected current from NFC in uA */
++	ret = regulator_set_load(nfc_dev->reg, nfc_dev->configs.ldo.max_current);
++	if (ret < 0) {
++		pr_err("%s: set load failed\n", __func__);
++		return ret;
++	}
++
++	ret = regulator_enable(nfc_dev->reg);
++	if (ret < 0)
++		pr_err("%s: regulator_enable failed\n", __func__);
++	else
++		nfc_dev->is_vreg_enabled = true;
++	return ret;
++}
++
++int nfc_ldo_config(struct device *dev, struct ntag_dev *nfc_dev)
++{
++	int ret;
++
++	if (of_get_property(dev->of_node, NTAG5_LDO_SUPPLY_NAME, NULL)) {
++		// Get the regulator handle
++		nfc_dev->reg = regulator_get(dev, NTAG5_LDO_SUPPLY_DT_NAME);
++		if (IS_ERR(nfc_dev->reg)) {
++			ret = PTR_ERR(nfc_dev->reg);
++			nfc_dev->reg = NULL;
++			pr_err("%s: regulator_get failed, ret = %d\n",
++				__func__, ret);
++			return ret;
++		}
++	} else {
++		nfc_dev->reg = NULL;
++		pr_err("%s: regulator entry not present\n", __func__);
++		// return success as it's optional to configure LDO
++		return 0;
++	}
++
++	// LDO config supported by platform DT
++	ret = nfc_ldo_vote(nfc_dev);
++	if (ret < 0) {
++		pr_err("%s: LDO voting failed, ret = %d\n", __func__, ret);
++		regulator_put(nfc_dev->reg);
++		nfc_dev->reg = NULL;
++	}
++	return ret;
++}
++
++
++
++
++
++
++
++
++
+--- /dev/null
++++ b/sheng-ports/pogo/ntag/ntag_common.h
+@@ -0,0 +1,155 @@
++
++#ifndef _NTAG_COMMON_H_
++#define _NTAG_COMMON_H_
++
++#include <linux/types.h>
++#include <linux/kref.h>
++#include <linux/version.h>
++#include <linux/semaphore.h>
++#include <linux/completion.h>
++#include <linux/ioctl.h>
++#include <linux/cdev.h>
++#include <linux/spinlock.h>
++#include <linux/gpio.h>
++#include <linux/fs.h>
++#include <linux/kernel.h>
++#include <linux/module.h>
++#include <linux/of_device.h>
++#include <linux/interrupt.h>
++#include <linux/delay.h>
++#include <linux/uaccess.h>
++#include <linux/slab.h>
++#include <linux/regulator/consumer.h>
++#include <linux/ipc_logging.h>
++#include <linux/mutex.h>
++#include <linux/delay.h>
++#include "ntag_i2c_drv.h"
++
++// Max device count for this driver
++#define DEV_COUNT            1
++
++// NFC device class
++#define CLASS_NAME           "ntag5-nfc"
++
++//  NFC character device name, this will be in /dev/
++#define NFC_CHAR_DEV_NAME	 "ntag5-nci"
++
++#define NTAG5_I2C_DRV_STR   "nxp,ntag5"	/*kept same as dts */
++
++#define DTS_IRQ_GPIO_STR	"qcom,ntag-pu"
++#define DTS_HPD_GPIO_STR	"qcom,ntag-hpd"
++
++#define NTAG5_LDO_SUPPLY_DT_NAME	"qcom,ntag-vdd-3p2"
++#define NTAG5_LDO_SUPPLY_NAME	    "qcom,ntag-vdd-3p2-supply"
++#define NTAG5_LDO_VOL_DT_NAME	    "qcom,ntag-vdd-3p2-voltage"
++#define NTAG5_LDO_CUR_DT_NAME	    "qcom,ntag-vdd-3p2-current"
++#define NFC_VDDIO_MIN		3200000 //in uV
++#define NFC_VDDIO_MAX		3200000 //in uV
++#define NFC_CURRENT_MAX		60000 //in uA
++
++#define MAX_BUFFER_SIZE  (255)
++#define MAX_DL_BUFFER_SIZE (560)
++
++#define NTAG5_BLOCK_SIZE          4
++#define STATUS_BUFFER_SIZE_NOT_SUPPORT    247		// BUF溢出错误
++
++#define NFCLOG_IPC(nfc_dev, log_to_dmesg, x...)	\
++do { \
++	if (log_to_dmesg) { \
++		if (nfc_dev->nfc_device) \
++			dev_err((nfc_dev->nfc_device), x); \
++		else \
++			pr_err(x); \
++	} \
++} while (0)
++
++/*nfc state flags*/
++enum nfc_state_flags {
++
++	/**NTAG5 default state*/
++	NTAG5_DEFAULT_STATE = 0,
++
++	/**NTAG5 PU/ED  event detection state */
++	NTAG5_PU_STATE = 0x1,
++
++	/**NTAG5 hard power down state*/
++	NTAG5_HPD_STATE = 0x2,
++
++};
++
++/* Enum for GPIO values*/
++enum gpio_values {
++	GPIO_INPUT = 0x0,
++	GPIO_OUTPUT = 0x1,
++	GPIO_OUTPUT_HIGH = 0x3,
++	GPIO_OUTPUT_LOW = 0x5,
++	GPIO_IRQ = 0x6,
++	GPIO_HPD = 0x7,
++};
++
++// NFC GPIO variables
++struct platform_gpio {
++	unsigned int pu;
++	unsigned int hpd;
++};
++
++// NFC LDO entries from DT
++struct platform_ldo {
++  	int vdd_levels[2];
++  	int max_current;
++};
++
++// NFC Struct to get all the required configs from DTS
++struct platform_configs {
++	struct platform_gpio gpio;
++	struct platform_ldo ldo;
++};
++
++/* Device specific structure */
++struct ntag_dev {
++	struct kref ref;
++	bool ready;
++
++	struct i2c_dev i2c_dev;
++
++	struct platform_configs configs;
++
++	struct cdev c_dev;
++
++	dev_t devno;
++	wait_queue_head_t read_wq;
++
++	uint8_t nfc_state;
++
++	struct pinctrl              *ntag5_pinctrl;
++	struct pinctrl_state        *ntag5_pu_default;
++	struct pinctrl_state        *ntag5_pu_suspend;
++	struct pinctrl_state        *ntag5_hpd_default;
++	struct pinctrl_state        *ntag5_hpd_suspend;
++
++	struct class *nfc_class;
++	struct device *nfc_device;
++
++	struct fasync_struct *fasync_queue; //异步通知队列
++	struct regulator *reg;
++	bool is_vreg_enabled;
++
++	int (*nfc_read)(struct ntag_dev *dev, char *buf, size_t count, int timeout);
++
++	int (*nfc_enable_intr)(void);
++	int (*nfc_disable_intr)(void);
++};
++
++int nfc_misc_register(struct ntag_dev *ntag_dev,
++		const struct file_operations *nfc_fops, int count, char *devname,
++		char *classname);
++
++void nfc_misc_unregister(struct ntag_dev *ntag_dev, int count);
++
++int configure_gpio(unsigned int gpio, int flag);
++int nfc_parse_dt(struct device *dev, struct platform_configs *nfc_configs);
++int ntag5_gpio_init(struct ntag_dev *ntag_dev);
++int nfc_ldo_vote(struct ntag_dev *nfc_dev);
++int nfc_ldo_vote(struct ntag_dev *nfc_dev);
++int nfc_ldo_config(struct device *dev, struct ntag_dev *nfc_dev);
++#endif
+--- /dev/null
++++ b/sheng-ports/pogo/ntag/ntag_i2c_drv.c
+@@ -0,0 +1,443 @@
++
++
++#include "ntag_common.h"
++
++struct ntag_dev *ntag_dev = NULL;
++void read_wire_data_test(void);
++int ntag5_read_data(u8 *buf, int count, int flags);
++int ntag5_write_data(u8 *buf, int count, int flags);
++int read_register(int add, u8 reg, u8 *val);
++int write_register(int add, char reg, char mask, char *val);
++unsigned char ntag5_i2c_blockWrite(unsigned short addr, unsigned char *buf, unsigned char size);
++unsigned char ntag5_i2c_blockRead(unsigned short addr, unsigned short count, unsigned char *buf, unsigned short size);
++static ssize_t nfc_i2c_dev_read(struct file *, char __user *, size_t, loff_t *);
++static ssize_t nfc_i2c_dev_write(struct file *, const char __user *, size_t, loff_t *);
++static int ntag5_irq_fasync(int, struct file *, int);
++static int ntag5_fasync_release(struct inode *, struct file *);
++
++
++static DEFINE_MUTEX(ntag_api_lock);
++static int ntag_transfer_locked(struct ntag_dev *dev, u8 *buf, int count, int flags)
++{
++ struct i2c_msg msg;
++ int ret;
++ if (!dev || dev != ntag_dev) return -ENODEV;
++ if (!buf || count <= 0 || count > MAX_BUFFER_SIZE) return -EINVAL;
++ msg.addr = dev->i2c_dev.client->addr;
++ msg.flags = flags;
++ msg.len = count;
++ msg.buf = buf;
++ ret = i2c_transfer(dev->i2c_dev.client->adapter, &msg, 1);
++ return ret == 1 ? count : ret < 0 ? ret : -EIO;
++}
++
++int ntag5_read_data(u8 *buf, int count, int flags)
++{
++ int ret;
++ mutex_lock(&ntag_api_lock);
++ ret = ntag_transfer_locked(ntag_dev, buf, count, flags | I2C_M_RD);
++ mutex_unlock(&ntag_api_lock);
++ return ret;
++}
++
++int ntag5_write_data(u8 *buf, int count, int flags)
++{
++ int ret;
++ mutex_lock(&ntag_api_lock);
++ ret = ntag_transfer_locked(ntag_dev, buf, count, flags);
++ mutex_unlock(&ntag_api_lock);
++ return ret;
++}
++
++static void ntag_release(struct kref *ref)
++{ kfree(container_of(ref, struct ntag_dev, ref)); }
++
++static int ntag_open(struct inode *inode, struct file *filp)
++{
++ int ret = -ENODEV;
++ mutex_lock(&ntag_api_lock);
++ if (ntag_dev && ntag_dev->ready && inode->i_cdev == &ntag_dev->c_dev) {
++  kref_get(&ntag_dev->ref);
++  filp->private_data = ntag_dev;
++  ret = stream_open(inode, filp);
++ }
++ mutex_unlock(&ntag_api_lock);
++ return ret;
++}
++
++int read_register(int add, u8 reg, u8 *val)
++{
++	u8 buffer[3];
++	buffer[0] = add >> 8;
++	buffer[1] = add & 0xFF;
++	buffer[2] = reg;
++	if (ntag5_write_data(buffer, 3, 0) != 3) {
++		return 1;
++	}
++
++	if (ntag5_read_data(val, 1, 0) != 1) {
++		return 1;
++	}
++	return 0;
++}
++
++int write_register(int add, char reg, char mask, char *val)
++{
++	u8 buffer[5];
++	buffer[0] = add >> 8;
++	buffer[1] = add & 0xFF;
++	buffer[2] = reg;
++	buffer[3] = mask;
++	buffer[4] = val[0];
++	if (ntag5_write_data(buffer, 5, 0) != 5) {
++		return 1;
++	}
++	/* Wait for write operation completion */
++	mdelay(10);
++	return 0;
++}
++
++/**************************************************************************************************
++** IN:     unsigned short iicBlockAddr    block number to be written
++**         unsigned char *wtBuf           data to be written
++**         unsigned char wtBuf_size       data buffer size
++** NOTE    IMPORTANT - host shall wait for ~4ms after stop_condition to have eeprom programming finished
++**         write 4 bytes to EEPROM or Configuration area
++**************************************************************************************************/
++unsigned char ntag5_i2c_blockWrite(unsigned short iicBlockAddr, unsigned char *wtBuf, unsigned char wtBuf_size)
++{
++	unsigned char status = 1;
++	unsigned char buf[7];
++
++	pr_info("%s : ntag5_i2c_blockWrite iicBlockAddr = %d!\n", __func__, iicBlockAddr);
++	pr_info("%s : ntag5_i2c_blockWrite wtBuf_size = %d!\n", __func__, wtBuf_size);
++
++	if (wtBuf_size < NTAG5_BLOCK_SIZE) {
++		pr_err("%s : ntag5_i2c_blockWrite STATUS_BUFFER_SIZE_NOT_SUPPORT!\n", __func__);
++		return STATUS_BUFFER_SIZE_NOT_SUPPORT;
++	}
++
++	// write one I2C Block: 1 + 4bytes
++	buf[0] = iicBlockAddr >> 8;	// block address: memAddr H
++	buf[1] = (unsigned char)iicBlockAddr;	// block address: memAddr L
++	memcpy(&buf[2], wtBuf, 4);	// data to be written
++
++	status = ntag5_write_data(buf, 6, 0);
++	pr_info("%s : ntag5_i2c_blockWrite status = %d!\n", __func__, status);
++
++	//host shall wait for ~4ms after stop_condition
++	mdelay(4);
++
++	return status;
++}
++
++/**************************************************************************************************
++** IN:          unsigned short iicBlockAddr     starting block number to be read
++**              unsigned char nrOfBlocks        number of blocks to be read, 4 bytes per block
++**              unsigned char *rdBuf            buffer to store read data
++**              unsigned short rdBuf_size       buffer size
++** OUT:         ntag5 will continuely send back data unless receive NACK or Stop from Host
++** NOTE         make sure the read buffer does not overflow
++**************************************************************************************************/
++unsigned char ntag5_i2c_blockRead(unsigned short iicBlockAddr, unsigned short nrOfBlocks, unsigned char *rdBuf, unsigned short rdBuf_size)
++{
++	unsigned char status = 1;
++	unsigned char addr[2];
++
++	pr_info("%s : ntag5_i2c_blockRead iicBlockAddr = %d!\n", __func__, iicBlockAddr);
++	pr_info("%s : ntag5_i2c_blockRead nrOfBlocks = %d!\n", __func__, nrOfBlocks);
++	pr_info("%s : ntag5_i2c_blockRead rdBuf_size = %d!\n", __func__, rdBuf_size);
++
++	if (rdBuf_size < NTAG5_BLOCK_SIZE * nrOfBlocks) {
++		pr_err("%s : ntag5_i2c_blockRead STATUS_BUFFER_SIZE_NOT_SUPPORT!\n", __func__);
++		return STATUS_BUFFER_SIZE_NOT_SUPPORT;
++	}
++
++	addr[0] = iicBlockAddr >> 8;	// addr High
++	addr[1] = (unsigned char)iicBlockAddr;
++
++	// write Block Address: 2bytes
++	status = ntag5_write_data(addr, 2, 0);
++	if (status)
++	{
++		// read block data, total bytes = nrOfBlocks * 4
++		status = ntag5_read_data(rdBuf, nrOfBlocks * 4, 0);
++		if (true) {
++			pr_err("%s : ntag5_i2c_blockRead status = %d!\n", __func__, status);
++		}
++	}
++
++	mdelay(4);
++	return status;
++}
++
++int i2c_disable_irq(void)
++{
++	unsigned long flags;
++	pr_info("%s : i2c_disable_irq enter  !\n", __func__);
++	spin_lock_irqsave(&ntag_dev->i2c_dev.irq_enabled_lock, flags);
++	if (ntag_dev->i2c_dev.irq_enabled) {
++		disable_irq_nosync(ntag_dev->i2c_dev.client->irq);
++		ntag_dev->i2c_dev.irq_enabled = false;
++		pr_err("%s : i2c_disable_irq success !\n", __func__);
++	}
++	spin_unlock_irqrestore(&ntag_dev->i2c_dev.irq_enabled_lock, flags);
++	pr_info("%s : i2c_disable_irq exit   !\n", __func__);
++	return 0;
++}
++
++/**
++ * i2c_enable_irq()
++ *
++ * Check if interrupt is enabled or not
++ * and enable interrupt
++ *
++ * Return: int
++ */
++int i2c_enable_irq(void)
++{
++	unsigned long flags;
++	pr_info("%s : i2c_enable_irq enter  !\n", __func__);
++	spin_lock_irqsave(&ntag_dev->i2c_dev.irq_enabled_lock, flags);
++	if (!ntag_dev->i2c_dev.irq_enabled) {
++		ntag_dev->i2c_dev.irq_enabled = true;
++		enable_irq(ntag_dev->i2c_dev.client->irq);
++		pr_err("%s : i2c_enable_irq success !\n", __func__);
++
++	}
++	spin_unlock_irqrestore(&ntag_dev->i2c_dev.irq_enabled_lock, flags);
++	pr_info("%s : i2c_enable_irq exit   !\n", __func__);
++	return 0;
++}
++
++
++int i2c_read(struct ntag_dev *dev, char *buf, size_t count, int timeout)
++{
++ int ret;
++ if (count > MAX_BUFFER_SIZE || timeout < 0) return -EINVAL;
++ mutex_lock(&ntag_api_lock);
++ ret = ntag_transfer_locked(dev, (u8 *)buf, count, I2C_M_RD);
++ mutex_unlock(&ntag_api_lock);
++ return ret;
++}
++
++static ssize_t nfc_i2c_dev_read(struct file *filp, char __user *buf,
++ size_t count, loff_t *offset)
++{
++ u8 kernel_buf[MAX_BUFFER_SIZE];
++ int ret;
++ if (!count) return 0;
++ if (count > sizeof(kernel_buf)) return -EMSGSIZE;
++ mutex_lock(&ntag_api_lock);
++ ret = ntag_transfer_locked(filp->private_data, kernel_buf, count, I2C_M_RD);
++ mutex_unlock(&ntag_api_lock);
++ if (ret < 0) return ret;
++ return copy_to_user(buf, kernel_buf, count) ? -EFAULT : ret;
++}
++
++static ssize_t nfc_i2c_dev_write(struct file *filp, const char __user *buf,
++ size_t count, loff_t *offset)
++{
++ u8 kernel_buf[6];
++ int ret;
++ if (!count) return 0;
++ if (count != 2 && count != 5 && count != 6) return -EINVAL;
++ if (copy_from_user(kernel_buf, buf, count)) return -EFAULT;
++ mutex_lock(&ntag_api_lock);
++ ret = ntag_transfer_locked(filp->private_data, kernel_buf, count, 0);
++ mutex_unlock(&ntag_api_lock);
++ return ret;
++}
++
++static irqreturn_t i2c_irq_handler(int irq, void *dev_id)
++{
++
++	unsigned long flags;
++	struct ntag_dev *ntag_dev = dev_id;
++	spin_lock_irqsave(&ntag_dev->i2c_dev.irq_enabled_lock, flags);
++	if(ntag_dev->fasync_queue) {
++		/* 在中断服务函数中向应用层发送SIGIO信号-异步通知 */
++		pr_info("%s kill_fasync, inform upper layer", __func__);
++		kill_fasync(&(ntag_dev->fasync_queue), SIGIO, POLL_IN);
++	}
++	spin_unlock_irqrestore(&ntag_dev->i2c_dev.irq_enabled_lock, flags);
++	wake_up(&ntag_dev->read_wq);
++	return IRQ_HANDLED;
++}
++
++static int ntag5_irq_fasync(int fd, struct file *file, int on)
++{
++ struct ntag_dev *dev = file->private_data;
++ int ret;
++ mutex_lock(&ntag_api_lock);
++ if (!dev || (on && dev != ntag_dev)) ret = -ENODEV;
++ else ret = fasync_helper(fd, file, on, &dev->fasync_queue);
++ mutex_unlock(&ntag_api_lock);
++ return ret;
++}
++
++static int ntag5_fasync_release(struct inode *inode, struct file *filp)
++{
++ struct ntag_dev *dev = filp->private_data;
++ int ret = ntag5_irq_fasync(-1, filp, 0);
++ filp->private_data = NULL;
++ if (dev) kref_put(&dev->ref, ntag_release);
++ return ret;
++}
++
++static const struct file_operations ntag_i2c_dev_fops = {
++	.owner = THIS_MODULE,
++	.open = ntag_open,
++	.read = nfc_i2c_dev_read,
++	.write = nfc_i2c_dev_write,
++	.fasync = ntag5_irq_fasync,
++	.release = ntag5_fasync_release,
++};
++
++void read_wire_data_test(void)
++{
++	int count = 10;
++
++	int ret = -1;
++
++	while (count--) {
++		i2c_enable_irq();
++		if (gpio_get_value(ntag_dev->configs.gpio.pu)) {
++			ret = wait_event_interruptible(ntag_dev->read_wq,
++				!ntag_dev->i2c_dev.irq_enabled);
++			if (ret) {
++				pr_err("%s unexpeted wakeup of read wq, try wait again.\n", __func__);
++				return;
++			}
++		}
++		if (!gpio_get_value(ntag_dev->configs.gpio.pu)) {
++			pr_err("%s : gpio_get_value = 0!\n", __func__);
++			break;
++		}
++		i2c_disable_irq();
++		pr_err("%s unexpeted wakeup of read wq, try wait again, count = %d\n", __func__, count);
++	}
++
++}
++
++static int nfc_i2c_dev_probe(struct i2c_client *client)
++{
++ struct ntag_dev *dev;
++ struct platform_configs configs = {0};
++ bool pu = false, hpd = false, irq = false, misc = false;
++ char buffer = 1;
++ int ret;
++ ret = nfc_parse_dt(&client->dev, &configs);
++ if (ret) return ret;
++ if (!i2c_check_functionality(client->adapter, I2C_FUNC_I2C)) return -ENODEV;
++ dev = kzalloc(sizeof(*dev), GFP_KERNEL);
++ if (!dev) return -ENOMEM;
++ kref_init(&dev->ref);
++ dev->configs = configs;
++ dev->nfc_device = &client->dev;
++ dev->i2c_dev.client = client;
++ dev->nfc_enable_intr = i2c_enable_irq;
++ dev->nfc_disable_intr = i2c_disable_irq;
++ init_waitqueue_head(&dev->read_wq);
++ spin_lock_init(&dev->i2c_dev.irq_enabled_lock);
++ mutex_lock(&ntag_api_lock);
++ if (ntag_dev) { mutex_unlock(&ntag_api_lock); ret = -EBUSY; goto cleanup; }
++ ntag_dev = dev;
++ mutex_unlock(&ntag_api_lock);
++ ret = ntag5_gpio_init(dev);
++ if (ret) goto cleanup;
++ ret = configure_gpio(configs.gpio.pu, GPIO_IRQ);
++ if (ret < 0) goto cleanup;
++ pu = true;
++ client->irq = ret;
++ dev->i2c_dev.irq_enabled = true;
++ ret = request_irq(client->irq, i2c_irq_handler, IRQF_TRIGGER_FALLING, client->name, dev);
++ if (ret) goto cleanup;
++ irq = true;
++ ret = configure_gpio(configs.gpio.hpd, GPIO_HPD);
++ if (ret < 0) goto cleanup;
++ hpd = true;
++ ret = nfc_ldo_config(&client->dev, dev);
++ if (ret) goto cleanup;
++ ret = write_register(0x10A8, 0, 0xFF, &buffer);
++ if (ret) { ret = -EIO; goto cleanup; }
++ ret = nfc_misc_register(dev, &ntag_i2c_dev_fops, DEV_COUNT, NFC_CHAR_DEV_NAME, CLASS_NAME);
++ if (ret) goto cleanup;
++ misc = true;
++ i2c_set_clientdata(client, dev);
++ mutex_lock(&ntag_api_lock);
++ dev->ready = true;
++ mutex_unlock(&ntag_api_lock);
++ return 0;
++cleanup:
++ mutex_lock(&ntag_api_lock);
++ if (ntag_dev == dev) ntag_dev = NULL;
++ mutex_unlock(&ntag_api_lock);
++ if (misc) nfc_misc_unregister(dev, DEV_COUNT);
++ if (irq) free_irq(client->irq, dev);
++ if (!IS_ERR_OR_NULL(dev->reg)) { if (dev->is_vreg_enabled) regulator_disable(dev->reg); regulator_put(dev->reg); }
++ if (hpd) gpio_free(configs.gpio.hpd);
++ if (pu) gpio_free(configs.gpio.pu);
++ kref_put(&dev->ref, ntag_release);
++ return ret;
++}
++
++static void nfc_i2c_dev_remove(struct i2c_client *client)
++{
++ struct ntag_dev *dev = i2c_get_clientdata(client);
++ if (!dev) return;
++ mutex_lock(&ntag_api_lock);
++ dev->ready = false;
++ ntag_dev = NULL;
++ mutex_unlock(&ntag_api_lock);
++ free_irq(client->irq, dev);
++ nfc_misc_unregister(dev, DEV_COUNT);
++ if (!IS_ERR_OR_NULL(dev->reg)) { if (dev->is_vreg_enabled) regulator_disable(dev->reg); regulator_put(dev->reg); }
++ gpio_free(dev->configs.gpio.hpd);
++ gpio_free(dev->configs.gpio.pu);
++ i2c_set_clientdata(client, NULL);
++ kref_put(&dev->ref, ntag_release);
++}
++
++static const struct of_device_id nfc_i2c_dev_match_table[] = {
++	{.compatible = NTAG5_I2C_DRV_STR,},
++	{}
++};
++
++MODULE_DEVICE_TABLE(of, nfc_i2c_dev_match_table);
++
++static struct i2c_driver nfc_i2c_dev_driver = {
++	.probe = nfc_i2c_dev_probe,
++	.remove = nfc_i2c_dev_remove,
++	.driver = {
++		.name = NTAG5_I2C_DRV_STR,
++		.of_match_table = nfc_i2c_dev_match_table,
++		.probe_type = PROBE_PREFER_ASYNCHRONOUS,
++	},
++};
++
++static int __init my_i2c_drv_init(void)
++{
++
++	int ret = 0;
++	pr_info("loading NTAG5 I2C driver\n");
++	ret = i2c_add_driver(&nfc_i2c_dev_driver);
++	if (ret != 0) {
++		pr_err("NFC I2C add driver error ret %d\n", ret);
++	}
++	return ret;
++}
++
++module_init(my_i2c_drv_init);
++
++static void __exit my_i2c_drv_exit(void) {
++
++	pr_info("my_i2c_drv_exit NTAG5 I2C driver\n");
++	i2c_del_driver(&nfc_i2c_dev_driver);
++	return;
++}
++
++module_exit(my_i2c_drv_exit);
++
++MODULE_DESCRIPTION("NFC NTAG5 I2C driver");
++MODULE_LICENSE("GPL v2");
+--- /dev/null
++++ b/sheng-ports/pogo/ntag/ntag_i2c_drv.h
+@@ -0,0 +1,50 @@
++
++#ifndef _NTAG_I2C_DRV_H_
++#define _NTAG_I2C_DRV_H_
++
++#include <linux/i2c.h>
++
++#define NTAG5_I2C_DRV_STR   "nxp,ntag5"	/*kept same as dts */
++
++struct ntag_dev;
++
++//Interface specific parameters
++struct i2c_dev {
++	struct i2c_client *client;
++
++	/*IRQ parameters */
++	bool irq_enabled;
++
++	spinlock_t irq_enabled_lock;
++	/* NFC_IRQ wake-up state */
++	bool irq_wake_up;
++};
++
++
++
++#if IS_ENABLED(CONFIG_NTAG5_I2C)
++
++int i2c_enable_irq(void);
++int i2c_disable_irq(void);
++int i2c_read(struct ntag_dev *dev, char *buf, size_t count, int timeout);
++
++#else
++
++static inline int i2c_enable_irq(struct ntag_dev *dev)
++{
++	return -ENXIO;
++}
++
++static inline int i2c_disable_irq(struct ntag_dev *dev)
++{
++	return -ENXIO;
++}
++
++static inline int i2c_read(struct ntag_dev *dev, char *buf, size_t count, int timeout)
++{
++	return -ENXIO;
++}
++
++#endif
++
++#endif //_NFC_I2C_DRV_H_
+--- a/sheng-ports/pogo/Kbuild
++++ b/sheng-ports/pogo/Kbuild
+@@ -10,3 +10,8 @@
+ xm_charger-y := battmngr/xm_charger_core.o battmngr/xm_charger_votable.o battmngr/xm_charger_ffc.o battmngr/xm_charger_thermal.o battmngr/step-chg-jeita.o battmngr/main_charge.o
+ xm_battmngr_init-y := init/xm_battmngr_init.o
+ virtual_fg-y := extSOC/virtual_fg.o
++
++ccflags-y += -DCONFIG_NTAG5_I2C=1
++obj-m += ntag5_i2c.o qcom_ipc_lite.o
++ntag5_i2c-y := ntag/ntag_i2c_drv.o ntag/ntag_common.o
++qcom_ipc_lite-y := ipc/qcom_ipc_lite.o

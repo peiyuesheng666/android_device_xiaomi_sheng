@@ -1,0 +1,101 @@
+{
+  "schema": 1,
+  "reference_overrides": {
+    "pdr_interface": "Use the fixed Qualcomm SoC service locator implementation used by the matching audio, remoteproc and DSP techpacks; do not install the same-named core alternative.",
+    "qcom_pdr_msg": "Use the message definitions from the same Qualcomm SoC source as its pdr_interface and techpacks.",
+    "qmi_helpers": "Use the Qualcomm SoC QMI implementation against which this kernel's vendor modules are compiled; verify all resulting import CRCs."
+  },
+  "additional_modules": {
+    "governor_msm_adreno_ro": {
+      "source": "soc/governor_msm_adreno_ro.ko",
+      "order": "soc/modules.order",
+      "reason": "Retain the configured GMU GPU frequency reporting governor from the original SoC source. Android's device patch adds the module omitted by the reference generated Kbuild; the GMU still controls actual GPU frequency."
+    },
+    "qcom_logbuf_vh": {
+      "source": "soc/qcom_logbuf_vh.ko",
+      "order": "soc/modules.order",
+      "reason": "The active stock FDT has qcom,logbuf-vendor-hooks. Its original driver and CONFIG_QCOM_LOGBUF_VENDOR_HOOKS are present but the reference generated Kbuild omitted the module. Retain printk ringbuffer registration in real minidump."
+    },
+    "mhi_dev_dtr": {
+      "source": "soc/mhi_dev_dtr.ko",
+      "order": "soc/modules.order",
+      "reason": "Retain the original MHI IP_CTRL/DTR provider required by the original UCI module. The disabled-config host fallback returns -EIO for every request and cannot replace this hardware control path."
+    },
+    "mtdoops": {
+      "source": "soc/mtdoops.ko",
+      "order": "soc/modules.order",
+      "reason": "The native MTD logger with shipping sheng notifier semantics is now built in the SoC phase alongside its real pm8941-pwrkey provider. Its single canonical source remains ws/common/drivers/mtd/mtdoops.c; native panic/oops and OEM records are retained."
+    },
+    "hwid": {
+      "source": "soc/hwid.ko",
+      "order": "soc/modules.order",
+      "reason": "Real bootloader hardware identity APIs for platform/country/version/ADC values; CNSS uses this provider to select the actual sheng N81A board calibration file."
+    },
+    "nanosic_platform": {
+      "source": "sheng-ports/pogo/nanosic_platform.ko",
+      "order": "sheng-ports/pogo/modules.order",
+      "reason": "Pinned original sheng charge/ADSP interface and nano_ops provider; keyboard delivers real MCU packets and I2C commands through synchronized registered callbacks."
+    },
+    "xiaomi_keyboard_driver": {
+      "source": "sheng-ports/keyboard/xiaomi_keyboard_driver.ko",
+      "order": "sheng-ports/keyboard/modules.order",
+      "reason": "Shipping touchpad edge-filter provider; original two exports and real OF-configured sysfs enable/parameter controls. Native input diagnostics remain separately under review."
+    },
+    "xm_charger": {
+      "source": "sheng-ports/pogo/xm_charger.ko",
+      "order": "sheng-ports/pogo/modules.order",
+      "reason": "Original OEM charge consumer, retaining actual QTI/Nanosic hardware routes and registration/teardown."
+    },
+    "xm_battmngr_init": {
+      "source": "sheng-ports/pogo/xm_battmngr_init.ko",
+      "order": "sheng-ports/pogo/modules.order",
+      "reason": "Original OEM charge consumer, retaining actual QTI/Nanosic hardware routes and registration/teardown."
+    },
+    "virtual_fg": {
+      "source": "sheng-ports/pogo/virtual_fg.ko",
+      "order": "sheng-ports/pogo/modules.order",
+      "reason": "Original OEM charge consumer, retaining actual QTI/Nanosic hardware routes and registration/teardown."
+    },
+    "ntag5_i2c": {
+      "source": "sheng-ports/pogo/ntag5_i2c.ko",
+      "order": "sheng-ports/pogo/modules.order",
+      "reason": "Original live-bound NTAG device or IPC DSP interface, retaining real transfers and failure reporting."
+    },
+    "qcom_ipc_lite": {
+      "source": "sheng-ports/pogo/qcom_ipc_lite.ko",
+      "order": "sheng-ports/pogo/modules.order",
+      "reason": "Original live-bound NTAG device or IPC DSP interface, retaining real transfers and failure reporting."
+    },
+    "xiaomi_wifi_gpio": {
+      "source": "sheng-ports/pogo/xiaomi_wifi_gpio.ko",
+      "order": "sheng-ports/pogo/modules.order",
+      "reason": "Real SAR input and original wifi_sar multicast/query ABI used on the CN sheng board."
+    },
+    "dump_display": {
+      "source": "sheng-ports/pogo/dump_display.ko",
+      "order": "sheng-ports/pogo/modules.order",
+      "reason": "Actual stock platform binding: a4a80000.dump_display_region"
+    },
+    "rimps_log": {
+      "source": "sheng-ports/pogo/rimps_log.ko",
+      "order": "sheng-ports/pogo/modules.order",
+      "reason": "Actual stock platform binding: d8140000.qcom,rimps_log"
+    },
+    "cpufreq_stats_scmi": {
+      "source": "sheng-ports/pogo/cpufreq_stats_scmi.ko",
+      "order": "sheng-ports/pogo/modules.order",
+      "reason": "Original SCMI protocol 0x84 and stock scmi_dev.3 frequency/residency statistics provider."
+    },
+    "cpufreq_stats_vendor": {
+      "source": "sheng-ports/pogo/cpufreq_stats_vendor.ko",
+      "order": "sheng-ports/pogo/modules.order",
+      "reason": "Original SCMI protocol 0x84 and stock scmi_dev.3 frequency/residency statistics provider."
+    },
+    "thermal_minidump": {
+      "source": "soc/thermal_minidump.ko",
+      "order": "soc/modules.order",
+      "reason": "Real Qualcomm minidump record provider for the original TSENS thermal consumer, keeping the firmware-visible sensor/temperature layout."
+    }
+  },
+  "source_policy": "User-selected source plus the explicitly restored Android hardware port; collect all listed real providers and validate ABI/BTF."
+}

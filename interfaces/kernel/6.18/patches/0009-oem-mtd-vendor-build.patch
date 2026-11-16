@@ -1,0 +1,29 @@
+--- a/ws/common/drivers/mtd/Makefile
++++ b/ws/common/drivers/mtd/Makefile
+@@ -19,7 +19,7 @@
+ obj-$(CONFIG_RFD_FTL)		+= rfd_ftl.o
+ obj-$(CONFIG_SSFDC)		+= ssfdc.o
+ obj-$(CONFIG_SM_FTL)		+= sm_ftl.o
+-obj-$(CONFIG_MTD_OOPS)		+= mtdoops.o
++# sheng OEM mtdoops is built in soc/Kbuild with the PMIC notifier provider.
+ obj-$(CONFIG_MTD_PSTORE)	+= mtdpstore.o
+ obj-$(CONFIG_MTD_SWAP)		+= mtdswap.o
+ 
+--- a/soc/Kbuild
++++ b/soc/Kbuild
+@@ -3,6 +3,9 @@
+ obj-m += governor_msm_adreno_ro.o
+ governor_msm_adreno_ro-y := drivers/devfreq/governor_msm_adreno_ro.o
+ # Preserve the active sheng printk/minidump DT provider.
++# Same native MTD source, linked with its actual OEM notifier provider.
++obj-m += mtdoops.o
++mtdoops-y := drivers/mtd/mtdoops-sheng.o
+ obj-m += qcom_logbuf_vh.o
+ qcom_logbuf_vh-y := drivers/soc/qcom/qcom_logbuf_vendor_hooks.o
+ ccflags-y += -include $(M)/gen/autoconf_vendor.h
+--- /dev/null
++++ b/soc/drivers/mtd/mtdoops-sheng.c
+@@ -0,0 +1,3 @@
++/* SPDX-License-Identifier: GPL-2.0-only */
++/* One canonical MTD implementation; only its build phase is SoC-specific. */
++#include "../../../ws/common/drivers/mtd/mtdoops.c"

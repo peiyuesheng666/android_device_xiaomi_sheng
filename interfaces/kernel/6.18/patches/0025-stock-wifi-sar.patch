@@ -1,0 +1,261 @@
+--- /dev/null
++++ b/sheng-ports/pogo/sar/xiaomi_wifi_gpio.c
+@@ -0,0 +1,249 @@
++// SPDX-License-Identifier: GPL-2.0-only
++/* Shipping sheng Wi-Fi SAR GPIO/netlink ABI, reconstructed from the GPLv2
++ * OS3.0.303.0.WNXCNXM module. The status comes from the actual board GPIO.
++ */
++#include <linux/module.h>
++#include <linux/platform_device.h>
++#include <linux/of_gpio.h>
++#include <linux/gpio.h>
++#include <linux/hwid.h>
++#include <linux/interrupt.h>
++#include <linux/pm_wakeirq.h>
++#include <linux/workqueue.h>
++#include <net/genetlink.h>
++
++#define SAR_ATTR_STATUS 1
++#define SAR_CMD_QUERY 1
++#define SAR_CMD_EVENT 2
++
++struct sheng_sar {
++	struct device *dev;
++	int gpio;
++	int irq;
++	u32 debounce_ms;
++	bool stopping;
++	bool awake;
++	struct delayed_work debounce;
++};
++
++static DEFINE_MUTEX(sar_api_lock);
++static struct sheng_sar *sar_device;
++static bool sar_registered;
++static struct genl_family sar_fam;
++
++static int sar_send_status(int status)
++{
++	struct sk_buff *skb;
++	void *header;
++	int ret;
++	skb = genlmsg_new(NLMSG_GOODSIZE, GFP_KERNEL);
++	if (!skb)
++		return -ENOMEM;
++	header = genlmsg_put(skb, 0, 0, &sar_fam, 0, SAR_CMD_EVENT);
++	if (!header)
++		goto too_small;
++	ret = nla_put_u32(skb, SAR_ATTR_STATUS, status);
++	if (ret) {
++		genlmsg_cancel(skb, header);
++		goto too_small;
++	}
++	genlmsg_end(skb, header);
++	ret = genlmsg_multicast(&sar_fam, skb, 0, 0, GFP_KERNEL);
++	/* No listener is a normal condition, as in the shipping driver. */
++	return ret == -ESRCH ? 0 : ret;
++too_small:
++	nlmsg_free(skb);
++	return -EMSGSIZE;
++}
++
++static int sar_read_status(struct sheng_sar *sar)
++{
++	int status = gpio_get_value(sar->gpio);
++	return status < 0 ? status : sar_send_status(status);
++}
++
++static int sar_status_set(struct sk_buff *skb, struct genl_info *info)
++{
++	int ret = -ENODEV;
++	mutex_lock(&sar_api_lock);
++	if (sar_device && !sar_device->stopping)
++		ret = sar_read_status(sar_device);
++	mutex_unlock(&sar_api_lock);
++	return ret;
++}
++
++static const struct nla_policy sar_policy[SAR_ATTR_STATUS + 1] = {
++	[SAR_ATTR_STATUS] = { .type = NLA_U32 },
++};
++
++static const struct genl_ops sar_ops[] = {
++	{ .cmd = SAR_CMD_QUERY, .flags = GENL_ADMIN_PERM,
++	  .validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
++	  .doit = sar_status_set },
++};
++
++static const struct genl_multicast_group sar_mcgrps[] = {
++	{ .name = "sar_event" },
++};
++
++static struct genl_family sar_fam = {
++	.name = "wifi_sar",
++	.version = 1,
++	.maxattr = SAR_ATTR_STATUS,
++	.policy = sar_policy,
++	.ops = sar_ops,
++	.n_ops = ARRAY_SIZE(sar_ops),
++	.mcgrps = sar_mcgrps,
++	.n_mcgrps = ARRAY_SIZE(sar_mcgrps),
++	.module = THIS_MODULE,
++};
++
++static void gpio_debounce_work(struct work_struct *work)
++{
++	struct sheng_sar *sar = container_of(to_delayed_work(work), struct sheng_sar, debounce);
++	int ret;
++	mutex_lock(&sar_api_lock);
++	if (!sar->stopping) {
++		ret = sar_read_status(sar);
++		if (ret)
++			dev_err_ratelimited(sar->dev, "SAR status delivery failed: %d\n", ret);
++	}
++	if (sar->awake) {
++		sar->awake = false;
++		pm_relax(sar->dev);
++	}
++	mutex_unlock(&sar_api_lock);
++}
++
++static irqreturn_t gpio_testing_threaded_irq_handler(int irq, void *data)
++{
++	struct sheng_sar *sar = data;
++	mutex_lock(&sar_api_lock);
++	if (!sar->stopping) {
++		if (!sar->awake) {
++			pm_stay_awake(sar->dev);
++			sar->awake = true;
++		}
++		mod_delayed_work(system_wq, &sar->debounce, msecs_to_jiffies(sar->debounce_ms));
++	}
++	mutex_unlock(&sar_api_lock);
++	return IRQ_HANDLED;
++}
++
++static int xiaomi_wifi_gpio_probe(struct platform_device *pdev)
++{
++	struct sheng_sar *sar;
++	int ret;
++	sar = devm_kzalloc(&pdev->dev, sizeof(*sar), GFP_KERNEL);
++	if (!sar)
++		return -ENOMEM;
++	sar->dev = &pdev->dev;
++	sar->debounce_ms = 50;
++	of_property_read_u32(pdev->dev.of_node, "debounce-time", &sar->debounce_ms);
++	sar->gpio = of_get_named_gpio(pdev->dev.of_node, "gpio", 0);
++	if (sar->gpio < 0)
++		return sar->gpio;
++	ret = devm_gpio_request_one(&pdev->dev, sar->gpio, GPIOF_IN, "gpio");
++	if (ret)
++		return ret;
++	ret = gpio_direction_input(sar->gpio);
++	if (ret)
++		return ret;
++	sar->irq = gpio_to_irq(sar->gpio);
++	if (sar->irq < 0)
++		return sar->irq;
++	INIT_DELAYED_WORK(&sar->debounce, gpio_debounce_work);
++	ret = device_init_wakeup(&pdev->dev, true);
++	if (ret)
++		return ret;
++	ret = dev_pm_set_wake_irq(&pdev->dev, sar->irq);
++	if (ret)
++		goto clear_wakeup;
++	mutex_lock(&sar_api_lock);
++	if (sar_device) {
++		mutex_unlock(&sar_api_lock);
++		ret = -EBUSY;
++		goto clear_irq;
++	}
++	sar_device = sar;
++	mutex_unlock(&sar_api_lock);
++	ret = devm_request_threaded_irq(&pdev->dev, sar->irq, NULL,
++		gpio_testing_threaded_irq_handler,
++		IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING | IRQF_ONESHOT,
++		"xiaomi_wifi_gpio", sar);
++	if (ret)
++		goto unpublish;
++	platform_set_drvdata(pdev, sar);
++	return 0;
++unpublish:
++	mutex_lock(&sar_api_lock);
++	sar_device = NULL;
++	mutex_unlock(&sar_api_lock);
++clear_irq:
++	dev_pm_clear_wake_irq(&pdev->dev);
++clear_wakeup:
++	device_init_wakeup(&pdev->dev, false);
++	return ret;
++}
++
++static void xiaomi_wifi_gpio_remove(struct platform_device *pdev)
++{
++	struct sheng_sar *sar = platform_get_drvdata(pdev);
++	mutex_lock(&sar_api_lock);
++	sar->stopping = true;
++	sar_device = NULL;
++	mutex_unlock(&sar_api_lock);
++	disable_irq(sar->irq);
++	cancel_delayed_work_sync(&sar->debounce);
++	mutex_lock(&sar_api_lock);
++	if (sar->awake) {
++		sar->awake = false;
++		pm_relax(sar->dev);
++	}
++	mutex_unlock(&sar_api_lock);
++	dev_pm_clear_wake_irq(&pdev->dev);
++	device_init_wakeup(&pdev->dev, false);
++}
++
++static const struct of_device_id gpio_testing_mode_of_match[] = {
++	{ .compatible = "xiaomi,xiaomi-wifi" },
++	{ },
++};
++MODULE_DEVICE_TABLE(of, gpio_testing_mode_of_match);
++
++static struct platform_driver xiaomi_wifi_gpio_driver = {
++	.probe = xiaomi_wifi_gpio_probe,
++	.remove = xiaomi_wifi_gpio_remove,
++	.driver = { .name = "xiaomi_wifi_gpio", .of_match_table = gpio_testing_mode_of_match },
++};
++
++static int __init wifi_gpio_driver_init(void)
++{
++	int ret;
++	/* Shipping region rule: get_hw_country_version() == 0 is CN. */
++	if (get_hw_country_version() != 0)
++		return 0;
++	ret = genl_register_family(&sar_fam);
++	if (ret)
++		return ret;
++	ret = platform_driver_register(&xiaomi_wifi_gpio_driver);
++	if (ret) {
++		genl_unregister_family(&sar_fam);
++		return ret;
++	}
++	sar_registered = true;
++	return 0;
++}
++
++static void __exit wifi_gpio_driver_exit(void)
++{
++	if (sar_registered) {
++		platform_driver_unregister(&xiaomi_wifi_gpio_driver);
++		genl_unregister_family(&sar_fam);
++	}
++}
++
++module_init(wifi_gpio_driver_init);
++module_exit(wifi_gpio_driver_exit);
++MODULE_LICENSE("GPL v2");
++MODULE_DESCRIPTION("Xiaomi sheng Wi-Fi SAR GPIO and original netlink interface");
+--- a/sheng-ports/pogo/Kbuild
++++ b/sheng-ports/pogo/Kbuild
+@@ -15,3 +15,6 @@
+ obj-m += ntag5_i2c.o qcom_ipc_lite.o
+ ntag5_i2c-y := ntag/ntag_i2c_drv.o ntag/ntag_common.o
+ qcom_ipc_lite-y := ipc/qcom_ipc_lite.o
++
++obj-m += xiaomi_wifi_gpio.o
++xiaomi_wifi_gpio-y := sar/xiaomi_wifi_gpio.o

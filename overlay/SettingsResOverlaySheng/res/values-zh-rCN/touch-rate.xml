@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="high_touch_polling_rate_title">高触控报告率</string>
+    <string name="high_touch_polling_rate_summary">提高触摸屏报告频率</string>
+</resources>

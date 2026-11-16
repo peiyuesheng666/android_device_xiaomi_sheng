@@ -1,0 +1,65 @@
+--- a/k618/sheng-ports/keyboard/sheng_nanosic.c
++++ b/k618/sheng-ports/keyboard/sheng_nanosic.c
+@@ -53,6 +53,8 @@
+ 
+ 	bool suspended;
+ 	bool keyboard_attached;
++	bool connection_known;
++	int connection_state;
+ 
+ 	/* Stock HAL owns authentication; kernel only transports real messages. */
+ 	struct miscdevice raw_misc;
+@@ -75,6 +77,7 @@
+ #include "sheng_nanosic_bridge.h"
+ #include "sheng_nanosic_power.h"
+ #include "sheng_nanosic_connection.h"
++#include "sheng_nanosic_state.h"
+ extern int xiaomi_touchpad_edge_filter_param_init(struct device_node *node);
+ extern int xiaomi_touchpad_edge_filter(u8 *packet);
+ extern int Nanosic_vendor_raw_data_inject(void *buf, size_t len);
+@@ -384,6 +387,8 @@
+ 			mutex_unlock(&nanosic->conn_mutex);
+ 			return;
+ 		}
++		nanosic->connection_state = state;
++		nanosic->connection_known = true;
+ 		/* The shipping provider leaves keyboard_plugin unchanged for docks. */
+ 		if (state != SHENG_NANO_DOCK && nanosic->plugin_requested != attached) {
+ 			nanosic->plugin_requested = attached;
+@@ -865,6 +870,7 @@
+ 	nano->raw_misc.name = "nanodev0";
+ 	nano->raw_misc.fops = &sheng_nano_fops;
+ 	nano->raw_misc.parent = dev;
++	nano->raw_misc.groups = sheng_nano_state_groups;
+ 	/* Stock init assigns system ownership/mode on boot. */
+ 	ret = misc_register(&nano->raw_misc);
+ 	if (ret)
+--- /dev/null
++++ b/k618/sheng-ports/keyboard/sheng_nanosic_state.h
+@@ -0,0 +1,26 @@
++/* SPDX-License-Identifier: GPL-2.0-only */
++/* Cached physical attachment only; reading this must not wake or query the MCU. */
++static ssize_t connection_show(struct device *dev,
++			       struct device_attribute *attr, char *buf)
++{
++	struct miscdevice *misc = dev_get_drvdata(dev);
++	struct nanosic_wn8030 *nano =
++		container_of(misc, struct nanosic_wn8030, raw_misc);
++	ssize_t ret;
++
++	mutex_lock(&nano->conn_mutex);
++	if (!nano->connection_known)
++		ret = -ENODATA;
++	else
++		ret = sysfs_emit(buf, "Connected=[%u]\n",
++				 nano->connection_state == SHENG_NANO_KEYBOARD);
++	mutex_unlock(&nano->conn_mutex);
++	return ret;
++}
++static DEVICE_ATTR_RO(connection);
++
++static struct attribute *sheng_nano_state_attrs[] = {
++	&dev_attr_connection.attr,
++	NULL,
++};
++ATTRIBUTE_GROUPS(sheng_nano_state);

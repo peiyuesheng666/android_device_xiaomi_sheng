@@ -1,0 +1,5 @@
+set_prop(vendor_init, vendor_fp_prop)
+# The vendor property file owns the exact Dolby version property.
+set_prop(vendor_init, vendor_sheng_dolby_prop)
+# init.sm8550.rc selects the mode consumed by the QCC system service.
+set_prop(vendor_init, vendor_qcc_prop)

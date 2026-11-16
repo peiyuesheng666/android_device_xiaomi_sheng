@@ -1,0 +1,375 @@
+--- /dev/null
++++ b/sheng-ports/pogo/diagnostics/dump_display.c
+@@ -0,0 +1,106 @@
++// SPDX-License-Identifier: GPL-2.0-only
++/* Derived from pinned sheng-u-oss drivers/xiaomi/dump_display.c.
++ * Copyright (C) 2022 YangHui.
++ * Keep the shipping crash record, with bounded writes and device lifetime.
++ */
++#include <linux/io.h>
++#include <linux/module.h>
++#include <linux/mod_devicetable.h>
++#include <linux/panic_notifier.h>
++#include <linux/platform_device.h>
++#include <linux/slab.h>
++#include <linux/spinlock.h>
++#include <linux/stacktrace.h>
++#include <linux/sched.h>
++
++#define CRASH_RECORD_MAGIC 0x12345678
++#define TRACE_INFO_SIZE 2044
++struct crash_info { u32 magic; char back_trace[TRACE_INFO_SIZE]; };
++struct dump_display {
++	void __iomem *region;
++	struct notifier_block panic;
++	raw_spinlock_t lock;
++	char trace[TRACE_INFO_SIZE];
++};
++
++static size_t trace_snprint(char *buf, size_t size,
++		const unsigned long *entries, unsigned int count)
++{
++	size_t written = 0;
++	unsigned int i;
++
++	if (!size)
++		return 0;
++	buf[0] = '\0';
++	for (i = 0; entries && i < count && written < size - 1; i++)
++		written += scnprintf(buf + written, size - written,
++				"\n\r%pS", (void *)entries[i]);
++	written += scnprintf(buf + written, size - written,
++			"\n\rcomm:%s", current->comm);
++	return written;
++}
++
++static int set_backtrace_msg(struct notifier_block *nb,
++		unsigned long event, void *data)
++{
++	struct dump_display *info = container_of(nb, struct dump_display, panic);
++	unsigned long entries[30], flags;
++	unsigned int count;
++
++	/* A nested panic must never deadlock on the first panic's record. */
++	if (!raw_spin_trylock_irqsave(&info->lock, flags))
++		return NOTIFY_DONE;
++	count = stack_trace_save(entries, ARRAY_SIZE(entries), 2);
++	if (count) {
++		memset(info->trace, 0, sizeof(info->trace));
++		trace_snprint(info->trace, sizeof(info->trace), entries, count);
++		memcpy_toio(info->region + offsetof(struct crash_info, back_trace),
++				info->trace, sizeof(info->trace));
++		wmb();
++	}
++	raw_spin_unlock_irqrestore(&info->lock, flags);
++	return NOTIFY_DONE;
++}
++
++static int dump_display_probe(struct platform_device *pdev)
++{
++	struct dump_display *info;
++	struct resource *res;
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	if (!res || resource_size(res) < sizeof(struct crash_info))
++		return -EINVAL;
++	info = devm_kzalloc(&pdev->dev, sizeof(*info), GFP_KERNEL);
++	if (!info)
++		return -ENOMEM;
++	/* This is the firmware's shared reserved record, as in the stock driver. */
++	info->region = devm_ioremap(&pdev->dev, res->start, resource_size(res));
++	if (!info->region)
++		return -ENOMEM;
++	raw_spin_lock_init(&info->lock);
++	info->panic.notifier_call = set_backtrace_msg;
++	memset_io(info->region, 0, resource_size(res));
++	iowrite32(CRASH_RECORD_MAGIC, info->region);
++	memcpy_toio(info->region + offsetof(struct crash_info, back_trace),
++			"UNKNOWN", sizeof("UNKNOWN"));
++	wmb();
++	platform_set_drvdata(pdev, info);
++	return atomic_notifier_chain_register(&panic_notifier_list, &info->panic);
++}
++
++static void dump_display_remove(struct platform_device *pdev)
++{
++	struct dump_display *info = platform_get_drvdata(pdev);
++	atomic_notifier_chain_unregister(&panic_notifier_list, &info->panic);
++}
++
++static const struct of_device_id ddp_match[] = {
++	{ .compatible = "xiaomi,dump_display" }, {}
++};
++MODULE_DEVICE_TABLE(of, ddp_match);
++static struct platform_driver dump_display_driver = {
++	.probe = dump_display_probe, .remove = dump_display_remove,
++	.driver = { .name = "dump_display", .of_match_table = ddp_match },
++};
++module_platform_driver(dump_display_driver);
++MODULE_LICENSE("GPL v2");
+--- /dev/null
++++ b/sheng-ports/pogo/diagnostics/rimps_log.c
+@@ -0,0 +1,182 @@
++// SPDX-License-Identifier: GPL-2.0-only
++/* Derived from pinned sheng-u-oss drivers/soc/qcom/rimps_log.c.
++ * Copyright (c) 2020 The Linux Foundation.
++ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
++ * Real firmware mailbox/MMIO logs with bounded payloads and paired cleanup.
++ */
++#include <linux/io.h>
++#include <linux/list.h>
++#include <linux/mailbox_client.h>
++#include <linux/module.h>
++#include <linux/mod_devicetable.h>
++#include <linux/platform_device.h>
++#include <linux/slab.h>
++#include <linux/spinlock.h>
++#include <linux/workqueue.h>
++#include "rimps_payload.h"
++#define CREATE_TRACE_POINTS
++#include "trace_cpucp.h"
++
++#define MAX_PRINT_SIZE 1024
++#define MAX_BUF_NUM 4
++struct rimps_buf {
++	struct list_head node;
++	char *bytes;
++	size_t length;
++};
++struct rimps_log_info {
++	void __iomem *regions[2];
++	size_t region_size;
++	struct mbox_client client;
++	struct mbox_chan *channel;
++	struct work_struct work;
++	struct workqueue_struct *queue;
++	spinlock_t lock;
++	struct list_head free, full;
++	struct rimps_buf buffers[MAX_BUF_NUM];
++	bool stopping;
++	size_t carry_length;
++	char carry[MAX_PRINT_SIZE];
++};
++
++static void rimps_log_work(struct work_struct *work)
++{
++	struct rimps_log_info *info = container_of(work, struct rimps_log_info, work);
++	struct rimps_buf *buffer;
++	unsigned long flags;
++	char text[MAX_PRINT_SIZE + 1], *source;
++	size_t size, chunk, count;
++	bool newline;
++
++	for (;;) {
++		spin_lock_irqsave(&info->lock, flags);
++		if (list_empty(&info->full)) {
++			spin_unlock_irqrestore(&info->lock, flags);
++			return;
++		}
++		buffer = list_first_entry(&info->full, struct rimps_buf, node);
++		list_del(&buffer->node);
++		spin_unlock_irqrestore(&info->lock, flags);
++		source = buffer->bytes + MAX_PRINT_SIZE - info->carry_length;
++		size = buffer->length + info->carry_length;
++		memcpy(source, info->carry, info->carry_length);
++		info->carry_length = 0;
++		while (size) {
++			chunk = min_t(size_t, size, MAX_PRINT_SIZE);
++			newline = get_last_newline(source, chunk, &count);
++			if (!newline && size < MAX_PRINT_SIZE) {
++				memcpy(info->carry, source, size);
++				info->carry_length = size;
++				break;
++			}
++			/* Trace never scans beyond the received fragment for a NUL. */
++			memcpy(text, source, count);
++			text[count] = '\0';
++			trace_cpucp_log(text);
++			source += count;
++			size -= count;
++		}
++		spin_lock_irqsave(&info->lock, flags);
++		list_add_tail(&buffer->node, &info->free);
++		spin_unlock_irqrestore(&info->lock, flags);
++	}
++}
++
++static void rimps_log_rx(struct mbox_client *client, void *message)
++{
++	struct rimps_log_info *info = container_of(client, struct rimps_log_info, client);
++	struct rimps_payload payload;
++	struct rimps_buf *buffer;
++	unsigned long flags;
++	u32 marker;
++
++	spin_lock_irqsave(&info->lock, flags);
++	if (info->stopping || list_empty(&info->free))
++		goto unlock;
++	marker = readl(info->regions[0]);
++	if (!rimps_payload_decode(marker, info->region_size, &payload))
++		goto unlock;
++	buffer = list_first_entry(&info->free, struct rimps_buf, node);
++	list_del(&buffer->node);
++	memcpy_fromio(buffer->bytes + MAX_PRINT_SIZE,
++			info->regions[payload.region] + payload.offset, payload.length);
++	buffer->length = payload.length;
++	list_add_tail(&buffer->node, &info->full);
++	/* Queue under the same lock as stopping; remove cannot race a new queue. */
++	queue_work(info->queue, &info->work);
++unlock:
++	spin_unlock_irqrestore(&info->lock, flags);
++}
++
++static int rimps_log_probe(struct platform_device *pdev)
++{
++	struct rimps_log_info *info;
++	struct resource *res[2];
++	unsigned int i;
++
++	res[0] = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	res[1] = platform_get_resource(pdev, IORESOURCE_MEM, 1);
++	if (!res[0] || !res[1] || platform_get_resource(pdev, IORESOURCE_MEM, 2) ||
++	    resource_size(res[0]) != resource_size(res[1]) ||
++	    resource_size(res[0]) < 4 || resource_size(res[0]) > U32_MAX / 2)
++		return -EINVAL;
++	info = devm_kzalloc(&pdev->dev, sizeof(*info), GFP_KERNEL);
++	if (!info)
++		return -ENOMEM;
++	info->region_size = resource_size(res[0]);
++	spin_lock_init(&info->lock);
++	INIT_LIST_HEAD(&info->free);
++	INIT_LIST_HEAD(&info->full);
++	INIT_WORK(&info->work, rimps_log_work);
++	for (i = 0; i < 2; i++) {
++		info->regions[i] = devm_ioremap(&pdev->dev, res[i]->start, resource_size(res[i]));
++		if (!info->regions[i])
++			return -ENOMEM;
++	}
++	for (i = 0; i < MAX_BUF_NUM; i++) {
++		info->buffers[i].bytes = devm_kmalloc(&pdev->dev,
++				info->region_size + MAX_PRINT_SIZE, GFP_KERNEL);
++		if (!info->buffers[i].bytes)
++			return -ENOMEM;
++		list_add_tail(&info->buffers[i].node, &info->free);
++	}
++	info->client.dev = &pdev->dev;
++	info->client.tx_block = false;
++	info->client.knows_txdone = true;
++	info->client.rx_callback = rimps_log_rx;
++	/* Preserve the stock logger's freezable queue, with a per-device owner. */
++	info->queue = alloc_workqueue("rimps_wq", WQ_FREEZABLE | WQ_UNBOUND, 1);
++	if (!info->queue)
++		return -ENOMEM;
++	platform_set_drvdata(pdev, info);
++	info->channel = mbox_request_channel(&info->client, 0);
++	if (IS_ERR(info->channel)) {
++		WRITE_ONCE(info->stopping, true);
++		destroy_workqueue(info->queue);
++		return PTR_ERR(info->channel);
++	}
++	return 0;
++}
++
++static void rimps_log_remove(struct platform_device *pdev)
++{
++	struct rimps_log_info *info = platform_get_drvdata(pdev);
++	unsigned long flags;
++
++	spin_lock_irqsave(&info->lock, flags);
++	info->stopping = true;
++	spin_unlock_irqrestore(&info->lock, flags);
++	mbox_free_channel(info->channel);
++	cancel_work_sync(&info->work);
++	destroy_workqueue(info->queue);
++}
++static const struct of_device_id rimps_log_match[] = {
++	{ .compatible = "qcom,rimps-log" }, {}
++};
++MODULE_DEVICE_TABLE(of, rimps_log_match);
++static struct platform_driver rimps_log_driver = {
++	.probe = rimps_log_probe, .remove = rimps_log_remove,
++	.driver = { .name = "rimps-log", .of_match_table = rimps_log_match },
++};
++module_platform_driver(rimps_log_driver);
++MODULE_LICENSE("GPL v2");
+--- /dev/null
++++ b/sheng-ports/pogo/diagnostics/rimps_payload.h
+@@ -0,0 +1,44 @@
++/* SPDX-License-Identifier: GPL-2.0-only */
++#ifndef SHENG_RIMPS_PAYLOAD_H
++#define SHENG_RIMPS_PAYLOAD_H
++
++struct rimps_payload { unsigned int region; size_t offset, length; };
++
++/* Stock firmware's marker counts two equal regions; the first four bytes
++ * contain the marker itself. Reject malformed markers before touching memory.
++ */
++static bool rimps_payload_decode(u32 marker, size_t region_size,
++		struct rimps_payload *payload)
++{
++	struct rimps_payload result;
++
++	if (region_size < 4 || region_size > U32_MAX / 2 || marker < 4 ||
++	    marker > region_size * 2)
++		return false;
++	if (marker <= region_size) {
++		result.region = 0;
++		result.offset = 4;
++		result.length = marker - 4;
++	} else {
++		result.region = 1;
++		result.offset = 0;
++		result.length = marker - region_size;
++	}
++	*payload = result;
++	return true;
++}
++
++static bool get_last_newline(char *buf, size_t size, size_t *count)
++{
++	size_t i = size;
++	while (i) {
++		if (buf[--i] == '\n') {
++			buf[i] = '\0';
++			*count = i + 1;
++			return true;
++		}
++	}
++	*count = size;
++	return false;
++}
++#endif
+--- /dev/null
++++ b/sheng-ports/pogo/diagnostics/trace_cpucp.h
+@@ -0,0 +1,19 @@
++/* SPDX-License-Identifier: GPL-2.0-only */
++/* Shipping RIMPS trace ABI; 6.18 uses the one-argument __assign_str. */
++#if !defined(_TRACE_CPUCP_H) || defined(TRACE_HEADER_MULTI_READ)
++#define _TRACE_CPUCP_H
++#undef TRACE_SYSTEM
++#define TRACE_SYSTEM cpucp
++#include <linux/tracepoint.h>
++TRACE_EVENT(cpucp_log,
++	TP_PROTO(char *str), TP_ARGS(str),
++	TP_STRUCT__entry(__string(str, str)),
++	TP_fast_assign(__assign_str(str);),
++	TP_printk("%s\n", __get_str(str))
++);
++#endif
++#undef TRACE_INCLUDE_PATH
++#define TRACE_INCLUDE_PATH .
++#undef TRACE_INCLUDE_FILE
++#define TRACE_INCLUDE_FILE trace_cpucp
++#include <trace/define_trace.h>
+--- a/sheng-ports/pogo/Kbuild
++++ b/sheng-ports/pogo/Kbuild
+@@ -18,3 +18,9 @@
+ 
+ obj-m += xiaomi_wifi_gpio.o
+ xiaomi_wifi_gpio-y := sar/xiaomi_wifi_gpio.o
++
++# Actually bound sheng crash-record and CPUCP firmware-log providers.
++ccflags-y += -I$(src)/diagnostics
++obj-m += dump_display.o rimps_log.o
++dump_display-y := diagnostics/dump_display.o
++rimps_log-y := diagnostics/rimps_log.o

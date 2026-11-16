@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<Included>
+    <Include href="media_codecs_c2_audio_base.xml" />
+    <Decoders>
+        <!-- The software APE backend discards valid PCM from its final frame. -->
+        <MediaCodec name="c2.qti.ape.sw.decoder" type="audio/x-ape" update="true" enabled="false" />
+        <MediaCodec name="c2.qti.ape.hw.decoder" type="audio/x-ape" update="true" rank="0" />
+    </Decoders>
+</Included>

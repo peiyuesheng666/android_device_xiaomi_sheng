@@ -1,0 +1,35 @@
+<resources>
+    <string name="charge_acquiring">获取中…</string>
+    <string name="back">返回</string>
+    <string name="page_subtitle">连接与充电状态，一目了然</string>
+    <string name="your_pen">我的手写笔</string>
+    <string name="focus_pen">Focus Pen</string>
+    <string name="device_information">设备信息</string>
+    <string name="charging">正在充电</string>
+    <string name="fully_charged">已充满</string>
+    <string name="charge_attached">已吸附 · 等待充电</string>
+    <string name="charge_detached">未充电 · 已取下</string>
+    <string name="not_charging">未充电</string>
+    <string name="charge_unknown">充电状态暂未读取到</string>
+    <string name="charge_placement">请调整手写笔的吸附位置</string>
+    <string name="charge_hint">将手写笔吸附在平板上即可充电。</string>
+    <string name="app_name">手写笔</string>
+    <string name="settings_summary">Focus Pen 连接、电量与版本信息</string>
+    <string name="connection">连接</string>
+    <string name="pen">手写笔</string>
+    <string name="not_paired">尚未配对 Focus Pen</string>
+    <string name="connected">已连接</string>
+    <string name="paired">已配对，未连接</string>
+    <string name="bluetooth_off">蓝牙已关闭</string>
+    <string name="permission_needed">需要蓝牙权限才能读取手写笔状态</string>
+    <string name="battery">电量</string>
+    <string name="firmware">固件版本</string>
+    <string name="software">软件版本</string>
+    <string name="unknown">暂未读取到</string>
+    <string name="reading">正在读取…</string>
+    <string name="profile_unavailable">暂未读取到手写笔连接状态</string>
+    <string name="identity_unverified">暂未确认 Focus Pen 身份</string>
+    <string name="manage_connection">管理蓝牙连接</string>
+    <string name="refresh">刷新状态</string>
+    <string name="unsupported_platform">此设备或 Android 版本暂不支持读取 Focus Pen 信息。</string>
+</resources>

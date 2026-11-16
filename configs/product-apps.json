@@ -1,0 +1,31 @@
+{
+  "partition": "product",
+  "applications": [
+    {"module": "ShengDolby", "package": "org.lineageos.sheng.dolby", "path": "priv-app/ShengDolby/ShengDolby.apk", "blueprint": "dolby/ShengDolby/Android.bp"},
+    {"module": "ShengDisplayDefaults", "package": "org.lineageos.sheng.displaydefaults", "path": "priv-app/ShengDisplayDefaults/ShengDisplayDefaults.apk", "blueprint": "interfaces/display/defaults/Android.bp"},
+    {"module": "ShengFaceUnlock", "package": "org.lineageos.sheng.faceunlock", "path": "priv-app/ShengFaceUnlock/ShengFaceUnlock.apk", "blueprint": "interfaces/biometrics/systemface/Android.bp"},
+    {"module": "ShengKeyboardPresence", "package": "org.lineageos.sheng.keyboard", "path": "priv-app/ShengKeyboardPresence/ShengKeyboardPresence.apk", "blueprint": "interfaces/input/keyboard/Android.bp"},
+    {"module": "ShengMetokNLP", "package": "com.xiaomi.metoknlp", "path": "priv-app/ShengMetokNLP/ShengMetokNLP.apk", "blueprint": "interfaces/location/Android.bp"},
+    {"module": "ShengPenSettings", "package": "org.lineageos.sheng.pen", "path": "app/ShengPenSettings/ShengPenSettings.apk", "blueprint": "interfaces/input/pen/Android.bp"},
+    {"module": "ShengStylus", "package": "org.lineageos.sheng.stylus", "path": "priv-app/ShengStylus/ShengStylus.apk", "blueprint": "interfaces/input/stylus/Android.bp"},
+    {"module": "ShengTouch", "package": "com.xiaomi.sheng.touch", "path": "priv-app/ShengTouch/ShengTouch.apk", "blueprint": "interfaces/input/touch/Android.bp"},
+    {"module": "MiAONService", "package": "com.xiaomi.aon", "path": "app/MiAONService/MiAONService.apk", "proprietary_source": "product/app/MiAONService/MiAONService.apk"},
+    {"module": "MiDevAuthService", "package": "com.xiaomi.devauth", "path": "app/MiDevAuthService/MiDevAuthService.apk", "proprietary_source": "product/app/MiDevAuthService/MiDevAuthService.apk;PRESIGNED"}
+  ],
+  "uninstalled_applications": [
+    {"module": "ShengIndicatorSettings", "blueprint": "interfaces/lights/Android.bp"},
+    {"module": "ShengFaceLab", "blueprint": "interfaces/biometrics/softwareface/Android.bp"},
+    {"module": "ShengFaceUnlockLegacy", "blueprint": "interfaces/biometrics/systemface/Android.bp"},
+    {"module": "ShengSogouIme", "package": "com.sohu.inputmethod.sogouoem", "blueprint": "interfaces/input/ime/Android.bp", "new_source": "interfaces/input/ime/proprietary/SogouIme.apk"}
+  ],
+  "companions": [
+    {"path": "etc/permissions/privapp-permissions-org.lineageos.sheng.dolby.xml", "module": "privapp-permissions-org.lineageos.sheng.dolby.xml", "blueprint": "dolby/ShengDolby/Android.bp"},
+    {"path": "etc/permissions/privapp-permissions-org.lineageos.sheng.faceunlock.xml", "module": "privapp-permissions-org.lineageos.sheng.faceunlock.xml", "blueprint": "interfaces/biometrics/systemface/Android.bp"},
+    {"path": "etc/permissions/privapp-permissions-sheng-location.xml", "module": "privapp-permissions-sheng-location", "blueprint": "interfaces/location/Android.bp"},
+    {"path": "etc/permissions/privapp-permissions-com.xiaomi.sheng.touch.xml", "module": "privapp-permissions-com.xiaomi.sheng.touch.xml", "blueprint": "interfaces/input/touch/Android.bp"},
+    {"path": "etc/permissions/privapp-permissions-org.lineageos.sheng.stylus.xml", "module": "privapp-permissions-org.lineageos.sheng.stylus.xml", "blueprint": "interfaces/input/stylus/Android.bp"},
+    {"path": "etc/init/init.sheng-keyboard-presence.rc", "module": "init.sheng-keyboard-presence.rc", "blueprint": "interfaces/input/keyboard/Android.bp"},
+    {"path": "overlay/ShengLocationOverlay.apk", "module": "ShengLocationOverlay", "blueprint": "interfaces/location/overlay/Android.bp"},
+    {"path": "etc/default-permissions/default-permissions-sheng-location.xml", "copy_file_source": "interfaces/location/permissions/default-permissions-sheng-location.xml"}
+  ]
+}

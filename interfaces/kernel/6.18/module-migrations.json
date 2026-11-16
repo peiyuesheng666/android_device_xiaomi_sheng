@@ -1,0 +1,283 @@
+{
+  "schema": 1,
+  "integrated_providers": {
+    "ns": {
+      "required_modules": [
+        "qrtr"
+      ],
+      "reason": "The actual namespace service is linked into qrtr, including initialization, error handling and cleanup; exported APIs are retained.",
+      "source_sha256": {
+        "soc/net/qrtr/af_qrtr.c": "656fc4a6e1c6991f20d218c32537fefb4a71b6b0a3963809565987c8a7c4b630",
+        "soc/net/qrtr/ns.c": "9ac45328e85794cfec86da587cac7fc201c9ebce70a61bb2eb7c6a6b877fd4f8"
+      },
+      "retained_exports": [
+        "qrtr_get_service_id",
+        "qrtr_ns_init",
+        "qrtr_ns_remove"
+      ],
+      "runtime_verified": false
+    },
+    "rndisipam": {
+      "required_modules": [
+        "ipam",
+        "ipanetm"
+      ],
+      "reason": "Real RNDIS network-device and IPA data-path implementation is linked into ipam. Its lifecycle remains in ipanetm, so both modules are required.",
+      "source_sha256": {
+        "vendor/qcom/opensource/dataipa/drivers/platform/msm/ipa/Kbuild": "a82cebb8e1e5418c6e7e569161e74f9f15408dfda8e06da353e8f8115b4d3e11",
+        "vendor/qcom/opensource/dataipa/drivers/platform/msm/ipa/ipam.mod": "cff0335e158e5db85715f97a6976d3469187290d8de08bd9839b082c73f6c4cd",
+        "vendor/qcom/opensource/dataipa/drivers/platform/msm/ipa/ipa_clients/rndis_ipa.c": "784f115b2621aee27bbcc6e321b590b48c76d76ade60745603337ec479d96451",
+        "vendor/qcom/opensource/dataipa/drivers/platform/msm/ipa/ipa_v3/ipa_net.c": "e2a0dea13eb2ea840a14749ae374d6ca0c976de25f117f3854c7de905cd1495f"
+      },
+      "retained_exports": [
+        "rndis_ipa_cleanup",
+        "rndis_ipa_init",
+        "rndis_ipa_pipe_connect_notify",
+        "rndis_ipa_pipe_disconnect_notify"
+      ],
+      "runtime_verified": false
+    },
+    "mi_thermal_interface": {
+      "required_modules": [
+        "qti_battery_charger"
+      ],
+      "reason": "All 27 original thermal_message and 2 power_save attributes, real frequency-QoS votes, panel/USB notifications and registration/cleanup are integrated into the QTI charger. The exact thermal header and six adapters match the previously tested production code.",
+      "source_sha256": {
+        "soc/drivers/power/supply/sheng_thermal_message.h": "c416f44ce0f1ee201314fc7f7fd4ea959901efbb1927f237c0bdabc7c472cb2d",
+        "soc/drivers/power/supply/qti_battery_charger.c": "f36ce31fcf799c230e54ce5dda64fec46054f73ddc49cd08ab3f55b38c710243"
+      },
+      "retained_sysfs_attributes": [
+        {
+          "name": "temp_state",
+          "mode": "0o664",
+          "show": true,
+          "store": true
+        },
+        {
+          "name": "cpu_limits",
+          "mode": "0o664",
+          "show": true,
+          "store": true
+        },
+        {
+          "name": "sconfig",
+          "mode": "0o664",
+          "show": true,
+          "store": true
+        },
+        {
+          "name": "screen_state",
+          "mode": "0o664",
+          "show": true,
+          "store": false
+        },
+        {
+          "name": "boost",
+          "mode": "0o644",
+          "show": true,
+          "store": true
+        },
+        {
+          "name": "board_sensor",
+          "mode": "0o664",
+          "show": true,
+          "store": false
+        },
+        {
+          "name": "board_sensor_temp",
+          "mode": "0o664",
+          "show": true,
+          "store": true
+        },
+        {
+          "name": "board_sensor_second_temp",
+          "mode": "0o664",
+          "show": true,
+          "store": true
+        },
+        {
+          "name": "board_sensor_other_temp",
+          "mode": "0o664",
+          "show": true,
+          "store": true
+        },
+        {
+          "name": "balance_mode",
+          "mode": "0o664",
+          "show": true,
+          "store": true
+        },
+        {
+          "name": "modem_limit",
+          "mode": "0o664",
+          "show": true,
+          "store": true
+        },
+        {
+          "name": "wifi_limit",
+          "mode": "0o664",
+          "show": true,
+          "store": true
+        },
+        {
+          "name": "flash_state",
+          "mode": "0o664",
+          "show": true,
+          "store": true
+        },
+        {
+          "name": "torch_level",
+          "mode": "0o664",
+          "show": true,
+          "store": true
+        },
+        {
+          "name": "torch_real_level",
+          "mode": "0o664",
+          "show": true,
+          "store": true
+        },
+        {
+          "name": "thermal_max_brightness",
+          "mode": "0o664",
+          "show": true,
+          "store": true
+        },
+        {
+          "name": "voice_limit",
+          "mode": "0o664",
+          "show": true,
+          "store": true
+        },
+        {
+          "name": "market_download_limit",
+          "mode": "0o664",
+          "show": true,
+          "store": true
+        },
+        {
+          "name": "board_sensor_temp_comp",
+          "mode": "0o664",
+          "show": true,
+          "store": true
+        },
+        {
+          "name": "poor_modem_limit",
+          "mode": "0o664",
+          "show": true,
+          "store": true
+        },
+        {
+          "name": "cpu_nolimit_temp",
+          "mode": "0o664",
+          "show": true,
+          "store": true
+        },
+        {
+          "name": "modem_rate",
+          "mode": "0o664",
+          "show": true,
+          "store": true
+        },
+        {
+          "name": "modem_level",
+          "mode": "0o664",
+          "show": true,
+          "store": true
+        },
+        {
+          "name": "ambient_sensor",
+          "mode": "0o664",
+          "show": true,
+          "store": false
+        },
+        {
+          "name": "ambient_sensor_temp",
+          "mode": "0o664",
+          "show": true,
+          "store": true
+        },
+        {
+          "name": "charger_temp",
+          "mode": "0o664",
+          "show": true,
+          "store": true
+        },
+        {
+          "name": "usb_online",
+          "mode": "0o664",
+          "show": true,
+          "store": false
+        },
+        {
+          "name": "powersave_mode",
+          "mode": "0o664",
+          "show": true,
+          "store": true
+        },
+        {
+          "name": "power_level",
+          "mode": "0o664",
+          "show": true,
+          "store": true
+        }
+      ],
+      "runtime_verified": false
+    },
+    "crypto_qti_common": {
+      "required_modules": [
+        "qcom_ice",
+        "ufshcd_crypto_qti",
+        "ufs_qcom",
+        "tmecom_intf"
+      ],
+      "reason": "The active sheng UFS consumer uses the actual ICE HWKM/TME transport-key setup, secure-world wrapped-key programming, key eviction and secret derivation. Its callers are rebuilt against the new APIs; old eMMC consumers have no bound device on this tablet. No software key programming or false-success branch replaces hardware encryption.",
+      "source_sha256": {
+        "soc/drivers/soc/qcom/ice.c": "d42a1cad51671fd8a411eec2816bd54acbeeca8b752e34347a3481793ac93848",
+        "soc/drivers/ufs/host/ufshcd-crypto-qti.c": "9709ceca9f7b2a3bf11528f5fe833d494daefccf6dd59f662b2a97383f7f6541",
+        "soc/drivers/ufs/host/ufs-qcom.c": "8de1640844b892dda98d58bd3a5ff4e869845d12a90c6f37de199b8ec4e69448",
+        "soc/drivers/soc/qcom/tmecom/tme_hwkm_master.c": "619568d6fdbe9cba605ef25fd9f86b7de47fb207f13307deb89d34d8e597b5c3"
+      },
+      "legacy_exports_replaced_by_rebuilt_consumers": true,
+      "runtime_verified": false,
+      "remaining": "Actual Android FBE mount, device reset and suspend/resume need matching 6.18 runtime validation."
+    },
+    "crypto_qti_hwkm": {
+      "required_modules": [
+        "qcom_ice",
+        "ufshcd_crypto_qti",
+        "ufs_qcom",
+        "tmecom_intf"
+      ],
+      "reason": "The active sheng UFS consumer uses the actual ICE HWKM/TME transport-key setup, secure-world wrapped-key programming, key eviction and secret derivation. Its callers are rebuilt against the new APIs; old eMMC consumers have no bound device on this tablet. No software key programming or false-success branch replaces hardware encryption.",
+      "source_sha256": {
+        "soc/drivers/soc/qcom/ice.c": "d42a1cad51671fd8a411eec2816bd54acbeeca8b752e34347a3481793ac93848",
+        "soc/drivers/ufs/host/ufshcd-crypto-qti.c": "9709ceca9f7b2a3bf11528f5fe833d494daefccf6dd59f662b2a97383f7f6541",
+        "soc/drivers/ufs/host/ufs-qcom.c": "8de1640844b892dda98d58bd3a5ff4e869845d12a90c6f37de199b8ec4e69448",
+        "soc/drivers/soc/qcom/tmecom/tme_hwkm_master.c": "619568d6fdbe9cba605ef25fd9f86b7de47fb207f13307deb89d34d8e597b5c3"
+      },
+      "legacy_exports_replaced_by_rebuilt_consumers": true,
+      "runtime_verified": false,
+      "remaining": "Actual Android FBE mount, device reset and suspend/resume need matching 6.18 runtime validation."
+    },
+    "hwkm": {
+      "required_modules": [
+        "qcom_ice",
+        "ufshcd_crypto_qti",
+        "ufs_qcom",
+        "tmecom_intf"
+      ],
+      "reason": "The active sheng UFS consumer uses the actual ICE HWKM/TME transport-key setup, secure-world wrapped-key programming, key eviction and secret derivation. Its callers are rebuilt against the new APIs; old eMMC consumers have no bound device on this tablet. No software key programming or false-success branch replaces hardware encryption.",
+      "source_sha256": {
+        "soc/drivers/soc/qcom/ice.c": "d42a1cad51671fd8a411eec2816bd54acbeeca8b752e34347a3481793ac93848",
+        "soc/drivers/ufs/host/ufshcd-crypto-qti.c": "9709ceca9f7b2a3bf11528f5fe833d494daefccf6dd59f662b2a97383f7f6541",
+        "soc/drivers/ufs/host/ufs-qcom.c": "8de1640844b892dda98d58bd3a5ff4e869845d12a90c6f37de199b8ec4e69448",
+        "soc/drivers/soc/qcom/tmecom/tme_hwkm_master.c": "619568d6fdbe9cba605ef25fd9f86b7de47fb207f13307deb89d34d8e597b5c3"
+      },
+      "legacy_exports_replaced_by_rebuilt_consumers": true,
+      "runtime_verified": false,
+      "remaining": "Actual Android FBE mount, device reset and suspend/resume need matching 6.18 runtime validation."
+    }
+  },
+  "policy": "Source and full implementation review are required. Same symbol names alone do not establish equivalent behavior. No other legacy names are excluded by this file."
+}

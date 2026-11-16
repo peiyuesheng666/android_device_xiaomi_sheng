@@ -1,0 +1,19 @@
+From: sheng device integration
+Subject: [PATCH] usb: share the enabled core RNDIS protocol
+
+--- a/soc/Kbuild
++++ b/soc/Kbuild
+@@ -982,7 +982,12 @@
+ CFLAGS_drivers/usb/gadget/function/f_cdev.o += -I$(M)/drivers/usb/gadget/function
+ 
+ obj-m += usb_f_gsi.o
+-usb_f_gsi-y := drivers/usb/gadget/function/f_gsi.o drivers/usb/gadget/function/rndis.o
++usb_f_gsi-y := drivers/usb/gadget/function/f_gsi.o
++# CONFIG_USB_F_RNDIS already provides the shared protocol exports.
++# Keep the local provider for the reference configuration without it.
++ifeq ($(filter y m,$(CONFIG_USB_F_RNDIS)),)
++usb_f_gsi-y += drivers/usb/gadget/function/rndis.o
++endif
+ CFLAGS_drivers/usb/gadget/function/f_gsi.o += -I$(M)/drivers/usb/gadget/function -I$(M)/drivers/usb/gadget/function -I$(M)/drivers/usb/dwc3 -I$(M)/drivers/soc/qcom -I$(M)/drivers/remoteproc -I$(M)/drivers/rpmsg -I$(M)/kernel/trace -I$(M)/drivers/dma-buf/heaps -I$(M)/drivers/dma-buf/heaps/aizerofs -I$(M)/drivers/soc/qcom/mem_buf -I$(M)/include/linux -I$(M)/drivers/firmware/qcom -I$(M)/drivers/virt/gunyah -I$(M)/arch/arm64/gunyah -I$(M)/include/linux/gunyah -I$(M)/drivers/clk/qcom
+ CFLAGS_drivers/usb/gadget/function/rndis.o += -I$(M)/drivers/usb/gadget/function -I$(M)/drivers/usb/gadget/function -I$(M)/drivers/usb/dwc3 -I$(M)/drivers/soc/qcom -I$(M)/drivers/remoteproc -I$(M)/drivers/rpmsg -I$(M)/kernel/trace -I$(M)/drivers/dma-buf/heaps -I$(M)/drivers/dma-buf/heaps/aizerofs -I$(M)/drivers/soc/qcom/mem_buf -I$(M)/include/linux -I$(M)/drivers/firmware/qcom -I$(M)/drivers/virt/gunyah -I$(M)/arch/arm64/gunyah -I$(M)/include/linux/gunyah -I$(M)/drivers/clk/qcom
+ 

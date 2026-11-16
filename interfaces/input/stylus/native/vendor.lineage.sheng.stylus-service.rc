@@ -1,0 +1,11 @@
+on early-init
+    # tmpfs marker survives a daemon restart, and disappears at a real reboot.
+    mkdir /dev/sheng-stylus 0700 system system
+    restorecon_recursive /dev/sheng-stylus
+
+service vendor.sheng-stylus /vendor/bin/hw/vendor.lineage.sheng.stylus-service
+    class hal
+    user system
+    group system
+    gentle_kill
+    interface aidl vendor.lineage.sheng.stylus.IPenController/default

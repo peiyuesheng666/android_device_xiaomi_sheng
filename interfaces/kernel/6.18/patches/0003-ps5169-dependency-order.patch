@@ -1,0 +1,12 @@
+--- a/sheng-ports/ps5169/ps5169.c
++++ b/sheng-ports/ps5169/ps5169.c
+@@ -960,7 +960,8 @@
+ 	.id_table = ps5169_id,
+ };
+ 
+-MODULE_SOFTDEP("post: redriver dwc3_msm");
++/* redriver exports are required before this driver can register. */
++MODULE_SOFTDEP("pre: redriver post: dwc3_msm");
+ 
+ static int __init ps5169_init(void)
+ {

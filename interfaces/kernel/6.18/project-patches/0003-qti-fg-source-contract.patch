@@ -1,0 +1,33 @@
+--- a/scripts/apply-charging-fix.py
++++ b/scripts/apply-charging-fix.py
+@@ -20,7 +20,7 @@
+ # Exact device-owned Android downstream source, following the factory overlay.
+ # Never accept an arbitrary source edit or disable inherited hash checks.
+ def android_interface_matches(name, got):
+-    expected = {'k618/soc/drivers/power/supply/qti_battery_charger.c': 'ceb3f39530b927fe95a326ff5e89d620762061da1dfb511f1bb8205acf3eb532', 'k618/soc/drivers/power/supply/sheng_qti_pogo.h': '1954ddf5023d1093776406dd073d0fc6cdf2b808ce8ec58aa24a731878c3ef8b', 'k618/soc/drivers/power/supply/sheng_qti_pogo_wire.h': '2a5162795fbb50098762720cb5c3492d77b78ed3bbf67e8e6b61bad0a053c8af', 'k618/soc/drivers/power/supply/sheng_qti_pogo_api.h': '45ae1c8129628d56fd20b8c43c1ca346bab11c832ff8f8d22fc14e47c1f4c739', 'k618/soc/drivers/power/supply/sheng_keyboard_charger_api.h': '365e124b828dcdea8bc80df0025a7d61359f42c9dd588a1d1352208b05459f9f'}
++    expected = {'k618/soc/drivers/power/supply/qti_battery_charger.c': 'f1cbedb69d96fe200d859133183a742578237c75d018b83e8228acce31fb11ba', 'k618/soc/drivers/power/supply/sheng_qti_pogo.h': '6428f9203cdef411a325d5e694cf5c3443d94a726807b87f7267f4ac09073556', 'k618/soc/drivers/power/supply/sheng_qti_pogo_wire.h': '871444c4ffae087d05142fcf07d4adecc726cc1f522e370bec5c4cfb09bff4d2', 'k618/soc/drivers/power/supply/sheng_qti_pogo_api.h': '45ae1c8129628d56fd20b8c43c1ca346bab11c832ff8f8d22fc14e47c1f4c739', 'k618/soc/drivers/power/supply/sheng_keyboard_charger_api.h': '365e124b828dcdea8bc80df0025a7d61359f42c9dd588a1d1352208b05459f9f', 'k618/soc/drivers/power/supply/sheng_qti_fg_math.h': '847cf98f5cec047ebdf621835d11fff5f284202a9401b96ab2ad3fd7cf38285d', 'k618/soc/drivers/power/supply/sheng_qti_fg_api.h': '7948c74291508ebf573f520804ee4c6800ed040dbde614c75d21914172fb2ca2', 'k618/soc/Kbuild': '25d05e47e3067adb82d94dd2bc7da4bc73f342dcd6f598f1c35c57c08a4da48b', 'k618/sheng-ports/pogo/platform_class.c': '9d444a73ca7bed2a55fa466b893ac53400f5e2029acf1335d64ef4ba1526a297', 'k618/sheng-ports/pogo/sheng_battmngr_calls.h': '2f825aa482b40ee3a2bb5497de4d109c104f457a63cc91264e3115f45cc83def'}
+     if name not in expected or got != expected[name]:
+         return False
+     build_root = Path(os.environ['BUILD_ROOT']).resolve()
+--- a/scripts/apply-repair-r85.py
++++ b/scripts/apply-repair-r85.py
+@@ -19,7 +19,7 @@
+ # Exact device-owned Android downstream source, following the factory overlay.
+ # Never accept an arbitrary source edit or disable inherited hash checks.
+ def android_interface_matches(name, got):
+-    expected = {'k618/soc/drivers/power/supply/qti_battery_charger.c': 'ceb3f39530b927fe95a326ff5e89d620762061da1dfb511f1bb8205acf3eb532', 'k618/soc/drivers/power/supply/sheng_qti_pogo.h': '1954ddf5023d1093776406dd073d0fc6cdf2b808ce8ec58aa24a731878c3ef8b', 'k618/soc/drivers/power/supply/sheng_qti_pogo_wire.h': '2a5162795fbb50098762720cb5c3492d77b78ed3bbf67e8e6b61bad0a053c8af', 'k618/soc/drivers/power/supply/sheng_qti_pogo_api.h': '45ae1c8129628d56fd20b8c43c1ca346bab11c832ff8f8d22fc14e47c1f4c739', 'k618/soc/drivers/power/supply/sheng_keyboard_charger_api.h': '365e124b828dcdea8bc80df0025a7d61359f42c9dd588a1d1352208b05459f9f'}
++    expected = {'k618/soc/drivers/power/supply/qti_battery_charger.c': 'f1cbedb69d96fe200d859133183a742578237c75d018b83e8228acce31fb11ba', 'k618/soc/drivers/power/supply/sheng_qti_pogo.h': '6428f9203cdef411a325d5e694cf5c3443d94a726807b87f7267f4ac09073556', 'k618/soc/drivers/power/supply/sheng_qti_pogo_wire.h': '871444c4ffae087d05142fcf07d4adecc726cc1f522e370bec5c4cfb09bff4d2', 'k618/soc/drivers/power/supply/sheng_qti_pogo_api.h': '45ae1c8129628d56fd20b8c43c1ca346bab11c832ff8f8d22fc14e47c1f4c739', 'k618/soc/drivers/power/supply/sheng_keyboard_charger_api.h': '365e124b828dcdea8bc80df0025a7d61359f42c9dd588a1d1352208b05459f9f', 'k618/soc/drivers/power/supply/sheng_qti_fg_math.h': '847cf98f5cec047ebdf621835d11fff5f284202a9401b96ab2ad3fd7cf38285d', 'k618/soc/drivers/power/supply/sheng_qti_fg_api.h': '7948c74291508ebf573f520804ee4c6800ed040dbde614c75d21914172fb2ca2', 'k618/soc/Kbuild': '25d05e47e3067adb82d94dd2bc7da4bc73f342dcd6f598f1c35c57c08a4da48b', 'k618/sheng-ports/pogo/platform_class.c': '9d444a73ca7bed2a55fa466b893ac53400f5e2029acf1335d64ef4ba1526a297', 'k618/sheng-ports/pogo/sheng_battmngr_calls.h': '2f825aa482b40ee3a2bb5497de4d109c104f457a63cc91264e3115f45cc83def'}
+     if name not in expected or got != expected[name]:
+         return False
+     build_root = Path(os.environ['BUILD_ROOT']).resolve()
+--- a/scripts/apply-factory-interfaces.py
++++ b/scripts/apply-factory-interfaces.py
+@@ -10,7 +10,7 @@
+ # Exact device-owned Android downstream source, following the factory overlay.
+ # Never accept an arbitrary source edit or disable inherited hash checks.
+ def android_interface_matches(name, got):
+-    expected = {'k618/soc/drivers/power/supply/qti_battery_charger.c': 'ceb3f39530b927fe95a326ff5e89d620762061da1dfb511f1bb8205acf3eb532', 'k618/soc/drivers/power/supply/sheng_qti_pogo.h': '1954ddf5023d1093776406dd073d0fc6cdf2b808ce8ec58aa24a731878c3ef8b', 'k618/soc/drivers/power/supply/sheng_qti_pogo_wire.h': '2a5162795fbb50098762720cb5c3492d77b78ed3bbf67e8e6b61bad0a053c8af', 'k618/soc/drivers/power/supply/sheng_qti_pogo_api.h': '45ae1c8129628d56fd20b8c43c1ca346bab11c832ff8f8d22fc14e47c1f4c739', 'k618/soc/drivers/power/supply/sheng_keyboard_charger_api.h': '365e124b828dcdea8bc80df0025a7d61359f42c9dd588a1d1352208b05459f9f'}
++    expected = {'k618/soc/drivers/power/supply/qti_battery_charger.c': 'f1cbedb69d96fe200d859133183a742578237c75d018b83e8228acce31fb11ba', 'k618/soc/drivers/power/supply/sheng_qti_pogo.h': '6428f9203cdef411a325d5e694cf5c3443d94a726807b87f7267f4ac09073556', 'k618/soc/drivers/power/supply/sheng_qti_pogo_wire.h': '871444c4ffae087d05142fcf07d4adecc726cc1f522e370bec5c4cfb09bff4d2', 'k618/soc/drivers/power/supply/sheng_qti_pogo_api.h': '45ae1c8129628d56fd20b8c43c1ca346bab11c832ff8f8d22fc14e47c1f4c739', 'k618/soc/drivers/power/supply/sheng_keyboard_charger_api.h': '365e124b828dcdea8bc80df0025a7d61359f42c9dd588a1d1352208b05459f9f', 'k618/soc/drivers/power/supply/sheng_qti_fg_math.h': '847cf98f5cec047ebdf621835d11fff5f284202a9401b96ab2ad3fd7cf38285d', 'k618/soc/drivers/power/supply/sheng_qti_fg_api.h': '7948c74291508ebf573f520804ee4c6800ed040dbde614c75d21914172fb2ca2', 'k618/soc/Kbuild': '25d05e47e3067adb82d94dd2bc7da4bc73f342dcd6f598f1c35c57c08a4da48b', 'k618/sheng-ports/pogo/platform_class.c': '9d444a73ca7bed2a55fa466b893ac53400f5e2029acf1335d64ef4ba1526a297', 'k618/sheng-ports/pogo/sheng_battmngr_calls.h': '2f825aa482b40ee3a2bb5497de4d109c104f457a63cc91264e3115f45cc83def'}
+     if name not in expected or got != expected[name]:
+         return False
+     build_root = Path(os.environ['BUILD_ROOT']).resolve()

@@ -1,0 +1,6 @@
+typeattribute sheng_indicator_app coredomain;
+app_domain(sheng_indicator_app)
+binder_use(sheng_indicator_app)
+binder_call(sheng_indicator_app, system_server)
+allow sheng_indicator_app { app_api_service system_api_service }:service_manager find;
+set_prop(sheng_indicator_app, sheng_indicator_prop)

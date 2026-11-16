@@ -1,0 +1,2 @@
+type sheng_indicator_app, domain;
+system_restricted_prop(sheng_indicator_prop)

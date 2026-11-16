@@ -1,0 +1,16 @@
+# SPDX-License-Identifier: Apache-2.0
+typeattribute sheng_keyboard_app coredomain;
+app_domain(sheng_keyboard_app)
+binder_use(sheng_keyboard_app)
+binder_call(sheng_keyboard_app, system_server)
+binder_call(sheng_keyboard_app, sheng_devauth_app)
+allow sheng_keyboard_app { app_api_service system_api_service }:service_manager find;
+
+typeattribute sheng_devauth_app coredomain;
+app_domain(sheng_devauth_app)
+net_domain(sheng_devauth_app)
+binder_use(sheng_devauth_app)
+binder_call(sheng_devauth_app, system_server)
+allow sheng_devauth_app { app_api_service system_api_service }:service_manager find;
+
+# Both applications keep their ordinary per-UID package data and MLS isolation.

@@ -1,0 +1,12 @@
+#!/bin/sh
+# SPDX-License-Identifier: Apache-2.0
+set -eu
+tool_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+if [ -n "${ANDROID_JAVA_HOME:-}" ]; then
+    java_cmd=$ANDROID_JAVA_HOME/bin/java
+elif [ -n "${JAVA_HOME:-}" ]; then
+    java_cmd=$JAVA_HOME/bin/java
+else
+    java_cmd=java
+fi
+exec "$java_cmd" -Xmx8g -jar "$tool_dir/../framework/sheng-systemui-patch.jar" "$@"

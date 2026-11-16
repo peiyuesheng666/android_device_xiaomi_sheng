@@ -1,0 +1,10 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="org.lineageos.sheng.keyboard" android:versionCode="1" android:versionName="1.0">
+    <uses-permission android:name="android.permission.DISABLE_INPUT_DEVICE" />
+    <uses-permission android:name="android.permission.TABLET_MODE" />
+    <queries><package android:name="com.xiaomi.devauth" /></queries>
+    <application android:name=".PresenceApplication"
+        android:label="Keyboard connection service"
+        android:persistent="true" android:directBootAware="true"
+        android:allowBackup="false" />
+</manifest>

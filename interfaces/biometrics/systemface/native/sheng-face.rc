@@ -1,0 +1,22 @@
+# SPDX-License-Identifier: Apache-2.0
+service sheng-face /system_ext/bin/sheng-face
+    class hal
+    user system
+    group system camera
+    interface aidl android.hardware.biometrics.face.IFace/default
+    disabled
+    restart_period 10
+
+service sheng-face-self-test /system_ext/bin/sheng-face --self-test
+    class hal
+    user system
+    group system camera
+    disabled
+    oneshot
+
+on property:sys.sheng.face.test_request=1
+    start sheng-face-self-test
+
+# Lazy interface startup also works before boot-completed when FaceService discovers it.
+on property:sys.boot_completed=1
+    start sheng-face

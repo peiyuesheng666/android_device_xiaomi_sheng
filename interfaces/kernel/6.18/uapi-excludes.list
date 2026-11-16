@@ -1,0 +1,17 @@
+kernel/xiaomi/sheng-build/sources/k618/soc/include/uapi/linux/qseecom.h
+kernel/xiaomi/sheng-build/sources/k618/vendor/nxp/opensource/driver/include/uapi/linux/nfc/nfcinfo.h
+kernel/xiaomi/sheng-build/sources/k618/vendor/qcom/opensource/audio-kernel/include/uapi/audio/linux/msm_audio.h
+kernel/xiaomi/sheng-build/sources/k618/vendor/qcom/opensource/audio-kernel/include/uapi/audio/sound/audio_effects.h
+kernel/xiaomi/sheng-build/sources/k618/vendor/qcom/opensource/audio-kernel/include/uapi/audio/sound/audio_slimslave.h
+kernel/xiaomi/sheng-build/sources/k618/vendor/qcom/opensource/audio-kernel/include/uapi/audio/sound/devdep_params.h
+kernel/xiaomi/sheng-build/sources/k618/vendor/qcom/opensource/audio-kernel/include/uapi/audio/sound/lsm_params.h
+kernel/xiaomi/sheng-build/sources/k618/vendor/qcom/opensource/audio-kernel/include/uapi/audio/sound/msmcal-hwdep.h
+kernel/xiaomi/sheng-build/sources/k618/vendor/qcom/opensource/audio-kernel/include/uapi/audio/sound/voice_params.h
+kernel/xiaomi/sheng-build/sources/k618/vendor/qcom/opensource/audio-kernel/include/uapi/audio/sound/wcd-dsp-glink.h
+kernel/xiaomi/sheng-build/sources/k618/vendor/qcom/opensource/display-drivers/include/uapi/display/drm/msm_drm_pp.h
+kernel/xiaomi/sheng-build/sources/k618/vendor/qcom/opensource/display-drivers/include/uapi/display/drm/sde_drm.h
+kernel/xiaomi/sheng-build/sources/k618/vendor/qcom/opensource/display-drivers/include/uapi/display/hdcp/msm_hdmi_hdcp_mgr.h
+kernel/xiaomi/sheng-build/sources/k618/vendor/qcom/opensource/display-drivers/include/uapi/display/media/mmm_color_fmt.h
+kernel/xiaomi/sheng-build/sources/k618/vendor/qcom/opensource/display-drivers/include/uapi/display/media/msm_sde_rotator.h
+kernel/xiaomi/sheng-build/sources/k618/vendor/xiaomi/adsprpc-515/include/uapi/linux/msm_ion.h
+kernel/xiaomi/sheng-build/sources/k618/vendor/xiaomi/adsprpc-515/include/uapi/linux/msm_ion_ids.h

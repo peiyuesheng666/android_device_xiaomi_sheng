@@ -1,0 +1,304 @@
+--- /dev/null
++++ b/soc/drivers/misc/hwid/hwid.c
+@@ -0,0 +1,165 @@
++/*
++ * Copyright (C) 2021 XiaoMi, Inc.
++ *               2022 The LineageOS Project
++ *
++ * SPDX-License-Identifier: GPL-2.0
++ */
++
++#include <linux/module.h>
++#include <linux/kobject.h>
++#include <linux/sysfs.h>
++#include <soc/qcom/socinfo.h>
++
++#include <linux/hwid.h>
++
++#define HW_MAJOR_VERSION_SHIFT      16
++#define HW_MINOR_VERSION_SHIFT      0
++#define HW_COUNTRY_VERSION_SHIFT    20
++#define HW_BUILD_VERSION_SHIFT      16
++#define HW_MAJOR_VERSION_MASK       0xFFFF0000
++#define HW_MINOR_VERSION_MASK       0x0000FFFF
++#define HW_COUNTRY_VERSION_MASK     0xFFF00000
++#define HW_BUILD_VERSION_MASK       0x000F0000
++
++char *SOC_207_PRODUCTS[] = {
++	"nuwa",
++	"fuxi",
++	"wangshu",
++	"socrates",
++	"ishtar",
++	"babylon",
++	"vermeer",
++	"sheng"
++};
++int SOC_207_PRODUCT_CNT = sizeof(SOC_207_PRODUCTS) / sizeof(char*);
++
++/* These four parameters are supplied by the shipping bootloader. Android
++ * libmodprobe passes module-qualified /proc/cmdline options unchanged. */
++static uint project;
++module_param(project, uint, 0444);
++
++static uint hwid_value;
++module_param(hwid_value, uint, 0444);
++
++uint32_t get_hw_version_platform(void)
++{
++	return project;
++}
++EXPORT_SYMBOL(get_hw_version_platform);
++
++uint32_t get_hw_id_value(void)
++{
++	return hwid_value;
++}
++EXPORT_SYMBOL(get_hw_id_value);
++
++uint32_t get_hw_country_version(void)
++{
++	return (hwid_value & HW_COUNTRY_VERSION_MASK) >> HW_COUNTRY_VERSION_SHIFT;
++}
++EXPORT_SYMBOL(get_hw_country_version);
++
++uint32_t get_hw_version_major(void)
++{
++	return (hwid_value & HW_MAJOR_VERSION_MASK) >> HW_MAJOR_VERSION_SHIFT;
++}
++EXPORT_SYMBOL(get_hw_version_major);
++
++uint32_t get_hw_version_minor(void)
++{
++	return (hwid_value & HW_MINOR_VERSION_MASK) >> HW_MINOR_VERSION_SHIFT;
++}
++EXPORT_SYMBOL(get_hw_version_minor);
++
++uint32_t get_hw_version_build(void)
++{
++	return (hwid_value & HW_BUILD_VERSION_MASK) >> HW_BUILD_VERSION_SHIFT;
++}
++EXPORT_SYMBOL(get_hw_version_build);
++
++char* product_name_get(void) {
++	int soc_id = socinfo_get_id();
++	char **product_array = NULL;
++	int product_count = 0;
++	int index = 0;
++
++	switch(soc_id) {
++		case 0x207: // SM8550
++			product_array = SOC_207_PRODUCTS;
++			product_count = SOC_207_PRODUCT_CNT;
++			index = project - 1;
++			break;
++		default:
++			goto unknown;
++	}
++
++	if (index >= 0 && index < product_count && product_array != NULL) {
++		return product_array[index];
++	}
++
++unknown:
++	return "unknown";
++}
++EXPORT_SYMBOL(product_name_get);
++
++MODULE_AUTHOR("weixiaotian1@xiaomi.com");
++MODULE_LICENSE("GPL v2");
++
++/* Shipping module also exposes the two actual bootloader ADC readings. */
++static uint build_adc, project_adc;
++module_param(build_adc, uint, 0444);
++module_param(project_adc, uint, 0444);
++
++uint32_t get_hw_build_adc(void)
++{
++	return build_adc;
++}
++EXPORT_SYMBOL(get_hw_build_adc);
++
++uint32_t get_hw_project_adc(void)
++{
++	return project_adc;
++}
++EXPORT_SYMBOL(get_hw_project_adc);
++
++/* Retain the shipping read-only identity/ADC attributes with real values. */
++static struct kobject *hwid_kobj;
++#define HWID_ATTR(name, getter) \
++static ssize_t name##_show(struct kobject *obj, struct kobj_attribute *attr, char *buf) \
++{ \
++	return sysfs_emit(buf, "0x%x\n", getter()); \
++} \
++static struct kobj_attribute name##_attr = __ATTR_RO(name)
++HWID_ATTR(hwid_project, get_hw_version_platform);
++HWID_ATTR(hwid_value, get_hw_id_value);
++HWID_ATTR(hwid_build_adc, get_hw_build_adc);
++HWID_ATTR(hwid_project_adc, get_hw_project_adc);
++
++static struct attribute *hwid_attrs[] = {
++	&hwid_project_attr.attr, &hwid_value_attr.attr,
++	&hwid_build_adc_attr.attr, &hwid_project_adc_attr.attr, NULL,
++};
++static const struct attribute_group hwid_group = { .attrs = hwid_attrs };
++
++static int __init hwid_init(void)
++{
++	int ret;
++
++	hwid_kobj = kobject_create_and_add("hwid", NULL);
++	if (!hwid_kobj)
++		return -ENOMEM;
++	ret = sysfs_create_group(hwid_kobj, &hwid_group);
++	if (ret) {
++		kobject_put(hwid_kobj);
++		hwid_kobj = NULL;
++	}
++	return ret;
++}
++
++static void __exit hwid_exit(void)
++{
++	sysfs_remove_group(hwid_kobj, &hwid_group);
++	kobject_put(hwid_kobj);
++}
++module_init(hwid_init);
++module_exit(hwid_exit);
+--- /dev/null
++++ b/soc/include/linux/hwid.h
+@@ -0,0 +1,34 @@
++/*
++ * Copyright (C) 2021 XiaoMi, Inc.
++ *               2022 The LineageOS Project
++ *
++ * SPDX-License-Identifier: GPL-2.0
++ */
++
++#ifndef __HWID_H__
++#define __HWID_H__
++
++#include <linux/types.h>
++
++#define HARDWARE_PROJECT_UNKNOWN    0
++
++typedef enum {
++	CountryCN = 0x00,
++	CountryGlobal = 0x01,
++	CountryIndia = 0x02,
++	CountryJapan = 0x03,
++	INVALID = 0x04,
++	CountryIDMax = 0x7FFFFFFF
++} CountryType;
++
++uint32_t get_hw_version_platform(void);
++uint32_t get_hw_id_value(void);
++uint32_t get_hw_country_version(void);
++uint32_t get_hw_version_major(void);
++uint32_t get_hw_version_minor(void);
++uint32_t get_hw_version_build(void);
++char* product_name_get(void);
++uint32_t get_hw_build_adc(void);
++uint32_t get_hw_project_adc(void);
++
++#endif /* __HWID_H__ */
+--- a/soc/Kbuild
++++ b/soc/Kbuild
+@@ -1194,3 +1194,7 @@
+ CFLAGS_sound/usb/usb_audio_qmi_svc.o += -I$(M)/sound/usb -I$(M)/sound/usb -I$(M)/kernel/trace -I$(M)/drivers/soc/qcom -I$(M)/drivers/dma-buf/heaps -I$(M)/drivers/dma-buf/heaps/aizerofs -I$(M)/drivers/soc/qcom/mem_buf -I$(M)/include/linux -I$(M)/drivers/firmware/qcom -I$(M)/drivers/virt/gunyah -I$(M)/arch/arm64/gunyah -I$(M)/include/linux/gunyah
+ CFLAGS_sound/usb/usb_audio_qmi_v01.o += -I$(M)/sound/usb -I$(M)/sound/usb -I$(M)/kernel/trace -I$(M)/drivers/soc/qcom -I$(M)/drivers/dma-buf/heaps -I$(M)/drivers/dma-buf/heaps/aizerofs -I$(M)/drivers/soc/qcom/mem_buf -I$(M)/include/linux -I$(M)/drivers/firmware/qcom -I$(M)/drivers/virt/gunyah -I$(M)/arch/arm64/gunyah -I$(M)/include/linux/gunyah
+ 
++
++# Real shipping hardware identity, including bootloader module parameters.
++obj-m += hwid.o
++hwid-y := drivers/misc/hwid/hwid.o
+--- a/soc/gen/autoconf_vendor.h
++++ b/soc/gen/autoconf_vendor.h
+@@ -1137,3 +1137,7 @@
+ #ifndef CONFIG_XLOGCHAR_MODULE
+ #define CONFIG_XLOGCHAR_MODULE 1
+ #endif
++
++#ifndef CONFIG_MI_HARDWARE_ID_MODULE
++#define CONFIG_MI_HARDWARE_ID_MODULE 1
++#endif
+--- a/vendor/qcom/opensource/wlan/platform/cnss2/qmi.c
++++ b/vendor/qcom/opensource/wlan/platform/cnss2/qmi.c
+@@ -13,6 +13,8 @@
+ #include "main.h"
+ #include "qmi.h"
+ #include "genl.h"
++#include <linux/hwid.h>
++#include "sheng_wifi_bdf.h"
+ 
+ #ifdef OPLUS_FEATURE_WIFI_BDF
+ //Modify for: multi projects using different bdf
+@@ -33,17 +35,6 @@
+ #define REGDB_FILE_NAME			"regdb.bin"
+ #define HDS_FILE_NAME			"hds.bin"
+ 
+-/* k618: the 13 Pro's own board and regulatory files, as its 5.15 cnss2 (Xiaomi's: it picks them
+- * with hwid's get_hw_version_platform()) asks for them -- kiwi/bd_m2.elf and kiwi/regdb_xiaomi.bin
+- * (5.15 dmesg). firmware_mnt also carries Qualcomm's reference bdwlan.elf / regdb.bin, which differ
+- * (sha256). A global unit would boot with cnss2.bdf_name=bd_m2gl.elf.
+- */
+-static char *k618_bdf_name = "bd_m2.elf";
+-module_param_named(bdf_name, k618_bdf_name, charp, 0644);
+-MODULE_PARM_DESC(bdf_name, "k618: board data file in the chip's firmware directory");
+-static char *k618_regdb_name = "regdb_xiaomi.bin";
+-module_param_named(regdb_name, k618_regdb_name, charp, 0644);
+-MODULE_PARM_DESC(regdb_name, "k618: regulatory database file in the chip's firmware directory");
+ #define CHIP_ID_GF_MASK			0x10
+ 
+ #ifdef OPLUS_FEATURE_WIFI_BDF
+@@ -978,8 +969,19 @@
+ 		/* Board ID will be equal or less than 0xFF in GF mask case */
+ 		if (plat_priv->board_info.board_id == 0xFF) {
+ #ifndef OPLUS_FEATURE_WIFI_BDF
+-			/* k618: board id 0xff on this phone: Xiaomi's per-project name */
+-			snprintf(filename_tmp, filename_len, "%s", k618_bdf_name);
++			const char *board_name;
++
++			if (plat_priv->chip_info.chip_id & CHIP_ID_GF_MASK) {
++				board_name = ELF_BDF_FILE_NAME_GF;
++			} else {
++				board_name = sheng_wifi_bdf_name(get_hw_version_platform(),
++							      get_hw_country_version());
++				if (!board_name) {
++					cnss_pr_err("Unknown bootloader HWID platform; no board file selected\n");
++					return -ENODEV;
++				}
++			}
++			snprintf(filename_tmp, sizeof(filename_tmp), "%s", board_name);
+ #else
+ 			cnss_get_oplus_bdf_file_name(plat_priv, filename_tmp, filename_len);
+ #endif /* OPLUS_FEATURE_WIFI_BDF */
+@@ -1024,7 +1026,7 @@
+ 		}
+ 		break;
+ 	case CNSS_BDF_REGDB:
+-		snprintf(filename_tmp, filename_len, "%s", k618_regdb_name);
++		snprintf(filename_tmp, sizeof(filename_tmp), "%s", "regdb_xiaomi.bin");
+ 		break;
+ 	case CNSS_BDF_HDS:
+ 		snprintf(filename_tmp, filename_len, HDS_FILE_NAME);
+--- /dev/null
++++ b/vendor/qcom/opensource/wlan/platform/cnss2/sheng_wifi_bdf.h
+@@ -0,0 +1,16 @@
++/* SPDX-License-Identifier: GPL-2.0-only */
++/* Shipping cnss2: platform comes from hwid.project, country from hwid_value. */
++static const char *sheng_wifi_bdf_name(u32 platform, u32 country)
++{
++	switch (platform) {
++	case 1: return country == 1 ? "bd_m2gl.elf" : "bd_m2.elf";
++	case 2: return country == 1 ? "bd_m3gl.elf" : "bd_m3.elf";
++	case 3: return "bdwlan.elf";
++	case 4: return country == 1 ? "bd_m11gl.elf" : "bd_m11.elf";
++	case 5: return country == 1 ? "bd_m1gl.elf" : "bd_m1.elf";
++	case 6: return country == 1 ? "bd_m18gl.elf" : "bd_m18.elf";
++	case 7: return country ? "bd_n11gl.elf" : "bd_n11.elf";
++	case 8: return country ? "bd_n81agl.elf" : "bd_n81a.elf";
++	default: return NULL;
++	}
++}

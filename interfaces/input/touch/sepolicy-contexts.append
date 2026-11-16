@@ -1,0 +1,5 @@
+# Append to DT vendor/genfs_contexts and vendor/file_contexts during integration.
+# The sysfs path was resolved on the supplied stock modules on 2026-11-07.
+genfscon sysfs /devices/platform/soc/ae00000.qcom,mdss_mdp/drm/card0/card0-DSI-1/dpms u:object_r:vendor_sysfs_sheng_touch_dpms:s0
+genfscon proc /xm_htc_gesture_switch u:object_r:vendor_proc_sheng_touch_gesture:s0
+/vendor/bin/sheng-touchctl u:object_r:vendor_sheng_touchctl_exec:s0

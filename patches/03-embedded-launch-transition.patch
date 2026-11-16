@@ -1,0 +1,66 @@
+diff --git a/libs/WindowManager/Shell/src/com/android/wm/shell/transition/RemoteTransitionHandler.java b/libs/WindowManager/Shell/src/com/android/wm/shell/transition/RemoteTransitionHandler.java
+index d8fbd4e2b..fe5e49191 100644
+--- a/libs/WindowManager/Shell/src/com/android/wm/shell/transition/RemoteTransitionHandler.java
++++ b/libs/WindowManager/Shell/src/com/android/wm/shell/transition/RemoteTransitionHandler.java
+@@ -20,6 +20,7 @@ import static com.android.wm.shell.Flags.addOneOffHandlerLeashes;
+ 
+ import android.annotation.NonNull;
+ import android.annotation.Nullable;
++import android.os.Build;
+ import android.os.IBinder;
+ import android.os.Parcel;
+ import android.os.RemoteException;
+@@ -28,6 +29,7 @@ import android.util.Log;
+ import android.util.Pair;
+ import android.util.Slog;
+ import android.view.SurfaceControl;
++import android.view.WindowManager;
+ import android.window.IRemoteTransition;
+ import android.window.IRemoteTransitionFinishedCallback;
+ import android.window.RemoteTransition;
+@@ -259,6 +261,10 @@ public class RemoteTransitionHandler implements Transitions.TransitionHandler {
+             @NonNull Transitions.TransitionFinishCallback finishCallback) {
+         final RemoteTransition remoteTransition = mRequestedRemotes.get(mergeTarget);
+         if (remoteTransition == null) return;
++        if (shouldDeferEmbeddedLaunch(remoteTransition, info)) {
++            Log.i(TAG, "Deferring embedded launch merge for #" + info.getDebugId());
++            return;
++        }
+ 
+         final IRemoteTransition remote = remoteTransition.getRemoteTransition();
+         if (remote == null) return;
+@@ -298,6 +304,34 @@ public class RemoteTransitionHandler implements Transitions.TransitionHandler {
+         }
+     }
+ 
++    /**
++     * Keep an embedded placeholder opening from ending an unrelated task launch early.
++     * This policy is scoped to sheng and its Quickstep launch transition.
++     */
++    private static boolean shouldDeferEmbeddedLaunch(@NonNull RemoteTransition remote,
++            @NonNull TransitionInfo info) {
++        if (!"sheng".equals(Build.DEVICE)
++                || !"QuickstepLaunch".equals(remote.getDebugName())
++                || info.getType() != WindowManager.TRANSIT_OPEN) {
++            return false;
++        }
++        boolean embeddedOpening = false;
++        for (TransitionInfo.Change change : info.getChanges()) {
++            final boolean embedded = change.hasFlags(
++                    TransitionInfo.FLAG_IN_TASK_WITH_EMBEDDED_ACTIVITY);
++            final boolean stationary = change.getStartAbsBounds().equals(change.getEndAbsBounds())
++                    && change.getStartDisplayId() == change.getEndDisplayId();
++            if (embedded && change.getMode() == WindowManager.TRANSIT_OPEN) {
++                embeddedOpening = true;
++            } else if (change.getMode() != WindowManager.TRANSIT_CHANGE
++                    || (!embedded && !stationary)) {
++                // Back, another task launch, rotation and resize still interrupt normally.
++                return false;
++            }
++        }
++        return embeddedOpening;
++    }
++
+     @Nullable
+     @Override
+     public Transitions.TransitionHandler getHandlerForTakeover(

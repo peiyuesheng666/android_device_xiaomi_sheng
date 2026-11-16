@@ -1,0 +1,7 @@
+# SPDX-License-Identifier: Apache-2.0
+# Cached connection state only; retain the driver's original root ownership.
+on boot
+    chmod 0444 /sys/class/nanodev/nanodev0/_version176x
+
+on property:sys.boot_completed=1
+    chmod 0444 /sys/class/nanodev/nanodev0/_version176x

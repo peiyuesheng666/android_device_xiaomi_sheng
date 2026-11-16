@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="high_touch_polling_rate_title">High touch report rate</string>
+    <string name="high_touch_polling_rate_summary">Increase touchscreen report frequency</string>
+</resources>

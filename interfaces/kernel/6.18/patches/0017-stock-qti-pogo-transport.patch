@@ -1,0 +1,439 @@
+--- a/soc/drivers/power/supply/qti_battery_charger.c
++++ b/soc/drivers/power/supply/qti_battery_charger.c
+@@ -16,6 +16,7 @@
+ #include <linux/reboot.h>
+ #include <linux/rpmsg.h>
+ #include <linux/mutex.h>
++#include <linux/spinlock.h>
+ #include <linux/jiffies.h>
+ #include <linux/workqueue.h>
+ #include <linux/pm_wakeup.h>
+@@ -508,8 +509,13 @@
+ };
+ 
+ #include "sheng_pps_policy.h"
++#include "sheng_qti_pogo_wire.h"
++#include "sheng_qti_pogo.h"
+ 
+ struct battery_chg_dev {
++	spinlock_t sheng_pogo_lock;
++	struct completion sheng_pogo_ack;
++	struct sheng_pogo_pending sheng_pogo;
+ 	struct device			*dev;
+ 	struct class			battery_class;
+ 	struct pmic_glink_client	*client;
+@@ -931,7 +937,7 @@
+ 	if (state == PMIC_GLINK_STATE_DOWN)
+ 		atomic_set(&bcdev->sheng_pps_reset, 1);
+ 	atomic_inc(&bcdev->sheng_thermal_epoch);
+-	atomic_set(&bcdev->state, state);
++	sheng_pogo_state_change(bcdev, state);
+ 	if (state == PMIC_GLINK_STATE_UP)
+ 		schedule_work(&bcdev->subsys_up_work);
+ 	else if (state == PMIC_GLINK_STATE_DOWN)
+@@ -1494,6 +1500,9 @@
+ 	struct pmic_glink_hdr *hdr = data;
+ 	struct battery_chg_dev *bcdev = priv;
+ 
++	/* GLINK data may be truncated; do not dereference its header first. */
++	if (!data || len < sizeof(*hdr))
++		return -EMSGSIZE;
+ 	pr_debug("owner: %u type: %u opcode: %#x len: %zu\n", hdr->owner,
+ 		hdr->type, hdr->opcode, len);
+ 
+@@ -1502,6 +1511,9 @@
+ 			 bcdev->state);
+ 		return 0;
+ 	}
++
++	if (sheng_pogo_response(bcdev, data, len))
++		return 0;
+ 
+ 	if (hdr->opcode == BC_NOTIFY_IND)
+ 		handle_notification(bcdev, data, len);
+@@ -6914,6 +6926,8 @@
+ 		return -ENOMEM;
+ 
+ 	mutex_init(&bcdev->rw_lock);
++	spin_lock_init(&bcdev->sheng_pogo_lock);
++	init_completion(&bcdev->sheng_pogo_ack);
+ 	mutex_init(&bcdev->sheng_pen_lock);
+ 	mutex_init(&bcdev->sheng_thermal_lock);
+ 	atomic_set(&bcdev->sheng_thermal_epoch, 0);
+@@ -7087,6 +7101,7 @@
+ 	bcdev->thermal_message = NULL;
+ 	class_unregister(&bcdev->battery_class);
+ error:
++	sheng_pogo_state_change(bcdev, PMIC_GLINK_STATE_DOWN);
+ 	WRITE_ONCE(bcdev->sheng_pps_stopping, true);
+ 	cancel_work_sync(&bcdev->subsys_up_work);
+ 	cancel_work_sync(&bcdev->usb_type_work);
+@@ -7105,6 +7120,9 @@
+ {
+ 	struct battery_chg_dev *bcdev = platform_get_drvdata(pdev);
+ 	int rc;
++
++	/* Abort any real request before waiting for the API's lifetime mutex. */
++	sheng_pogo_state_change(bcdev, PMIC_GLINK_STATE_DOWN);
+ 
+ 	WRITE_ONCE(bcdev->sheng_pps_stopping, true);
+ 	cancel_work_sync(&bcdev->subsys_up_work);
+--- /dev/null
++++ b/soc/drivers/power/supply/sheng_qti_pogo.h
+@@ -0,0 +1,16 @@
++/* SPDX-License-Identifier: GPL-2.0-only */
++#ifndef SHENG_QTI_POGO_H
++#define SHENG_QTI_POGO_H
++#ifdef SHENG_QTI_POGO_HOST_TEST
++#include "sheng_qti_pogo_wire.h"
++#else
++#include <linux/types.h>
++#endif
++int qti_set_keyboard_plugin(int plugin);
++int sc8651_wpc_gate_set(int value);
++int qti_enale_charge(int enable);
++int qti_get_ADC_CHGR_STATUS(void);
++int qti_get_DCIN_STATE(void);
++int write_voter_prop_id(u8 vote, u32 value);
++int read_voter_property_id(u8 vote, u32 prop_id);
++#endif
+--- /dev/null
++++ b/soc/drivers/power/supply/sheng_qti_pogo_wire.h
+@@ -0,0 +1,115 @@
++/* SPDX-License-Identifier: GPL-2.0-only */
++#ifndef SHENG_QTI_POGO_WIRE_H
++#define SHENG_QTI_POGO_WIRE_H
++#ifdef SHENG_QTI_POGO_HOST_TEST
++#include <errno.h>
++#include <stdbool.h>
++#include <stddef.h>
++#include <stdint.h>
++#include <string.h>
++typedef uint8_t u8;
++typedef uint32_t u32;
++#else
++#include <linux/errno.h>
++#include <linux/string.h>
++#include <linux/types.h>
++#endif
++
++/* Individually verified from OS3.0.303.0.WNXCNXM's shipping module.
++ * The older sheng-u-oss enum has different IDs. Do not apply its numbering. */
++#define SHENG_POGO_WPC_MOS 222
++#define SHENG_POGO_DCIN 223
++#define SHENG_POGO_ADC_STATUS 224
++#define SHENG_POGO_ENABLE 225
++#define SHENG_POGO_KEYBOARD 228
++#define SHENG_POGO_VOTER 229
++#define SHENG_POGO_OWNER 32778
++#define SHENG_POGO_GET 0x50
++#define SHENG_POGO_SET 0x51
++
++struct sheng_pogo_request {
++	u32 opcode, property;
++	u8 vote;
++	bool voter;
++};
++struct sheng_pogo_reply {
++	u32 value, wire_return;
++	int error;
++};
++struct sheng_pogo_pending {
++	struct sheng_pogo_request request;
++	struct sheng_pogo_reply reply;
++	u32 epoch;
++	int error;
++	bool active, fenced;
++};
++
++static inline u32 sheng_pogo_get32(const u8 *p)
++{
++	return (u32)p[0] | (u32)p[1] << 8 | (u32)p[2] << 16 | (u32)p[3] << 24;
++}
++static inline void sheng_pogo_put32(u8 *p, u32 value)
++{
++	p[0] = value; p[1] = value >> 8;
++	p[2] = value >> 16; p[3] = value >> 24;
++}
++
++static inline int sheng_pogo_encode(u8 *out, size_t capacity,
++		const struct sheng_pogo_request *request, u32 value)
++{
++	size_t len;
++
++	if (!out || !request || (request->opcode != SHENG_POGO_GET &&
++				request->opcode != SHENG_POGO_SET))
++		return -EINVAL;
++	len = request->voter ? 28 : 24;
++	if (capacity < len)
++		return -EMSGSIZE;
++	if (request->voter && (request->property != SHENG_POGO_VOTER || request->vote > 2))
++		return -EINVAL;
++	memset(out, 0, len);
++	sheng_pogo_put32(out, SHENG_POGO_OWNER);
++	sheng_pogo_put32(out + 4, 1);
++	sheng_pogo_put32(out + 8, request->opcode);
++	if (request->voter) {
++		sheng_pogo_put32(out + 12, request->property);
++		sheng_pogo_put32(out + 16, request->opcode == SHENG_POGO_SET ? value : 0);
++		out[20] = request->vote;
++		/* OEM operation selector, not an errno. Preserve its wire meaning. */
++		sheng_pogo_put32(out + 24, request->opcode == SHENG_POGO_SET ? 1 : 0);
++	} else {
++		sheng_pogo_put32(out + 16, request->property);
++		sheng_pogo_put32(out + 20, request->opcode == SHENG_POGO_SET ? value : 0);
++	}
++	return (int)len;
++}
++
++/* 0 is unrelated, 1 is a matched full reply; negative is a malformed reply.
++ * A standard firmware error is reported through reply.error without updating
++ * a property cache. Voter return_code has no documented errno interpretation. */
++static inline int sheng_pogo_decode(const struct sheng_pogo_request *request,
++		const void *data, size_t len, struct sheng_pogo_reply *reply)
++{
++	const u8 *p = data;
++
++	if (!request || !p || !reply)
++		return -EINVAL;
++	if (len < 12)
++		return 0;
++	if (sheng_pogo_get32(p) != SHENG_POGO_OWNER || sheng_pogo_get32(p + 4) != 1 ||
++	    sheng_pogo_get32(p + 8) != request->opcode)
++		return 0;
++	if (len < 16)
++		return -EMSGSIZE;
++	if (sheng_pogo_get32(p + 12) != request->property)
++		return 0;
++	if (len != (request->voter ? 28U : 24U))
++		return -EMSGSIZE;
++	if (request->voter && p[20] != request->vote)
++		return 0;
++	reply->value = sheng_pogo_get32(p + 16);
++	reply->wire_return = sheng_pogo_get32(p + (request->voter ? 24 : 20));
++	reply->error = !request->voter && reply->wire_return ? -EREMOTEIO : 0;
++	return 1;
++}
++#endif
+--- /dev/null
++++ b/soc/drivers/power/supply/sheng_qti_pogo_api.h
+@@ -0,0 +1,184 @@
++/* SPDX-License-Identifier: GPL-2.0-only */
++/* Included by the genuine QTI driver after its device and request definitions. */
++static DEFINE_MUTEX(sheng_keyboard_charger_lock);
++static struct battery_chg_dev *sheng_keyboard_bcdev;
++
++static void sheng_pogo_state_change(struct battery_chg_dev *bcdev, int state)
++{
++	unsigned long flags;
++
++	spin_lock_irqsave(&bcdev->sheng_pogo_lock, flags);
++	atomic_set(&bcdev->state, state);
++	bcdev->sheng_pogo.epoch++;
++	if (state == PMIC_GLINK_STATE_DOWN) {
++		if (bcdev->sheng_pogo.active) {
++			bcdev->sheng_pogo.error = -ENOTCONN;
++			bcdev->sheng_pogo.active = false;
++			complete(&bcdev->sheng_pogo_ack);
++		}
++		/* A transport reset drains the previous response stream. */
++		bcdev->sheng_pogo.fenced = false;
++	}
++	spin_unlock_irqrestore(&bcdev->sheng_pogo_lock, flags);
++}
++
++static bool sheng_pogo_response(struct battery_chg_dev *bcdev, void *data, size_t len)
++{
++	struct sheng_pogo_reply reply = {};
++	unsigned long flags;
++	int matched = 0;
++
++	spin_lock_irqsave(&bcdev->sheng_pogo_lock, flags);
++	if (bcdev->sheng_pogo.active)
++		matched = sheng_pogo_decode(&bcdev->sheng_pogo.request, data, len, &reply);
++	if (matched) {
++		bcdev->sheng_pogo.reply = reply;
++		bcdev->sheng_pogo.error = matched < 0 ? matched : reply.error;
++		if (matched < 0)
++			bcdev->sheng_pogo.fenced = true;
++		bcdev->sheng_pogo.active = false;
++		complete(&bcdev->sheng_pogo_ack);
++	}
++	spin_unlock_irqrestore(&bcdev->sheng_pogo_lock, flags);
++	return matched != 0;
++}
++
++/* The owner mutex protects device lifetime. rw_lock serializes against the
++ * driver's ordinary requests; only the dedicated matching ACK can finish us. */
++static int sheng_pogo_transfer(struct battery_chg_dev *bcdev,
++		const struct sheng_pogo_request *request, u32 value, u32 *result)
++{
++	u8 frame[28];
++	unsigned long flags, waited;
++	u32 epoch;
++	int len, ret;
++
++	len = sheng_pogo_encode(frame, sizeof(frame), request, value);
++	if (len < 0)
++		return len;
++	mutex_lock(&bcdev->rw_lock);
++	spin_lock_irqsave(&bcdev->sheng_pogo_lock, flags);
++	if (!READ_ONCE(bcdev->initialized))
++		ret = -ENODEV;
++	else if (atomic_read(&bcdev->state) != PMIC_GLINK_STATE_UP)
++		ret = -ENOTCONN;
++	else if (READ_ONCE(bcdev->debug_battery_detected) && READ_ONCE(bcdev->block_tx))
++		ret = -EACCES;
++	else if (bcdev->sheng_pogo.fenced)
++		ret = -EPIPE;
++	else
++		ret = 0;
++	if (ret) {
++		spin_unlock_irqrestore(&bcdev->sheng_pogo_lock, flags);
++		goto unlock;
++	}
++	reinit_completion(&bcdev->sheng_pogo_ack);
++	bcdev->sheng_pogo.request = *request;
++	bcdev->sheng_pogo.active = true;
++	bcdev->sheng_pogo.error = -EINPROGRESS;
++	epoch = bcdev->sheng_pogo.epoch;
++	spin_unlock_irqrestore(&bcdev->sheng_pogo_lock, flags);
++	ret = pmic_glink_write(bcdev->client, frame, len);
++	waited = ret ? 0 : wait_for_completion_timeout(&bcdev->sheng_pogo_ack,
++						 msecs_to_jiffies(BC_WAIT_TIME_MS));
++	spin_lock_irqsave(&bcdev->sheng_pogo_lock, flags);
++	if (bcdev->sheng_pogo.epoch != epoch ||
++	    atomic_read(&bcdev->state) != PMIC_GLINK_STATE_UP)
++		ret = -ENOTCONN;
++	else if (!ret && !waited) {
++		ret = -ETIMEDOUT;
++		/* No wire transaction ID exists. Do not let a late identical ACK
++		 * falsely complete a retry; require a real GLINK reset first. */
++		bcdev->sheng_pogo.fenced = true;
++	} else if (!ret) {
++		ret = bcdev->sheng_pogo.error;
++		if (!ret && result)
++			*result = bcdev->sheng_pogo.reply.value;
++	}
++	bcdev->sheng_pogo.active = false;
++	spin_unlock_irqrestore(&bcdev->sheng_pogo_lock, flags);
++unlock:
++	mutex_unlock(&bcdev->rw_lock);
++	return ret;
++}
++
++static int sheng_pogo_property(u32 property, bool write, u32 value, u32 *result)
++{
++	struct sheng_pogo_request request = {
++		.opcode = write ? SHENG_POGO_SET : SHENG_POGO_GET, .property = property,
++	};
++	int ret;
++
++	mutex_lock(&sheng_keyboard_charger_lock);
++	ret = sheng_keyboard_bcdev ? sheng_pogo_transfer(sheng_keyboard_bcdev,
++			&request, value, result) : -ENODEV;
++	mutex_unlock(&sheng_keyboard_charger_lock);
++	return ret;
++}
++
++int qti_set_keyboard_plugin(int plugin)
++{
++	if (plugin != 0 && plugin != 1)
++		return -EINVAL;
++	return sheng_pogo_property(SHENG_POGO_KEYBOARD, true, plugin, NULL);
++}
++EXPORT_SYMBOL(qti_set_keyboard_plugin);
++
++int sc8651_wpc_gate_set(int value)
++{
++	return sheng_pogo_property(SHENG_POGO_WPC_MOS, true, value, NULL);
++}
++EXPORT_SYMBOL(sc8651_wpc_gate_set);
++
++int qti_enale_charge(int enable)
++{
++	return sheng_pogo_property(SHENG_POGO_ENABLE, true, enable, NULL);
++}
++EXPORT_SYMBOL(qti_enale_charge);
++
++int qti_get_ADC_CHGR_STATUS(void)
++{
++	u32 value;
++	int ret = sheng_pogo_property(SHENG_POGO_ADC_STATUS, false, 0, &value);
++
++	return ret ? ret : (int)value;
++}
++EXPORT_SYMBOL(qti_get_ADC_CHGR_STATUS);
++
++int qti_get_DCIN_STATE(void)
++{
++	u32 value;
++	int ret = sheng_pogo_property(SHENG_POGO_DCIN, false, 0, &value);
++
++	return ret ? ret : (int)value;
++}
++EXPORT_SYMBOL(qti_get_DCIN_STATE);
++
++static int sheng_pogo_vote(u8 vote, bool write, u32 value)
++{
++	struct sheng_pogo_request request = {
++		.opcode = write ? SHENG_POGO_SET : SHENG_POGO_GET,
++		.property = SHENG_POGO_VOTER, .voter = true, .vote = vote,
++	};
++	int ret;
++
++	mutex_lock(&sheng_keyboard_charger_lock);
++	ret = sheng_keyboard_bcdev ? sheng_pogo_transfer(sheng_keyboard_bcdev,
++			&request, value, NULL) : -ENODEV;
++	mutex_unlock(&sheng_keyboard_charger_lock);
++	return ret;
++}
++
++int write_voter_prop_id(u8 vote, u32 value)
++{
++	return sheng_pogo_vote(vote, true, value);
++}
++EXPORT_SYMBOL(write_voter_prop_id);
++
++int read_voter_property_id(u8 vote, u32 prop_id)
++{
++	/* The original ABI ignores prop_id and requests ALL_VOTER. */
++	(void)prop_id;
++	return sheng_pogo_vote(vote, false, 0);
++}
++EXPORT_SYMBOL(read_voter_property_id);
+--- a/soc/drivers/power/supply/sheng_keyboard_charger_api.h
++++ b/soc/drivers/power/supply/sheng_keyboard_charger_api.h
+@@ -1,31 +1,2 @@
+ /* SPDX-License-Identifier: GPL-2.0-only */
+-/* Include after write_property_id; this is the shipping keyboard event API. */
+-static DEFINE_MUTEX(sheng_keyboard_charger_lock);
+-static struct battery_chg_dev *sheng_keyboard_bcdev;
+-
+-int qti_set_keyboard_plugin(int plugin)
+-{
+-	struct battery_chg_dev *bcdev;
+-	int ret;
+-
+-	if (plugin != 0 && plugin != 1)
+-		return -EINVAL;
+-	mutex_lock(&sheng_keyboard_charger_lock);
+-	bcdev = sheng_keyboard_bcdev;
+-	if (!bcdev) {
+-		ret = -ENODEV;
+-	} else if (!bcdev->initialized ||
+-		   atomic_read(&bcdev->state) != PMIC_GLINK_STATE_UP ||
+-		   (bcdev->debug_battery_detected && bcdev->block_tx)) {
+-		ret = -EAGAIN;
+-	} else {
+-		/* Shipping sheng qti_set_keyboard_plugin sends XM property 228.
+-		 * This is a board-specific event, not the phone's PACK_VENDOR ABI. */
+-		ret = write_property_id(bcdev, &bcdev->psy_list[PSY_TYPE_XM], 228, plugin);
+-		if (!ret && atomic_read(&bcdev->state) != PMIC_GLINK_STATE_UP)
+-			ret = -EAGAIN;
+-	}
+-	mutex_unlock(&sheng_keyboard_charger_lock);
+-	return ret;
+-}
+-EXPORT_SYMBOL_GPL(qti_set_keyboard_plugin);
++#include "sheng_qti_pogo_api.h"

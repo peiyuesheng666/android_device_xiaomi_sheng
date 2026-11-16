@@ -1,0 +1,18 @@
+{
+  "partition": "vendor",
+  "architecture": "arm64",
+  "application_module": "CACertService",
+  "application_path": "app/CACertService/CACertService.apk",
+  "libraries": [
+    {
+      "module": "libcacertclient",
+      "path": "lib64/libcacertclient.so",
+      "sha256": "d79d25d76447e89af21f547484d838171b218e431274b7231beb6d0dc9d4aaad"
+    },
+    {
+      "module": "libjnihelper",
+      "path": "lib64/libjnihelper.so",
+      "sha256": "7982473a3b109a237f14d58382bd9c4f1b4e63e09ec61c667fc56d93e18da875"
+    }
+  ]
+}

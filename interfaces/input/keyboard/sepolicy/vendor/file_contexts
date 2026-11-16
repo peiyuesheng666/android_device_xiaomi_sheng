@@ -1,0 +1,4 @@
+/odm/bin/hw/vendor\.xiaomi\.hardware\.keyboardnanoapp@1\.0-service u:object_r:nanoapp_exec:s0
+/odm/bin/midevauthd u:object_r:sheng_midevauth_exec:s0
+/odm/bin/mtd@1\.3 u:object_r:sheng_mtdservice_exec:s0
+/dev/nanodev0 u:object_r:sheng_nano_device:s0

@@ -1,0 +1,43 @@
+diff --git a/tools/invalidate-module-links.py b/tools/invalidate-module-links.py
+--- a/tools/invalidate-module-links.py
++++ b/tools/invalidate-module-links.py
+@@ -4,14 +4,15 @@
+ from pathlib import Path
+ project=Path(os.environ['PROJECT_ROOT']).resolve()
+ k618=Path(os.environ['K618']).resolve()
+-output=k618/'out-gki'
++output=(k618/'out-gki').resolve()
+ mapping=json.loads((project/'profiles/module-sources.json').read_text())
+ assert len(mapping)==345
+ count=0
+ for name,source in mapping.items():
+     path=(output/source[4:] if source.startswith('out/') else k618/source)
+     resolved=path.resolve()
+-    assert resolved.is_relative_to(k618) and resolved.suffix=='.ko',path
++    allowed=output if source.startswith('out/') else k618
++    assert resolved.is_relative_to(allowed) and resolved.suffix=='.ko',path
+     if path.exists():
+         path.unlink();count+=1
+ print('Invalidated %d mapped module links; object files retained, BTF regenerated' % count,flush=True)
+diff --git a/scripts/verify-r2.py b/scripts/verify-r2.py
+--- a/scripts/verify-r2.py
++++ b/scripts/verify-r2.py
+@@ -13,7 +13,7 @@
+ p = Path(os.environ['PROJECT_ROOT']).resolve()
+ b = Path(os.environ['BUILD_ROOT']).resolve()
+ root = b/'k618'
+-core = root/'out-gki'
++core = (root/'out-gki').resolve()
+ device = p/'android/device/xiaomi/sheng'
+ out = b/'qualified'
+ assert not out.exists(), 'Inspect prior qualification before rerunning'
+@@ -99,6 +99,9 @@
+     owners={}
+     for name,row in collection['modules'].items():
+         directory=Path(row['path']).parent
++        if directory.is_relative_to(core):
++            owners.setdefault(core/'Module.symvers',set()).add(name)
++            continue
+         if directory.is_relative_to(root/'soc'):
+             directory=root/'soc'
+         while directory.is_relative_to(root) and not (directory/'Module.symvers').exists():

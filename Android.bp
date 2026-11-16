@@ -1,0 +1,67 @@
+//
+// Copyright (C) 2024 The LineageOS Project
+//
+// SPDX-License-Identifier: Apache-2.0
+//
+
+soong_namespace {
+    imports: [
+        "hardware/xiaomi",
+        "hardware/qcom-caf/sm8550",
+        "vendor/xiaomi/sheng",
+        "vendor/qcom/opensource/commonsys-intf/display",
+        "vendor/qcom/opensource/display",
+    ],
+}
+
+install_symlink {
+    name: "sheng_firmware_wlanmdsp.otaupdate_symlink",
+    vendor: true,
+    installed_location: "firmware/wlanmdsp.otaupdate",
+    symlink_target: "/data/vendor/firmware/wlanmdsp.mbn",
+}
+
+install_symlink {
+    name: "sheng_firmware_wlan_mac.bin_symlink",
+    vendor: true,
+    installed_location: "firmware/wlan/qca_cld/kiwi_v2/wlan_mac.bin",
+    symlink_target: "/mnt/vendor/persist/kiwi_v2/wlan_mac.bin",
+}
+
+install_symlink {
+    name: "sheng_firmware_WCNSS_qcom_cfg.ini_symlink",
+    vendor: true,
+    installed_location: "firmware/wlan/qca_cld/kiwi_v2/WCNSS_qcom_cfg.ini",
+    symlink_target: "/vendor/etc/wifi/kiwi_v2/WCNSS_qcom_cfg.ini",
+}
+
+// libhardware looks up fingerprint.fpc.<variant>.so, then .default.so.
+install_symlink {
+    name: "sheng_fingerprint_fpc_default_symlink",
+    device_specific: true,
+    installed_location: "lib64/hw/fingerprint.fpc.default.so",
+    symlink_target: "fingerprint.fpc.so",
+}
+
+// Restore the stock vendor-facing alias to the unchanged ODM sensor protobuf.
+install_symlink {
+    name: "sheng_aon_front_vendor_symlink",
+    vendor: true,
+    installed_location: "lib64/camera/aon_front.pb",
+    symlink_target: "/odm/lib64/camera/aon_front.pb",
+}
+
+// Keep the accepted THP executable byte-identical and use the normal ELF installer.
+cc_prebuilt_binary {
+    name: "sheng-touch-report",
+    vendor: true,
+    compile_multilib: "64",
+    srcs: ["configs/touch/sheng-touch-report"],
+    strip: { none: true },
+    shared_libs: [
+        "libtouchsensor",
+        "libtensorflowlite_touch_c",
+        "libdl",
+        "liblog",
+    ],
+}
