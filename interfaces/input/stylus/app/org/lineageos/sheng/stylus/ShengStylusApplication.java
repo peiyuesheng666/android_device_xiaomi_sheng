@@ -26,6 +26,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import org.lineageos.sheng.pen.charge.ChargeStatus;
+import org.lineageos.sheng.pen.charge.PenDockPeer;
 
 /** Dock pairing and a single hardware/GATT actor for the connected supported pen. */
 public final class ShengStylusApplication extends Application {
@@ -146,8 +147,7 @@ public final class ShengStylusApplication extends Application {
 
     /** The reverse charger identifies the physically attached peer, never a scan name. */
     private void reconcileDockPairing() {
-        ChargeStatus charge = ChargeStatus.read();
-        String peer = charge.docked() ? charge.address : null;
+        String peer = PenDockPeer.read();
         long now = SystemClock.elapsedRealtime();
         if (peer == null || !peer.equals(dockPeer)) {
             dockPeer = peer;
@@ -178,10 +178,10 @@ public final class ShengStylusApplication extends Application {
         try {
             BluetoothDevice device = request.getParcelableExtra(
                     BluetoothDevice.EXTRA_DEVICE, BluetoothDevice.class);
-            ChargeStatus charge = ChargeStatus.read();
-            if (device == null || !charge.docked() || charge.address == null
-                    || !charge.address.equals(dockPeer) || pairingAttempts == 0
-                    || !charge.address.equals(ChargeStatus.address(device.getAddress()))
+            String peer = PenDockPeer.read();
+            if (device == null || peer == null
+                    || !peer.equals(dockPeer) || pairingAttempts == 0
+                    || !peer.equals(ChargeStatus.address(device.getAddress()))
                     || device.getBondState() != BluetoothDevice.BOND_BONDING) {
                 pendingDockPairing = null;
                 return;
@@ -211,19 +211,25 @@ public final class ShengStylusApplication extends Application {
     }
 
     private boolean confirmDockPairing(Intent request) {
-        if (request.getIntExtra(BluetoothDevice.EXTRA_PAIRING_VARIANT, BluetoothDevice.ERROR)
-                != BluetoothDevice.PAIRING_VARIANT_CONSENT) return false;
+        int variant = request.getIntExtra(BluetoothDevice.EXTRA_PAIRING_VARIANT, BluetoothDevice.ERROR);
+        if (variant != BluetoothDevice.PAIRING_VARIANT_CONSENT
+                && variant != BluetoothDevice.PAIRING_VARIANT_PASSKEY_CONFIRMATION) return false;
+        if (variant == BluetoothDevice.PAIRING_VARIANT_PASSKEY_CONFIRMATION) {
+            int key = request.getIntExtra(BluetoothDevice.EXTRA_PAIRING_KEY, BluetoothDevice.ERROR);
+            if (key < 0 || key > 999999) return false;
+        }
         BluetoothDevice device = request.getParcelableExtra(
                 BluetoothDevice.EXTRA_DEVICE, BluetoothDevice.class);
-        ChargeStatus charge = ChargeStatus.read();
-        if (device == null || !charge.docked() || charge.address == null
-                || !charge.address.equals(dockPeer) || pairingAttempts == 0
-                || !charge.address.equals(ChargeStatus.address(device.getAddress()))
+        String peer = PenDockPeer.read();
+        if (device == null || peer == null
+                || !peer.equals(dockPeer) || pairingAttempts == 0
+                || SystemClock.elapsedRealtime() - dockPeerSince < 2000
+                || !peer.equals(ChargeStatus.address(device.getAddress()))
                 || device.getBondState() != BluetoothDevice.BOND_BONDING) return false;
         try {
             if (!device.setPairingConfirmation(true)) return false;
             pendingDockPairing = null;
-            Log.i(TAG, "Automatically confirmed pairing for charger-identified attached pen");
+            Log.i(TAG, "Automatically confirmed pairing for charger-identified attached pen variant=" + variant);
             return true;
         } catch (RuntimeException error) {
             Log.w(TAG, "Dock pairing confirmation unavailable", error);

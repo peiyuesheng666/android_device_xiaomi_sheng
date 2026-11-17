@@ -148,7 +148,7 @@ import android.content.Context;import android.os.Handler;
 public class BluetoothDevice {
  public static final String ACTION_ACL_CONNECTED="connected",ACTION_ACL_DISCONNECTED="disconnected",ACTION_BOND_STATE_CHANGED="bond";
  public static final String ACTION_PAIRING_REQUEST="pair",EXTRA_DEVICE="device",EXTRA_PAIRING_VARIANT="variant",EXTRA_PAIRING_CONTEXT="context",EXTRA_PAIRING_KEY="key",EXTRA_PAIRING_INITIATOR="initiator";
- public static final int BOND_NONE=10,BOND_BONDING=11,BOND_BONDED=12,ERROR=-1,PAIRING_VARIANT_CONSENT=3,EXTRA_PAIRING_INITIATOR_FOREGROUND=1;
+ public static final int BOND_NONE=10,BOND_BONDING=11,BOND_BONDED=12,ERROR=-1,PAIRING_VARIANT_CONSENT=3,PAIRING_VARIANT_PASSKEY_CONFIRMATION=2,EXTRA_PAIRING_INITIATOR_FOREGROUND=1;
  public int getBondState(){return BOND_BONDED;}public boolean createBond(int transport){return true;}
  public int connect(){return 0;}public boolean setPairingConfirmation(boolean confirmed){return true;}
  public boolean isConnected(){return true;}public int connections;public String address="28:CE:15:31:70:0E";
@@ -528,7 +528,8 @@ actual = [SOURCE/'app/org/lineageos/sheng/stylus/PenGattSession.java',
           SOURCE/'src/org/lineageos/sheng/stylus/MippProfile.java',
           SOURCE/'src/org/lineageos/sheng/stylus/PenWakeGate.java',
           SOURCE/'src/org/lineageos/sheng/stylus/PenFeatureCommands.java',
-          SOURCE.parent/'pen/common/org/lineageos/sheng/pen/charge/ChargeStatus.java']
+          SOURCE.parent/'pen/common/org/lineageos/sheng/pen/charge/ChargeStatus.java',
+          SOURCE.parent/'pen/common/org/lineageos/sheng/pen/charge/PenDockPeer.java']
 jdk = ROM/'prebuilts/jdk/jdk21/linux-x86/bin'
 compile_result = subprocess.run([jdk/'javac', '-encoding', 'UTF-8', '-d', WORK/'classes', *sources, *actual],
                                 text=True, capture_output=True)

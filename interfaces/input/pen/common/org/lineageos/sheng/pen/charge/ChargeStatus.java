@@ -71,7 +71,7 @@ public final class ChargeStatus {
         } catch (Exception invalid) { return unknown(); }
     }
 
-    private static String node(String name) throws Exception {
+    static String node(String name) throws Exception {
         byte[] buffer = new byte[97];
         try (FileInputStream input = new FileInputStream("/sys/class/qcom-battery/" + name)) {
             int length = input.read(buffer);

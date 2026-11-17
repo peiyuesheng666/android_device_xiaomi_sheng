@@ -8,6 +8,7 @@ import android.database.MatrixCursor;
 import android.net.Uri;
 import android.os.Bundle;
 import org.lineageos.sheng.pen.charge.ChargeStatus;
+import org.lineageos.sheng.pen.charge.PenDockPeer;
 
 /** Read-only charger status and signature-protected window visibility; no hardware writes. */
 public final class PenChargeProvider extends ContentProvider {
@@ -20,8 +21,14 @@ public final class PenChargeProvider extends ContentProvider {
         return Bundle.EMPTY;
     }
     @Override public Cursor query(Uri uri, String[] projection, String selection, String[] args, String order) {
-        if (!"/status".equals(uri.getPath()) || selection != null || args != null || order != null)
+        if (selection != null || args != null || order != null)
             throw new IllegalArgumentException("Unsupported charging query");
+        if ("/dock".equals(uri.getPath())) {
+            MatrixCursor cursor = new MatrixCursor(new String[]{"address"}, 1);
+            cursor.addRow(new Object[]{PenDockPeer.read()});
+            return cursor;
+        }
+        if (!"/status".equals(uri.getPath())) throw new IllegalArgumentException("Unsupported charging query");
         ChargeStatus status = PenChargingState.read();
         MatrixCursor cursor = new MatrixCursor(new String[]{"state", "level", "address"}, 1);
         cursor.addRow(new Object[]{status.state.name(), status.level, status.address});

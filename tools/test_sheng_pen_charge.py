@@ -141,12 +141,15 @@ public class ChargeStateTest {
 ''')
 jdk = Path(os.environ.get('SHENG_ROM_ROOT','/root/sheng-pixelos/android'))/'prebuilts/jdk/jdk21/linux-x86/bin'
 commands = []
-for argv in ([jdk/'javac','-encoding','UTF-8','-d',work/'classes',source,acquisition_source,session_source,test],
-             [jdk/'java','-cp',work/'classes','org.lineageos.sheng.stylus.ChargeStateTest']):
+for argv in ([jdk/'javac','-encoding','UTF-8','-d',work/'classes',source,acquisition_source,session_source,test,
+              source.with_name('PenDockPeer.java'), session_source.parents[5]/'tests/PenDockPeerTest.java'],
+             [jdk/'java','-cp',work/'classes','org.lineageos.sheng.stylus.ChargeStateTest'],
+             [jdk/'java','-cp',work/'classes','org.lineageos.sheng.stylus.PenDockPeerTest']):
     result = subprocess.run(list(map(str,argv)),capture_output=True,text=True)
     commands.append(dict(argv=list(map(str,argv)),exit_code=result.returncode,stdout=result.stdout,stderr=result.stderr))
     if result.returncode: break
 receipt = dict(passed=result.returncode==0,source_sha256=hashlib.sha256(source.read_bytes()).hexdigest(),
+               dock_peer_source_sha256=hashlib.sha256(source.with_name('PenDockPeer.java').read_bytes()).hexdigest(),
                acquisition_source_sha256=hashlib.sha256(acquisition_source.read_bytes()).hexdigest(),
                session_source_sha256=hashlib.sha256(session_source.read_bytes()).hexdigest(),
                commands=commands,hardware_tested=False)

@@ -1,6 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="org.lineageos.sheng.stylus" android:sharedUserId="android.uid.system"
-    android:versionCode="16" android:versionName="1.15-test">
+    android:versionCode="17" android:versionName="1.16">
     <uses-sdk android:minSdkVersion="35" android:targetSdkVersion="37" />
     <permission android:name="org.lineageos.sheng.stylus.READ_CHARGING" android:protectionLevel="signature" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
