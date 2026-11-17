@@ -10,6 +10,9 @@ binder_call(sheng_stylus_app, vendor_sheng_stylus)
 allow sheng_stylus_app hal_sheng_stylus_service:service_manager find;
 
 allow vendor_sheng_stylus device:dir r_dir_perms;
+allow vendor_sheng_stylus input_device:dir r_dir_perms;
+allow vendor_sheng_stylus input_device:chr_file { getattr open read write ioctl };
+allowxperm vendor_sheng_stylus input_device:chr_file ioctl { 0x4502 0x4506 0x4508 0x4521 0x4522 };
 allow vendor_sheng_stylus vendor_hidraw_device:chr_file { getattr open read ioctl };
 allowxperm vendor_sheng_stylus vendor_hidraw_device:chr_file ioctl { 0x4801 0x4802 0x4803 0x4804 0x4808 };
 allow vendor_sheng_stylus touchfeature_device:chr_file { getattr open read write ioctl };

@@ -31,12 +31,13 @@ class PenController {
     explicit PenController(PenHardware& hardware) : hardware_(hardware) {}
     Result acquire(int type);
     Result setMode(int mode, int value);
-    Result forwardProPressure(const uint8_t* report, size_t length);
+    Result forwardPressure(const uint8_t* report, size_t length);
     Result release();
     void observePanel(bool stableOn) { if (!stableOn) suspended_ = true; }
     bool ownsConnection() const { return connected_; }
     bool needsRelease() const { return typeNotified_ || connected_ || ready_; }
     bool releasing() const { return releasing_; }
+    bool needsResume() const { return connected_ && ready_ && suspended_ && !releasing_; }
     int type() const { return type_; }
 
   private:

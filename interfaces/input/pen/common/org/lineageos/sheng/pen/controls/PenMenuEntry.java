@@ -28,6 +28,7 @@ public final class PenMenuEntry {
     }
     public String encode() { return component == null ? action.name() : "app:" + component; }
     public static PenMenuEntry[] read(String stored) {
+        if ("BACK,HOME,RECENTS,MEDIA,SCREENSHOT,SETTINGS".equals(stored)) stored = null;
         List<PenMenuEntry> result = new ArrayList<>();
         if (stored != null && stored.length() <= 4096) for (String token : stored.split(",")) {
             try {

@@ -6,6 +6,6 @@ on early-init
 service vendor.sheng-stylus /vendor/bin/hw/vendor.lineage.sheng.stylus-service
     class hal
     user system
-    group system
+    group system input
     gentle_kill
     interface aidl vendor.lineage.sheng.stylus.IPenController/default

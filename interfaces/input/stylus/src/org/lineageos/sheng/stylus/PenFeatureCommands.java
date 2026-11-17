@@ -18,10 +18,10 @@ public final class PenFeatureCommands {
         check(sensitivity, 4); check(vibration, 5);
         int down = 300 + 150 * sensitivity;
         return new byte[][] {
-            {0x5f, 1, 0},
+            {0x5f, 1, 1},
             {0x5c, 4, (byte) (down >>> 8), (byte) down, 1, 44},
             {0x5a, 1, (byte) vibration},
-            {0x63, 1, 0},
+            {0x63, 1, 1},
         };
     }
     public static byte[] haptic(int kind, int sensitivity) {

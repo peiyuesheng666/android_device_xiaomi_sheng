@@ -21,7 +21,7 @@ public final class PenControlsSettings {
         return 3;
     }
     public static boolean write(Context context, String key, String value) {
-        boolean allowed = key.equals(PenControls.MENU);
+        boolean allowed = key.equals(PenControls.MENU) || key.equals(PenControls.APP_OVERRIDES);
         for (PenControls.Gesture gesture : PenControls.Gesture.values()) allowed |= key.equals(gesture.key());
         if (!allowed) throw new IllegalArgumentException("Unknown pen preference");
         return Settings.Secure.putString(context.getContentResolver(), key, value);

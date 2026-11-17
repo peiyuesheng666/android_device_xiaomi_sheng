@@ -108,25 +108,25 @@ void pressureBoundaries() {
     uint8_t report[15]{5, 0xff, 0x3f};
     require(pen.acquire(99) == Result::Invalid && hw.modes.empty(), "unsupported pen rejected");
     require(pen.acquire(3) == Result::Applied && pen.setMode(37, 1) == Result::Applied, "ordinary fixture");
-    require(pen.forwardProPressure(report, sizeof(report)) == Result::Invalid && hw.pressureWrites == 0,
-            "ordinary report cannot inherit Pro pressure layout");
+    require(pen.forwardPressure(report, sizeof(report)) == Result::Applied && hw.pressureWrites == 1,
+            "descriptor-verified ordinary pressure is forwarded");
     require(pen.setMode(29, 1) == Result::Invalid, "Pro active command excluded from ordinary");
     require(pen.release() == Result::Applied && pen.acquire(8) == Result::Applied, "Pro fixture");
-    require(pen.forwardProPressure(report, sizeof(report)) == Result::Busy, "no pressure before ready");
+    require(pen.forwardPressure(report, sizeof(report)) == Result::Busy, "no pressure before ready");
     require(pen.setMode(37, 1) == Result::Applied, "Pro ready");
-    require(pen.forwardProPressure(report, sizeof(report)) == Result::Applied, "16383 pressure retained");
+    require(pen.forwardPressure(report, sizeof(report)) == Result::Applied, "16383 pressure retained");
     report[1] = 0; report[2] = 0x40;
-    require(pen.forwardProPressure(report, sizeof(report)) == Result::Applied, "HID logical maximum retained");
+    require(pen.forwardPressure(report, sizeof(report)) == Result::Applied, "HID logical maximum retained");
     report[1] = 1;
-    require(pen.forwardProPressure(report, sizeof(report)) == Result::Invalid, "out-of-range report rejected");
-    require(pen.forwardProPressure(report, 14) == Result::Invalid, "raw format requires report ID byte");
+    require(pen.forwardPressure(report, sizeof(report)) == Result::Invalid, "out-of-range report rejected");
+    require(pen.forwardPressure(report, 14) == Result::Invalid, "raw format requires report ID byte");
     report[0] = 2;
-    require(pen.forwardProPressure(report, sizeof(report)) == Result::Invalid, "keyboard report rejected");
+    require(pen.forwardPressure(report, sizeof(report)) == Result::Invalid, "keyboard report rejected");
     report[0] = 5; report[1] = 0; report[2] = 0;
     hw.on = false;
-    require(pen.forwardProPressure(report, sizeof(report)) == Result::Deferred, "no Off pressure write");
+    require(pen.forwardPressure(report, sizeof(report)) == Result::Deferred, "no Off pressure write");
     hw.on = true; hw.failPressure = true;
-    require(pen.forwardProPressure(report, sizeof(report)) == Result::Error && hw.pressureWrites == 3,
+    require(pen.forwardPressure(report, sizeof(report)) == Result::Error && hw.pressureWrites == 4,
             "uncertain pressure ACK is not replayed");
     require(pen.setMode(20, 8) == Result::Invalid, "public setter cannot bypass release ownership");
     require(pen.release() == Result::Applied, "pressure fixture release");
@@ -139,18 +139,45 @@ void wakeRequiresReady() {
     require(pen.acquire(8) == Result::Applied && pen.setMode(37, 1) == Result::Applied, "wake fixture");
     pen.observePanel(false);
     hw.on = false;
-    require(pen.forwardProPressure(report, sizeof(report)) == Result::Busy, "observed Off suspends pressure");
+    require(pen.forwardPressure(report, sizeof(report)) == Result::Busy, "observed Off suspends pressure");
     hw.on = true;
     pen.observePanel(true);
-    require(pen.forwardProPressure(report, sizeof(report)) == Result::Busy && hw.pressureWrites == 0,
+    require(pen.forwardPressure(report, sizeof(report)) == Result::Busy && hw.pressureWrites == 0,
             "stable On alone cannot replay pressure before client resumes timing");
     require(pen.setMode(22, 1) == Result::Applied && pen.setMode(22, 259) == Result::Applied,
             "reuse cached two-phase IDs after wake");
-    require(pen.forwardProPressure(report, sizeof(report)) == Result::Busy, "IDs alone do not enable pressure");
-    require(pen.setMode(37, 1) == Result::Applied && pen.forwardProPressure(report, sizeof(report)) == Result::Applied,
+    require(pen.forwardPressure(report, sizeof(report)) == Result::Busy, "IDs alone do not enable pressure");
+    require(pen.setMode(37, 1) == Result::Applied && pen.forwardPressure(report, sizeof(report)) == Result::Applied,
             "explicit ready resumes pressure");
     require(hw.connections == 1 && hw.disconnects == 0, "wake does not change connection count");
     require(pen.release() == Result::Applied && hw.disconnects == 1, "wake fixture releases once");
+}
+
+void transientPanelPause() {
+    for (const int type : {3, 8}) {
+        FakeHardware hw;
+        PenController pen(hw);
+        uint8_t report[15]{5, 20, 0};
+        require(!pen.needsResume(), "no resume before acquisition");
+        require(pen.acquire(type) == Result::Applied && pen.setMode(37, 1) == Result::Applied,
+                "transient pause fixture ready");
+        require(!pen.needsResume(), "ready panel has no resume debt");
+        pen.observePanel(false);
+        require(pen.needsResume(), "native-only pause is visible to the client");
+        pen.observePanel(true);
+        require(pen.needsResume(), "stable On cannot hide pending timing restoration");
+        require(pen.forwardPressure(report, sizeof(report)) == Result::Busy,
+                "no pressure before explicit resume");
+        require(pen.setMode(37, 0) == Result::Applied && !pen.needsResume(),
+                "client begins ordered resume without duplicate requests");
+        require(pen.setMode(22, 1) == Result::Applied && pen.setMode(22, 259) == Result::Applied,
+                "resume restores both timing IDs");
+        require(pen.setMode(37, 1) == Result::Applied && !pen.needsResume(), "resume clears native pause");
+        require(pen.forwardPressure(report, sizeof(report)) == Result::Applied,
+                "pressure resumes after native-only panel pause");
+        require(hw.connections == 1 && hw.disconnects == 0, "resume preserves connection ownership");
+        require(pen.release() == Result::Applied && !pen.needsResume(), "release clears resume state");
+    }
 }
 
 void failedModeRequiresRelease() {
@@ -166,7 +193,7 @@ void failedModeRequiresRelease() {
         hw.failMode = command.first;
         require(pen.setMode(command.first, command.second) == Result::Error,
                 "uncertain controller programming returns an error");
-        require(pen.forwardProPressure(report, sizeof(report)) == Result::Busy && hw.pressureWrites == 0,
+        require(pen.forwardPressure(report, sizeof(report)) == Result::Busy && hw.pressureWrites == 0,
                 "no pressure may pass between a failed mode and client release");
         require(pen.needsRelease() && hw.connections == 1 && hw.disconnects == 0,
                 "a failed mode preserves the exact owned cleanup debt");
@@ -228,7 +255,8 @@ void interruptedServerJournal() {
 }  // namespace
 int main() {
     deathWhileOff(); partialAcquisition(false); partialAcquisition(true);
-    partialRelease(); pressureBoundaries(); wakeRequiresReady(); failedModeRequiresRelease(); interruptedServerJournal();
+    partialRelease(); pressureBoundaries(); wakeRequiresReady(); transientPanelPause();
+    failedModeRequiresRelease(); interruptedServerJournal();
     printf("PASS assertions=%u: Off death, partial acquire/release, pressure/identity boundaries\n", assertions);
     return 0;
 }

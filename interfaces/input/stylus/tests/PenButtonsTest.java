@@ -52,10 +52,18 @@ public final class PenButtonsTest {
         for (int size : new int[]{0, 2, 14, 15, 128}) check(!state.accept(new byte[size], 5100));
         check(!state.accept(null, 5100)); check(!state.accept(report(0x6e), -1));
         check(events.isEmpty());
-        check(!state.accept(report(0x5b), 6000)); state.accept(report(0), 6010);
-        check(!state.accept(report(0x61), 6100)); state.accept(report(0), 6110);
-        check(!state.accept(report(0x58), 6200)); state.accept(report(0), 6210);
-        check(events.isEmpty());
+        for (int usage : new int[]{0x5b, 0x61, 0x58}) {
+            events.clear();
+            Gesture gesture = PenButtonState.gesture(usage);
+            check(state.accept(report(usage), 6000));
+            check(state.holdDelay(6000) == -1);
+            check(state.accept(report(usage), 6010));
+            state.held(6400);
+            check(events.equals(Arrays.asList("down " + gesture)));
+            state.accept(report(0), 6410);
+            check(events.equals(Arrays.asList("down " + gesture, "up " + gesture)));
+        }
+        events.clear();
 
         check(PenControls.menu(null).length == 6);
         check(Arrays.equals(PenControls.menu("NONE,MENU,BACK,BACK,HOME,invalid"),
@@ -67,10 +75,10 @@ public final class PenButtonsTest {
         check(PenControls.level("4", 2, 4) == 4);
         check(PenControls.level(null, 3, 5) == 3);
         byte[][] commands = PenFeatureCommands.configure(2, 3);
-        check(Arrays.equals(commands[0], new byte[]{0x5f, 1, 0}));
+        check(Arrays.equals(commands[0], new byte[]{0x5f, 1, 1}));
         check(Arrays.equals(commands[1], new byte[]{0x5c, 4, 2, 88, 1, 44}));
         check(Arrays.equals(commands[2], new byte[]{0x5a, 1, 3}));
-        check(Arrays.equals(commands[3], new byte[]{0x63, 1, 0}));
+        check(Arrays.equals(commands[3], new byte[]{0x63, 1, 1}));
         check(Arrays.equals(PenFeatureCommands.haptic(1, 2), new byte[]{0x5e, 2, 1, (byte) 172}));
         check(Arrays.equals(PenFeatureCommands.haptic(2, 4), new byte[]{0x5e, 2, 2, (byte) 248}));
         check(Arrays.equals(PenFeatureCommands.haptic(3, 0), new byte[]{0x5e, 2, 3, (byte) 128}));
@@ -91,6 +99,12 @@ public final class PenButtonsTest {
         check(app.component.equals("com.example.notes/com.example.notes.Main"));
         check(app.equals(PenMenuEntry.application("com.example.notes/com.example.notes.Main")));
         check(PenMenuEntry.read(null).length==6);
+        check(Arrays.stream(PenMenuEntry.read(null)).anyMatch(item -> item.action==PenControls.Action.LASER));
+        check(Arrays.stream(PenMenuEntry.read("BACK,HOME,RECENTS,MEDIA,SCREENSHOT,SETTINGS")).anyMatch(item -> item.action==PenControls.Action.LASER));
+        check(PenMenuEntry.read("BACK,HOME").length==2);
+        check(PenButtonState.gesture(0x61)==Gesture.SLIDE_UP);
+        check(PenButtonState.gesture(0x5b)==Gesture.SLIDE_DOWN);
+        check(PenButtonState.gesture(0x58)==Gesture.DOUBLE_TAP);
         PenMenuEntry[] entries=PenMenuEntry.read("BACK,app:com.example.notes/.Main,BACK,NONE,invalid,MENU");
         check(entries.length==2 && entries[0].action==PenControls.Action.BACK && entries[1].equals(app));
         String encoded=PenMenuEntry.write(Arrays.asList(app,PenMenuEntry.operation(PenControls.Action.HOME)));
@@ -126,6 +140,26 @@ public final class PenButtonsTest {
         check(!wake.ready(true,true,50));
         check(!wake.ready(false,true,2000));
         check(!wake.ready(true,true,-1));
+        state.clear(); events.clear(); state.setSideButtonLongPress(false);
+        check(state.accept(report(0x4b), 7000));
+        check(events.equals(Arrays.asList("down SECONDARY")));
+        check(state.holdDelay(7000) == -1);
+        state.accept(report(0x4b), 7050); state.held(7100);
+        check(events.equals(Arrays.asList("down SECONDARY")));
+        state.accept(report(0), 7130);
+        check(events.equals(Arrays.asList("down SECONDARY", "up SECONDARY")));
+        events.clear(); state.accept(report(0x4e), 7200); state.accept(report(0), 7340);
+        check(events.equals(Arrays.asList("down PRIMARY", "up PRIMARY")));
+        events.clear(); state.accept(report(0x6e), 7400); state.accept(report(0), 7500);
+        check(events.equals(Arrays.asList("down SQUEEZE", "up SQUEEZE")));
+        events.clear(); state.accept(report(0x4b), 7600); state.clear(); state.held(8000);
+        check(events.equals(Arrays.asList("down SECONDARY")));
+        state.accept(report(0), 8100); check(events.size() == 1);
+        events.clear(); state.accept(report(0x4e), 8200); state.setSideButtonLongPress(true);
+        events.clear(); state.held(8600); check(events.isEmpty());
+        state.accept(report(0x4e), 8700); check(events.isEmpty());
+        state.held(9079); check(events.isEmpty());
+        state.held(9080); check(events.equals(Arrays.asList("down PRIMARY")));
         System.out.println("PASS pen_button_checks=" + checks);
     }
 }

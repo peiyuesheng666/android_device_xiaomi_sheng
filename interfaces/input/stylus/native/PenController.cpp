@@ -48,11 +48,9 @@ Result PenController::setMode(int mode, int value) {
     return Result::Applied;
 }
 
-Result PenController::forwardProPressure(const uint8_t* report, size_t length) {
+Result PenController::forwardPressure(const uint8_t* report, size_t length) {
     if (!connected_ || !ready_ || releasing_ || suspended_) return Result::Busy;
-    // Only the physically verified Pro layout is forwarded. Ordinary Focus
-    // Pen uses type 3 and must acquire its own report-format evidence.
-    if (type_ != 8 || !report || length != 15 || report[0] != 5) return Result::Invalid;
+    if ((type_ != 3 && type_ != 8) || !report || length != 15 || report[0] != 5) return Result::Invalid;
     const unsigned pressure = report[1] | (static_cast<unsigned>(report[2]) << 8);
     if (pressure > 0x4000) return Result::Invalid;
     if (!hardware_.stableOn()) return Result::Deferred;

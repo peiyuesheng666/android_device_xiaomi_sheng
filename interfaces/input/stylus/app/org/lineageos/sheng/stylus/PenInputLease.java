@@ -16,14 +16,21 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-/** A durable restoration journal for exact Pro inputs previously enabled by Android. */
+/** A durable restoration journal for the active pen's Bluetooth companion inputs. */
 final class PenInputLease {
     private final AtomicFile journal;
     private final int boot;
     private final IInputManager input;
+    private final File keyLayouts;
     private final List<JSONObject> debts = new ArrayList<>();
+    private boolean pointerEnabled;
 
     PenInputLease(Context context) throws Exception {
+        this(context, new File("/vendor/etc/permissions"));
+    }
+
+    PenInputLease(Context context, File keyLayouts) throws Exception {
+        this.keyLayouts = keyLayouts;
         boot = Settings.Global.getInt(context.getContentResolver(), Settings.Global.BOOT_COUNT, -1);
         if (boot < 0) throw new IllegalStateException("Boot generation unavailable");
         journal = new AtomicFile(new File(context.createDeviceProtectedStorageContext()
@@ -59,14 +66,32 @@ final class PenInputLease {
     }
 
     private static boolean matches(InputDevice device, JSONObject debt) throws Exception {
-        return device != null && device.getVendorId() == 34
-                && PenModel.fromBluetoothIds(34, device.getProductId()) == PenModel.PRO
-                && device.getProductId() == debt.getInt("product")
-                && debt.getString("address").equalsIgnoreCase(device.getBluetoothAddress())
+        return device != null && PenInputIdentity.matches(device.getVendorId(),
+                device.getProductId(), device.getBluetoothAddress(), debt.getInt("product"),
+                debt.getString("address"))
                 && debt.getString("descriptor").equals(device.getDescriptor());
     }
 
+    void setPointerEnabled(boolean enabled) { pointerEnabled = enabled; }
+
+    private boolean canEnableMouse(InputDevice device) {
+        int sources = device.getSources();
+        if (sources == InputDevice.SOURCE_MOUSE) return true;
+        if (sources != (InputDevice.SOURCE_MOUSE | InputDevice.SOURCE_KEYBOARD)) return false;
+        File layout = new File(keyLayouts, String.format(java.util.Locale.ROOT,
+                "Vendor_0022_Product_%04x.kl", device.getProductId()));
+        try {
+            return layout.length() == 14 && Arrays.equals(java.nio.file.Files.readAllBytes(layout.toPath()),
+                    "key 0 UNKNOWN\n".getBytes(StandardCharsets.UTF_8));
+        } catch (java.io.IOException error) { return false; }
+    }
+
     boolean restore() throws Exception {
+        pointerEnabled = false;
+        return restoreOwned(-1);
+    }
+
+    private boolean restoreOwned(int onlyId) throws Exception {
         boolean unresolved = false;
         for (int index = debts.size() - 1; index >= 0; index--) {
             JSONObject debt = debts.get(index);
@@ -75,6 +100,7 @@ final class PenInputLease {
                 int id = ids.getInt(offset);
                 if (id < 0) throw new IllegalStateException("Invalid owned input ID");
                 InputDevice device = input.getInputDevice(id);
+                if (onlyId >= 0 && id != onlyId) continue;
                 if (device != null && !matches(device, debt)) {
                     // An ID reused for a different identity is not authority
                     // to enable that device. Keep its debt until it disappears.
@@ -103,14 +129,23 @@ final class PenInputLease {
     }
 
     boolean guard(PenModel model, int product, String address) throws Exception {
-        if (model != PenModel.PRO) return true;
+        if (model == null || PenModel.fromBluetoothIds(34, product) != model)
+            throw new IllegalArgumentException("Pen model/product mismatch");
         boolean disabled = true;
         for (int id : input.getInputDeviceIds()) {
             InputDevice device = input.getInputDevice(id);
-            if (device == null || device.getVendorId() != 34 || device.getProductId() != product
-                    || !address.equalsIgnoreCase(device.getBluetoothAddress())) continue;
+            if (device == null || !PenInputIdentity.matches(device.getVendorId(),
+                    device.getProductId(), device.getBluetoothAddress(), product, address)) continue;
             JSONObject owned = null;
             for (JSONObject debt : debts) if (matches(device, debt)) { owned = debt; break; }
+            if (pointerEnabled && canEnableMouse(device)) {
+                if (ownsId(owned, id)) {
+                    restoreOwned(id);
+                    InputDevice current = input.getInputDevice(id);
+                    if (current != null && !current.isEnabled()) disabled = false;
+                }
+                continue;
+            }
             if (!ownsId(owned, id) && device.isEnabled()) {
                 // Commit intent before the Binder operation. A crash afterwards
                 // leaves exact identity and every ID whose disable we own.

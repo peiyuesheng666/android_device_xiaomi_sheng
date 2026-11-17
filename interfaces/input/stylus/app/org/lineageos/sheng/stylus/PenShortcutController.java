@@ -25,6 +25,7 @@ import android.view.WindowManager;
 import android.widget.Toast;
 import com.android.internal.util.ScreenshotHelper;
 import java.util.function.IntConsumer;
+import java.util.function.Consumer;
 import org.lineageos.sheng.pen.controls.PenControls;
 import org.lineageos.sheng.pen.controls.PenControls.Action;
 import org.lineageos.sheng.pen.controls.PenControls.Gesture;
@@ -38,7 +39,10 @@ final class PenShortcutController {
     private final Context context;
     private final Handler actor, main = new Handler(Looper.getMainLooper());
     private final IntConsumer feedback;
+    private final Consumer<Boolean> pointerMode;
+    private final Consumer<Boolean> pointerButton;
     private final PenButtonState state;
+    private final PenAppRouting appRouting;
     private final int user;
     private final Runnable held;
     private final Runnable releaseTimeout;
@@ -49,50 +53,119 @@ final class PenShortcutController {
     private InputEventReceiver receiver;
     private float hoverX = -1, hoverY = -1;
     private long hoverAt;
+    private boolean ordinary;
+    private volatile boolean laserRequested;
+    private volatile int pointerProduct;
+    private volatile String pointerAddress;
+    private float mouseX, mouseY;
+    private boolean mousePositioned, mousePressed;
+    private final Runnable laserTimeout = this::hideLaser;
 
-    PenShortcutController(Context context, Handler actor, IntConsumer feedback) {
+    PenShortcutController(Context context, Handler actor, IntConsumer feedback, Consumer<Boolean> pointerMode,
+            Consumer<Boolean> pointerButton) {
         this.context = context; this.actor = actor; this.feedback = feedback;
+        this.pointerMode = pointerMode;
+        this.pointerButton = pointerButton;
         user = ActivityManager.getCurrentUser();
         state = new PenButtonState(new PenButtonState.Listener() {
             @Override public void down(Gesture gesture) {
                 if (!eligible()) return;
+                if (ordinary && (gesture == Gesture.DOUBLE_TAP || gesture == Gesture.SLIDE_UP
+                        || gesture == Gesture.SLIDE_DOWN)) return;
                 if (gesture.haptic != 0) vibrate(gesture.haptic);
-                Action action = PenControlsSettings.action(context, gesture, user);
+                Action action = ordinary && gesture == Gesture.SQUEEZE ? Action.LASER
+                        : PenControlsSettings.action(context, gesture, user);
                 final int ticket = generation;
                 Log.i(TAG, "gesture=" + gesture + " action=" + action);
-                main.post(() -> { if (ticket == generation && eligible()) run(action); });
+                main.post(() -> {
+                    if (appRouting.suppressGlobal() || ticket != generation || !eligible()) return;
+                    if (!ordinary && laserRequested) {
+                        if (gesture == Gesture.DOUBLE_TAP) {
+                            hideLaser();
+                            return;
+                        }
+                        if (gesture == Gesture.SQUEEZE) {
+                            pressMouse();
+                            return;
+                        }
+                    }
+                    if (gesture == Gesture.SLIDE_UP || gesture == Gesture.SLIDE_DOWN) {
+                        scroll(gesture == Gesture.SLIDE_UP ? 1 : -1);
+                        if (laserRequested) pointerMode.accept(true);
+                        return;
+                    }
+                    run(action);
+                });
             }
             @Override public void up(Gesture gesture) {
+                if (!ordinary && gesture == Gesture.SQUEEZE)
+                    main.post(() -> releaseMouse(false));
+                if (ordinary && gesture == Gesture.SQUEEZE) main.post(PenShortcutController.this::hideLaser);
                 if (gesture == Gesture.SQUEEZE && eligible()) vibrate(2);
             }
         });
         held = () -> { if (eligible()) state.held(SystemClock.uptimeMillis()); };
-        releaseTimeout = () -> { state.clear(); actor.removeCallbacks(held); };
+        releaseTimeout = () -> {
+            state.clear(); actor.removeCallbacks(held);
+            main.post(() -> { if (ordinary) hideLaser(); else releaseMouse(true); });
+        };
+        appRouting = new PenAppRouting(context, main, user, this::baseEligible, () -> {
+            generation++;
+            actor.post(() -> { state.clear(); actor.removeCallbacks(held); actor.removeCallbacks(releaseTimeout); });
+            if (menu != null) menu.hide();
+            hideLaser();
+        });
         main.post(this::startPointerObserver);
+    }
+    void setModel(PenModel model) {
+        ordinary = model != PenModel.PRO;
+        state.setSideButtonLongPress(!ordinary);
+        appRouting.setModel(model);
+    }
+    void setPointerIdentity(int product, String address) {
+        pointerProduct = product;
+        pointerAddress = address;
     }
 
     private boolean eligible() {
+        return baseEligible() && !appRouting.blocked();
+    }
+    private boolean baseEligible() {
         return !closed && available && ActivityManager.getCurrentUser() == user
                 && context.getSystemService(PowerManager.class).isInteractive()
                 && !context.getSystemService(KeyguardManager.class).isKeyguardLocked();
     }
     private void vibrate(int kind) {
+        if (!ordinary && laserRequested) return;
         if (PenControlsSettings.vibration(context, user) > 0) feedback.accept(kind);
     }
     void setAvailable(boolean enabled) {
+        enabled = enabled && ActivityManager.getCurrentUser() == user
+                && context.getSystemService(PowerManager.class).isInteractive()
+                && !context.getSystemService(KeyguardManager.class).isKeyguardLocked();
         if (available == enabled) return;
         available = enabled;
         if (!enabled) {
             generation++; state.clear(); actor.removeCallbacks(held); actor.removeCallbacks(releaseTimeout);
-            main.post(() -> { if (menu != null) menu.hide(); });
+            main.post(() -> { appRouting.cancel(); hoverAt = 0; if (menu != null) menu.hide(); hideLaser(); });
         }
     }
     void report(byte[] report) {
-        if (!eligible()) { state.clear(); return; }
+        if (!baseEligible()) {
+            state.clear(); actor.removeCallbacks(held); actor.removeCallbacks(releaseTimeout);
+            main.post(() -> { appRouting.cancel(); hideLaser(); });
+            return;
+        }
+        if (appRouting.intercept(report)) {
+            state.clear(); actor.removeCallbacks(held); actor.removeCallbacks(releaseTimeout);
+            return;
+        }
         boolean accepted = state.accept(report, SystemClock.uptimeMillis());
         if (!accepted) {
             actor.removeCallbacks(held); actor.removeCallbacks(releaseTimeout);
-            if (report.length == 1) Log.i(TAG, "unmapped keyboard usage=0x" + Integer.toHexString(report[0] & 255));
+            main.post(this::hideLaser);
+            if (report != null && report.length == 1)
+                Log.i(TAG, "unmapped keyboard usage=0x" + Integer.toHexString(report[0] & 255));
             return;
         }
         actor.removeCallbacks(held); actor.removeCallbacks(releaseTimeout);
@@ -104,6 +177,8 @@ final class PenShortcutController {
         closed = true; generation++; available = false; state.clear();
         actor.removeCallbacks(held); actor.removeCallbacks(releaseTimeout);
         main.post(() -> {
+            appRouting.close();
+            hideLaser();
             if (menu != null) menu.hide();
             if (receiver != null) { receiver.dispose(); receiver = null; }
             if (monitor != null) { monitor.dispose(); monitor = null; }
@@ -121,18 +196,31 @@ final class PenShortcutController {
                         if (!(event instanceof MotionEvent)) return;
                         MotionEvent motion = (MotionEvent) event;
                         InputDevice device = motion.getDevice();
-                        if (device == null || !"NVTCapacitivePenP81c".equals(device.getName())
+                        if (device != null && motion.isFromSource(InputDevice.SOURCE_MOUSE)
+                                && motion.getDisplayId() == Display.DEFAULT_DISPLAY
+                                && PenInputIdentity.matches(device.getVendorId(), device.getProductId(),
+                                        device.getBluetoothAddress(), pointerProduct, pointerAddress)) {
+                            if (!eligible()) { hideLaser(); return; }
+                            mouseX = motion.getRawX(); mouseY = motion.getRawY();
+                            mousePositioned = Float.isFinite(mouseX) && Float.isFinite(mouseY);
+                            return;
+                        }
+                        if (device == null || !("NVTCapacitivePenP81c".equals(device.getName())
+                                || "NVTCapacitivePenM80p".equals(device.getName()))
                                 || !motion.isFromSource(InputDevice.SOURCE_STYLUS)
                                 || motion.getDisplayId() != Display.DEFAULT_DISPLAY) return;
+                        if (!eligible()) { hoverAt = 0; hideLaser(); return; }
                         switch (motion.getActionMasked()) {
                             case MotionEvent.ACTION_HOVER_ENTER:
                             case MotionEvent.ACTION_HOVER_MOVE:
                             case MotionEvent.ACTION_MOVE:
                             case MotionEvent.ACTION_DOWN:
-                                hoverX = motion.getX(); hoverY = motion.getY(); hoverAt = SystemClock.uptimeMillis();
+                                hoverX = motion.getRawX(); hoverY = motion.getRawY(); hoverAt = SystemClock.uptimeMillis();
                                 break;
+                            case MotionEvent.ACTION_HOVER_EXIT:
                             case MotionEvent.ACTION_CANCEL:
-                                hoverAt = 0; break;
+                                hoverAt = 0;
+                                break;
                         }
                     } finally { finishInputEvent(event, false); }
                 }
@@ -144,7 +232,7 @@ final class PenShortcutController {
     }
 
     private void runEntry(PenMenuEntry entry) {
-        if(!eligible())return;
+        if(appRouting.suppressGlobal() || !eligible())return;
         if(entry.action!=null){run(entry.action);return;}
         try { PenMenuApps.launch(context,entry,user); }
         catch(RuntimeException error) {
@@ -155,12 +243,20 @@ final class PenShortcutController {
     }
 
     private void run(Action action) {
-        if (!eligible() || action == Action.NONE) return;
+        if (appRouting.suppressGlobal() || !eligible() || action == Action.NONE) return;
         try {
             switch (action) {
+                case LASER:
+                    if (laserRequested) { hideLaser(); return; }
+                    laserRequested = true;
+                    if (menu != null) menu.hide();
+                    pointerMode.accept(true);
+                    main.removeCallbacks(laserTimeout);
+                    if (ordinary) main.postDelayed(laserTimeout, 8000);
+                    return;
                 case MENU:
                     if (menu == null) menu = new PenShortcutMenu(context, main, this::runEntry);
-                    boolean fresh = SystemClock.uptimeMillis() - hoverAt < 1500;
+                    boolean fresh = hoverAt != 0 && SystemClock.uptimeMillis() - hoverAt < 1500;
                     menu.toggle(PenMenuEntry.read(PenControlsSettings.read(context, PenControls.MENU, user)),
                             fresh ? hoverX : -1, fresh ? hoverY : -1);
                     return;
@@ -196,6 +292,44 @@ final class PenShortcutController {
             Log.w(TAG, "Shortcut unavailable: " + action, error);
             Toast.makeText(context, chinese() ? "此操作暂不可用" : "Action unavailable", Toast.LENGTH_SHORT).show();
         }
+    }
+    private void hideLaser() {
+        releaseMouse(true);
+        mousePositioned = false;
+        boolean wasRequested = laserRequested;
+        laserRequested = false;
+        main.removeCallbacks(laserTimeout);
+        if (wasRequested) pointerMode.accept(false);
+    }
+    private void pressMouse() {
+        if (mousePressed) return;
+        mousePressed = true;
+        pointerButton.accept(true);
+        Log.i(TAG, "Native mouse primary requested pressed=true");
+    }
+    private void releaseMouse(boolean cancelled) {
+        if (!mousePressed) return;
+        mousePressed = false;
+        pointerButton.accept(false);
+        Log.i(TAG, "Native mouse primary requested pressed=false cancelled=" + cancelled);
+    }
+    private void scroll(int direction) {
+        android.util.DisplayMetrics metrics = context.getResources().getDisplayMetrics();
+        MotionEvent.PointerProperties properties = new MotionEvent.PointerProperties();
+        properties.id = 0; properties.toolType = MotionEvent.TOOL_TYPE_MOUSE;
+        MotionEvent.PointerCoords coordinates = new MotionEvent.PointerCoords();
+        coordinates.x = mousePositioned ? mouseX : (hoverAt != 0 ? hoverX : metrics.widthPixels / 2f);
+        coordinates.y = mousePositioned ? mouseY : (hoverAt != 0 ? hoverY : metrics.heightPixels / 2f);
+        coordinates.setAxisValue(MotionEvent.AXIS_VSCROLL, direction * 3f);
+        long now = SystemClock.uptimeMillis();
+        MotionEvent event = MotionEvent.obtain(now, now, MotionEvent.ACTION_SCROLL, 1,
+                new MotionEvent.PointerProperties[]{properties}, new MotionEvent.PointerCoords[]{coordinates},
+                0, 0, 1, 1, KeyCharacterMap.VIRTUAL_KEYBOARD, 0, InputDevice.SOURCE_MOUSE, 0);
+        event.setDisplayId(Display.DEFAULT_DISPLAY);
+        try {
+            context.getSystemService(InputManager.class)
+                    .injectInputEvent(event, InputManager.INJECT_INPUT_EVENT_MODE_ASYNC);
+        } finally { event.recycle(); }
     }
     private void key(int code, int modifiers) {
         InputManager input = context.getSystemService(InputManager.class);

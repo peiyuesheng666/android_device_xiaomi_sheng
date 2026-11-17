@@ -49,10 +49,13 @@ final class PenGattSession extends BluetoothGattCallback {
     private boolean closed, owned, awake, rateHeld, initialized, ready, resuming, pausing, needsResume;
     private boolean writeDone;
     private boolean buttonSubscribed, ambiguousButtons, featurePending;
+    private boolean pointerRequested;
+    private Boolean pointerSent;
     private int attemptedSensitivity = -1, attemptedVibration = -1;
     private boolean controlPending;
     private boolean screenOnSubmitted, restoreScreenOn, screenStatusOnly, nativeReadyAfterWake;
     private int screenStatusRequested;
+    private long lastPressureLogAt;
     private final PenWakeGate wakeGate = new PenWakeGate();
     private String pendingKind;
     private Object pendingObject;
@@ -66,7 +69,19 @@ final class PenGattSession extends BluetoothGattCallback {
         this.context = context; this.actor = actor; this.device = device; this.adapter = adapter;
         this.controller = controller; this.inputs = inputs; this.displays = displays;
         this.finished = finished; rate = new DisplayRateLease(context);
-        buttons = new PenShortcutController(context, actor, this::requestHaptic);
+        buttons = new PenShortcutController(context, actor, this::requestHaptic, enabled -> actor.post(() -> {
+            if (closed) return;
+            if (enabled && pointerRequested) pointerSent = null;
+            pointerRequested = enabled && initialized && ready && awake && currentDock == 1;
+            inputs.setPointerEnabled(pointerRequested);
+            observe(awake, currentDock);
+        }), pressed -> actor.post(() -> {
+            if (closed || !owned || (pressed && (!pointerRequested || !ready || !awake || currentDock != 1))) return;
+            try {
+                int result = controller.setMode(owner, 0x10000, pressed ? 1 : 0);
+                Log.i("ShengPenButtons", "Native mouse primary result=" + result + " pressed=" + pressed);
+            } catch (Exception error) { fail("mouse primary", error); }
+        }));
     }
     String address() { return device.getAddress(); }
     void start() {
@@ -111,6 +126,10 @@ final class PenGattSession extends BluetoothGattCallback {
         if (closed) return;
         boolean wentOff = awake && !on;
         awake = on; currentDock = dock;
+        if (!on || dock != 1) {
+            pointerRequested = false;
+            inputs.setPointerEnabled(false);
+        }
         // A docked pen must still observe screen On/Off. Releasing its 120 Hz
         // cap does not turn the screen off or restart the panel's wake interval.
         wakeGate.observe(on, SystemClock.uptimeMillis());
@@ -127,7 +146,21 @@ final class PenGattSession extends BluetoothGattCallback {
         }
         if (dock < 0) { close("Dock state unavailable while On"); return; }
         try {
-            if (owned && controller.getForwardedCount(owner) < 0) { close("native lease lost"); return; }
+            if (owned) {
+                long count = controller.getForwardedCount(owner);
+                if (count == -2) {
+                    if (nativeReadyAfterWake)
+                        Log.w(ShengStylusApplication.TAG, "Native panel pause detected; restoring pen timing");
+                    ready = false; needsResume = initialized; nativeReadyAfterWake = false;
+                    buttons.setAvailable(false);
+                } else if (count < 0) { close("native lease lost"); return; }
+                long now = SystemClock.uptimeMillis();
+                if (now - lastPressureLogAt >= 5000) {
+                    lastPressureLogAt = now;
+                    Log.i(ShengStylusApplication.TAG, "Pressure forwarded=" + count + " ready=" + ready
+                            + " type=" + (model == null ? -1 : model.touchType));
+                }
+            }
             // Java-side waiting does not suspend the native worker. Release
             // ownership before removing our vote or leaving an active native
             // controller at an unsupported actual rate, including setup before
@@ -301,7 +334,9 @@ final class PenGattSession extends BluetoothGattCallback {
         read(information == null ? null : information.getCharacteristic(PNP), value -> {
             model = PenModel.fromPnp(value);
             if (model == null) { close("Unsupported PnP identity"); return; }
+            buttons.setModel(model);
             product = (value[3] & 255) | ((value[4] & 255) << 8);
+            buttons.setPointerIdentity(product, address());
             Log.i("ShengPenButtons", "PnP product=0x" + Integer.toHexString(product) + " model=" + model);
             String expected = model == PenModel.PRO ? "Xiaomi Focus Pen Pro" : "Xiaomi Focus Pen";
             if (!expected.equals(device.getName())) { close("Name/PnP mismatch"); return; }
@@ -362,7 +397,7 @@ final class PenGattSession extends BluetoothGattCallback {
         actor.post(() -> {
             if (closed || g != client) return;
             if (c == buttonReport && buttonSubscribed) {
-                boolean usable = model == PenModel.PRO && initialized && ready && awake && currentDock == 1;
+                boolean usable = model != null && initialized && ready && awake && currentDock == 1;
                 Log.d("ShengPenButtons", "HID report2=" + java.util.Arrays.toString(copy) + " usable=" + usable);
                 buttons.setAvailable(usable);
                 if (usable) buttons.report(copy);
@@ -428,7 +463,7 @@ final class PenGattSession extends BluetoothGattCallback {
         later(() -> {
           try {
             if (!inputs.guard(model, product, address())) {
-                if (attempt >= 10) { close("Pro input guard unavailable"); return; }
+                if (attempt >= 10) { close("Pen input guard unavailable"); return; }
                 actor.postDelayed(() -> guard(attempt + 1), 500); return;
             }
             if (model == PenModel.PRO) queryActiveState(() -> assign(false));
@@ -476,7 +511,7 @@ final class PenGattSession extends BluetoothGattCallback {
                 notifiedDock = state;
                 Runnable makeReady = () -> mode(37, 1, () ->
                     exchange(MippProfile.parameters(localAddress, secondId, false), 0, ignored3 -> {
-                        if (initial && model == PenModel.PRO) pressureReferences(); else complete();
+                        if (initial) pressureReferences(); else complete();
                     }));
                 if (model == PenModel.PRO) exchange(MippProfile.proScreenState(model, true), 0, ignored3 -> {
                     if (initial) makeReady.run();
@@ -565,6 +600,18 @@ final class PenGattSession extends BluetoothGattCallback {
         if (!frequencies.isEmpty()) {
             int value = frequencies.remove();
             exchange(MippProfile.frequency((value >>> 8) & 255, value & 255), 0, ignored -> mode(22, 49, this::drain));
+            return;
+        }
+        if (model == PenModel.PRO && (pointerSent == null || pointerRequested != pointerSent)) {
+            boolean requested = pointerRequested;
+            exchange(new byte[]{0x50, 1, (byte) (requested ? 1 : 0)}, 0, ignored -> {
+                pointerSent = requested;
+                if (!requested) {
+                    attemptedSensitivity = -1;
+                    attemptedVibration = -1;
+                }
+                Log.i("ShengPenButtons", "Pointer mode acknowledged enabled=" + requested);
+            });
             return;
         }
         drainFeatures();

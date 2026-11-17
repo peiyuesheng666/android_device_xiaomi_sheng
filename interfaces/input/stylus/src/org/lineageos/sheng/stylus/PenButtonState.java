@@ -14,13 +14,27 @@ public final class PenButtonState {
     private int usage;
     private long since;
     private boolean longSent;
+    private boolean sideButtonLongPress = true;
     public PenButtonState(Listener listener) { this.listener = listener; }
+
+    public void setSideButtonLongPress(boolean enabled) {
+        if (sideButtonLongPress == enabled) return;
+        clear();
+        sideButtonLongPress = enabled;
+    }
+
+    private boolean requiresHold(Gesture gesture) {
+        return sideButtonLongPress && gesture.longPress();
+    }
 
     public static Gesture gesture(int usage) {
         switch (usage) {
             case 0x4e: return Gesture.PRIMARY;
             case 0x4b: return Gesture.SECONDARY;
             case 0x6e: return Gesture.SQUEEZE;
+            case 0x58: return Gesture.DOUBLE_TAP;
+            case 0x61: return Gesture.SLIDE_UP;
+            case 0x5b: return Gesture.SLIDE_DOWN;
             default: return null;
         }
     }
@@ -34,19 +48,19 @@ public final class PenButtonState {
         usage = next; since = now; longSent = false;
         if (old != null) listener.up(old);
         Gesture current = gesture(next);
-        if (current != null && !current.longPress()) listener.down(current);
+        if (current != null && !requiresHold(current)) listener.down(current);
         return true;
     }
 
     public void held(long now) {
         Gesture current = gesture(usage);
-        if (current != null && current.longPress() && !longSent && now >= since + HOLD_MS) {
+        if (current != null && requiresHold(current) && !longSent && now >= since + HOLD_MS) {
             longSent = true; listener.down(current);
         }
     }
     public long holdDelay(long now) {
         Gesture current = gesture(usage);
-        return current == null || !current.longPress() || longSent ? -1 : Math.max(0, since + HOLD_MS - now);
+        return current == null || !requiresHold(current) || longSent ? -1 : Math.max(0, since + HOLD_MS - now);
     }
     /** Cancellation is not a physical release and must not generate feedback/actions. */
     public void clear() { usage = 0; since = 0; longSent = false; }

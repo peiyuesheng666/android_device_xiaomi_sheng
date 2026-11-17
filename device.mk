@@ -525,5 +525,9 @@ PRODUCT_PACKAGES += ShengPenSettings
 # Persistent pen transport with the frozen vendor control interface.
 PRODUCT_PACKAGES += ShengStylus vendor.lineage.sheng.stylus-service
 
+PRODUCT_COPY_FILES += \
+    $(foreach product,4d80 3280 5081 3281,$(LOCAL_PATH)/configs/keylayout/sheng-pen-companion.kl:$(TARGET_COPY_OUT_VENDOR)/usr/keylayout/Vendor_0022_Product_$(product).kl) \
+    $(foreach product,4d80 3280 5081 3281,$(LOCAL_PATH)/configs/keylayout/sheng-pen-companion.kl:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/Vendor_0022_Product_$(product).kl)
+
 # Keep the QTI RGB service with its default-OFF output gate; no Settings control.
 PRODUCT_PACKAGES += vendor.qti.hardware.lights-service.sheng

@@ -37,6 +37,7 @@ class Service final : public BnPenController {
     int64_t forwarded_ = 0;
     bool stopped_ = false;
     bool quiescing_ = false;
+    std::chrono::steady_clock::time_point mouseReleaseAt_{};
     std::thread worker_;
 
     static bool systemCaller() { return AIBinder_getCallingUid() == 1000; }
@@ -82,6 +83,8 @@ class Service final : public BnPenController {
             // full second after every actual wake, not merely after startup.
             const bool on = hardware_->stableOn();
             controller_.observePanel(on);
+            if (hid_ && (!on || std::chrono::steady_clock::now() >= mouseReleaseAt_))
+                hid_->setMouseButton(false);
             if (!owner_.get() && controller_.needsRelease() && on
                     && std::chrono::steady_clock::now() >= retryAt) {
                 const Result result = releaseOwned();
@@ -97,8 +100,12 @@ class Service final : public BnPenController {
                     if (read == PenHidEndpoint::Read::Error) {
                         clearOwner(); releaseOwned(); break;
                     }
-                    const Result result = controller_.forwardProPressure(report.data(), report.size());
-                    if (result == Result::Applied) ++forwarded_;
+                    const Result result = controller_.forwardPressure(report.data(), report.size());
+                    if (result == Result::Applied) {
+                        ++forwarded_;
+                        if (forwarded_ == 1 || forwarded_ % 512 == 0)
+                            LOG(INFO) << "Pressure transport acknowledged count=" << forwarded_;
+                    }
                     else if (result == Result::Error || result == Result::Invalid) {
                         LOG(ERROR) << "Pressure transport rejected; releasing owner";
                         clearOwner(); releaseOwned(); break;
@@ -162,7 +169,11 @@ class Service final : public BnPenController {
         }
         const Result acquired = journal_.begin() ? controller_.acquire(endpoint->type()) : Result::Error;
         *result = static_cast<int32_t>(acquired);
-        if (acquired == Result::Applied) { hid_ = std::move(endpoint); forwarded_ = 0; }
+        if (acquired == Result::Applied) {
+            LOG(INFO) << "Pressure endpoint type=" << endpoint->type()
+                      << " descriptor_verified=" << endpoint->pressureSupported();
+            hid_ = std::move(endpoint); forwarded_ = 0;
+        }
         else { clearOwner(); if (!controller_.needsRelease()) journal_.finish(); }
         changed_.notify_all();
         return ScopedAStatus::ok();
@@ -171,6 +182,16 @@ class Service final : public BnPenController {
                          int32_t value, int32_t* result) override {
         if (!systemCaller()) return ScopedAStatus::fromExceptionCode(EX_SECURITY);
         std::lock_guard<std::mutex> lock(mutex_);
+        if (mode == 0x10000) {
+            const bool allowed = matches(owner) && hid_ && !quiescing_ && (value == 0 || value == 1)
+                    && (value == 0 || (controller_.ownsConnection() && !controller_.needsResume() && hardware_->stableOn()));
+            const bool applied = allowed && hid_->setMouseButton(value == 1);
+            if (applied && value == 1)
+                mouseReleaseAt_ = std::chrono::steady_clock::now() + std::chrono::seconds(8);
+            LOG(INFO) << "Native mouse primary pressed=" << value << " applied=" << applied;
+            *result = static_cast<int32_t>(applied ? Result::Applied : Result::Error);
+            return ScopedAStatus::ok();
+        }
         *result = static_cast<int32_t>(matches(owner) ? controller_.setMode(mode, value) : Result::Busy);
         return ScopedAStatus::ok();
     }
@@ -186,7 +207,7 @@ class Service final : public BnPenController {
     ScopedAStatus getForwardedCount(const SpAIBinder& owner, int64_t* result) override {
         if (!systemCaller()) return ScopedAStatus::fromExceptionCode(EX_SECURITY);
         std::lock_guard<std::mutex> lock(mutex_);
-        *result = matches(owner) ? forwarded_ : -1;
+        *result = !matches(owner) ? -1 : controller_.needsResume() ? -2 : forwarded_;
         return ScopedAStatus::ok();
     }
 };

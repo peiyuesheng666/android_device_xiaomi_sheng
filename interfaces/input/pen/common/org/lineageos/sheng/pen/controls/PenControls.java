@@ -8,13 +8,14 @@ public final class PenControls {
     public static final String SENSITIVITY = PREFIX + "squeeze_sensitivity";
     public static final String VIBRATION = PREFIX + "gesture_vibration";
     public static final String MENU = PREFIX + "menu_actions";
+    public static final String APP_OVERRIDES = PREFIX + "app_overrides";
 
     public enum Action {
         NONE("不执行操作", "No action"), MENU("快捷菜单", "Shortcut menu"),
         BACK("返回", "Back"), HOME("主屏幕", "Home"), RECENTS("最近任务", "Recent apps"),
         MEDIA("播放或暂停", "Play or pause"), SCREENSHOT("截屏", "Screenshot"),
         ASSISTANT("语音助理", "Assistant"), SETTINGS("手写笔设置", "Pen settings"),
-        UNDO("撤销", "Undo"), REDO("重做", "Redo");
+        UNDO("撤销", "Undo"), REDO("重做", "Redo"), LASER("鼠标指针", "Mouse pointer");
         private final String chinese, english;
         Action(String chinese, String english) { this.chinese = chinese; this.english = english; }
         public String title(boolean zh) { return zh ? chinese : english; }
@@ -26,6 +27,9 @@ public final class PenControls {
 
     public enum Gesture {
         SQUEEZE("握压笔身", "Squeeze", Action.MENU, 1),
+        DOUBLE_TAP("双击笔身", "Double tap", Action.NONE, 3),
+        SLIDE_UP("向上滑动", "Slide up", Action.NONE, 4),
+        SLIDE_DOWN("向下滑动", "Slide down", Action.NONE, 4),
         PRIMARY("主按键长按", "Hold primary button", Action.MENU, 0),
         SECONDARY("副按键长按", "Hold secondary button", Action.SCREENSHOT, 0);
         private final String chinese, english;
@@ -40,7 +44,7 @@ public final class PenControls {
     }
 
     public static final Action[] DEFAULT_MENU = {Action.BACK, Action.HOME, Action.RECENTS,
-            Action.MEDIA, Action.SCREENSHOT, Action.SETTINGS};
+            Action.LASER, Action.SCREENSHOT, Action.SETTINGS};
 
     public static Action[] menu(String stored) {
         if (stored == null) return DEFAULT_MENU.clone();
