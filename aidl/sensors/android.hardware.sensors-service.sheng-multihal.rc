@@ -1,3 +1,14 @@
+# Persist is mounted in fs. Finish calibration conversion before late-fs
+# starts sscrpcd, which loads SSC's registry and orientation configurations.
+on post-fs
+    exec_start vendor.sheng-sensor-frame
+
+service vendor.sheng-sensor-frame /vendor/bin/hw/android.hardware.sensors-service.sheng-multihal --migrate-landscape-frame
+    user system
+    group system
+    disabled
+    oneshot
+
 service vendor.sensors-hal-multihal /vendor/bin/hw/android.hardware.sensors-service.sheng-multihal
     override
     interface aidl android.hardware.sensors.ISensors/default

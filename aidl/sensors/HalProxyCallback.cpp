@@ -18,7 +18,6 @@
 #include "ShengCctSample.h"
 
 #include <cinttypes>
-#include <android-base/properties.h>
 
 namespace android {
 namespace hardware {
@@ -84,15 +83,9 @@ std::vector<V2_1::Event> HalProxyCallbackBase::processEvents(const std::vector<V
             continue;
         }
 
-        // sheng's stock device-orientation algorithm uses portrait zero,
-        // while its built-in display uses landscape zero. Adjust only this
-        // discrete rotation event; do not rewrite calibrated motion samples.
-        static const bool landscape_orientation =
-                ::android::base::GetProperty("ro.product.vendor.device", "") == "sheng";
-        if (landscape_orientation && sensor.type == V2_1::SensorType::DEVICE_ORIENTATION &&
-            event.u.scalar >= 0 && event.u.scalar <= 3) {
-            event.u.scalar = (static_cast<int>(event.u.scalar) + 3) % 4;
-        }
+        // ODM's IMU/magnetometer axis maps establish the landscape frame in
+        // SSC, before fusion and direct reporting. Keep every event in that
+        // frame here, including the discrete device-orientation event.
 
         if (sensor.type == V2_1::SensorType::PICK_UP_GESTURE && event.u.scalar != 1) {
             continue;

@@ -47,6 +47,7 @@
 #include <vector>
 
 #include "hwc_display.h"
+#include "client_composition_range.h"
 #include "hwc_debugger.h"
 #include "hwc_tonemapper.h"
 #include "hwc_session.h"
@@ -911,10 +912,35 @@ void HWCDisplay::BuildLayerStack() {
     layer_stack_.layers.push_back(layer);
   }
 
+  // The OEM strategy can put a single GPU target above translucent device
+  // layers when mixing dataspaces. Such layers cannot receive punched holes
+  // in SurfaceFlinger's client target. Use a stable input-only fallback for
+  // this combination, before the strategy caches a plane allocation.
+  bool promoted_client_range = false;
+  if (property_get_bool("vendor.display.client_range_fallback", true)) {
+    std::vector<DisplayCompositionInput> composition;
+    for (auto hwc_layer : layer_set_) {
+      Layer *layer = hwc_layer->GetSDMLayer();
+      composition.push_back({
+          hwc_layer->GetLayerDataspace(),
+          layer->blending != kBlendingOpaque || layer->plane_alpha != 255,
+          hwc_layer->IsProtected() || bool(layer->input_buffer.flags.secure_display)});
+    }
+    if (NeedsMixedDataspaceClientComposition(composition)) {
+      for (Layer *layer : layer_stack_.layers) {
+        layer->flags.skip = true;
+        layer->update_mask.set(kClientCompRequest);
+      }
+      layer_stack_.flags.skip_present = true;
+      promoted_client_range = true;
+    }
+  }
+
   // TODO(user): Set correctly when SDM supports geometry_changes as bitmask
 
   layer_stack_.flags.geometry_changed = UINT32((geometry_changes_ ||
-                                                geometry_changes_on_doze_suspend_) > 0);
+                                                geometry_changes_on_doze_suspend_ ||
+                                                promoted_client_range) > 0);
   layer_stack_.flags.advance_fb_present = client_target_3_1_set_;
   // Append client target to the layer stack
   Layer *sdm_client_target = client_target_->GetSDMLayer();
@@ -2651,7 +2677,10 @@ void HWCDisplay::Dump(std::ostringstream *os) {
     *os << " transform: " << transform.rotation << "/" << transform.flip_horizontal <<
           "/"<< transform.flip_vertical;
     *os << " buffer_id: " << std::hex << "0x" << sdm_layer->input_buffer.buffer_id << std::dec;
-    *os << " secure: " << layer->IsProtected()
+    *os << " skip: " << sdm_layer->flags.skip
+        << " blend: " << sdm_layer->blending
+        << " requested: " << to_string(layer->GetClientRequestedCompositionType())
+        << " secure: " << layer->IsProtected()
         << std::endl;
   }
 

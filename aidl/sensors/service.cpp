@@ -18,10 +18,21 @@
 #include <android/binder_manager.h>
 #include <android/binder_process.h>
 #include "HalProxyAidl.h"
+#include "ShengSensorFrame.h"
+#include <cstring>
 
 using ::aidl::android::hardware::sensors::implementation::HalProxyAidl;
 
-int main() {
+int main(int argc, char** argv) {
+    if (argc == 2 && strcmp(argv[1], "--migrate-landscape-frame") == 0) {
+        std::string error;
+        if (!sheng::MigrateSensorFrame("/mnt/vendor/persist/sensors/registry/registry", &error)) {
+            LOG(ERROR) << error;
+            return EXIT_FAILURE;
+        }
+        LOG(INFO) << "Sheng sensor calibration uses the natural landscape frame";
+        return EXIT_SUCCESS;
+    }
     ABinderProcess_setThreadPoolMaxThreadCount(0);
 
     // Make a default multihal sensors service

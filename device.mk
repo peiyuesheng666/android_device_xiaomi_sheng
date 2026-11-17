@@ -409,6 +409,15 @@ PRODUCT_COPY_FILES += \
 # Vendor configurations
 $(call inherit-product, vendor/xiaomi/sheng/sheng-vendor.mk)
 
+# Establish the natural landscape frame inside SSC, including direct reports
+# and fused sensors. Replace only these stock orientation configurations.
+PRODUCT_COPY_FILES := $(filter-out \
+    %:$(TARGET_COPY_OUT_ODM)/etc/sensors/config/sm8550_icm4x6xx_0.json \
+    %:$(TARGET_COPY_OUT_ODM)/etc/sensors/config/sm8550_qmc6308_0.json,$(PRODUCT_COPY_FILES))
+PRODUCT_COPY_FILES += \
+    device/xiaomi/sheng/configs/sensors/sm8550_icm4x6xx_0.json:$(TARGET_COPY_OUT_ODM)/etc/sensors/config/sm8550_icm4x6xx_0.json \
+    device/xiaomi/sheng/configs/sensors/sm8550_qmc6308_0.json:$(TARGET_COPY_OUT_ODM)/etc/sensors/config/sm8550_qmc6308_0.json
+
 # Vendor service manager
 PRODUCT_PACKAGES += \
     vndservicemanager

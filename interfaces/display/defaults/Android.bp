@@ -11,10 +11,18 @@ android_app {
     name: "ShengDisplayDefaults",
     manifest: "AndroidManifest.xml",
     srcs: ["src/**/*.java"],
-    sdk_version: "current",
+    platform_apis: true,
     min_sdk_version: "33",
     certificate: "platform",
     privileged: true,
     product_specific: true,
+    required: ["privapp-permissions-org.lineageos.sheng.displaydefaults.xml"],
     optimize: { enabled: false },
+}
+
+prebuilt_etc {
+    name: "privapp-permissions-org.lineageos.sheng.displaydefaults.xml",
+    product_specific: true,
+    sub_dir: "permissions",
+    src: "privapp-permissions-org.lineageos.sheng.displaydefaults.xml",
 }
