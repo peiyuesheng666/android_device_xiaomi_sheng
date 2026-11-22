@@ -1,0 +1,15 @@
+{
+  "status": "isolated_candidates_object_compile_passed_not_integrated_not_installed",
+  "fs_mgr_base_sha256": "9787818dcfb90ee6fbe5a1301ff37a5359c16da5764e9c65f9b8ecb74f36fbec",
+  "kernel_base_sha256": "e1b318f07756b19cf9d1d3c387329f10f5ea9eb9ce5b80153f2fecaf8c221b7e",
+  "fs_mgr_candidate_sha256": "f6dd4cc330231d9ba2bef65d7b9357a0efedb118d7d8bbc47e1a31886190d760",
+  "kernel_candidate_sha256": "c8fddb7ecf3ffaf537bf9cbafd425931f6252bc67d17b1734b4472282a488178",
+  "public_repository_modified": false,
+  "device_fstab_overlay_off_removed": false,
+  "android_reboot": false,
+  "flashing": false,
+  "isolated_target_object_compiles_passed": true,
+  "default_build_integration": false,
+  "combined_runtime_verified": false,
+  "root_cause_fix_complete": false
+}

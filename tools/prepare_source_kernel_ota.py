@@ -3,6 +3,7 @@ from pathlib import Path
 from datetime import datetime, timezone
 import hashlib, importlib.util, json, shutil, struct, subprocess
 import argparse
+from sheng_kernel_image import qualify as qualify_kernel_image
 parser=argparse.ArgumentParser()
 parser.add_argument('--build-root', type=Path, required=True)
 parser.add_argument('--project', type=Path, required=True)
@@ -16,6 +17,7 @@ assert not out.exists(), 'Use a new output directory'
 qualification=args.build_root.resolve()/'qualified/verification.json'
 qual=json.loads(qualification.read_text())
 assert qual['passed']
+final_image = qualify_kernel_image(root/'out-gki', Path('/root/sheng-pixelos/diagnostics/kernel618-android-deps/prebuilts/clang/host/linux-x86/clang-r584948c/bin/llvm-objcopy'))
 for name in ('namespaces','dependency-graph'):
     assert json.loads((qualification.parent/(name+'.json')).read_text())['passed']
 collection=json.loads((qualification.parent/'modules/collection.json').read_text())
@@ -148,6 +150,8 @@ install_modules(out/'vendor_ramdisk/lib/modules',plan['install']['vendor_boot'],
 boot_modules=out/'vendor_ramdisk/lib/modules'
 (boot_modules/'modules.load.recovery').write_text('\n'.join(records[planner.module_name(p)]['filename'] for p in plan['load']['recovery'])+'\n')
 report=dict(updated_utc=datetime.now(timezone.utc).isoformat(),candidate=str(out),qualification=str(qualification),
+    final_kernel_image=final_image,
+    final_kernel_out=str((root/'out-gki').resolve()),
     module_count=len(records),module_signing_certificate_sha256=sha(cert),modules=records,
     kernel_image_sha256=sha(root/'out-gki/kernel-Image'),kernel_release=collection['kernel_release'],
     staged_partitions=['vendor_dlkm','system_dlkm','vendor_ramdisk'],

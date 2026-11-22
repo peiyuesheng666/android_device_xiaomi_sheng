@@ -17,6 +17,29 @@ int main() {
   const ClientCompositionLayer alpha{false, true, false};
   const ClientCompositionLayer gpu{true, true, false};
   const ClientCompositionLayer secure{false, true, true};
+  using sdm::ToastClientCompositionPromotions;
+  assert(sdm::IsToastCompositionLayer("VRI[Toast]#154(BLAST Consumer)154"));
+  assert(sdm::IsToastCompositionLayer("VRI-Toast#4416"));
+  assert(!sdm::IsToastCompositionLayer("VRI[Settings]#12"));
+  assert(ToastClientCompositionPromotions({}, 0).empty());
+  assert(ToastClientCompositionPromotions({hw, alpha}, 2).empty());
+  assert((ToastClientCompositionPromotions({hw, alpha, hw, alpha}, 2) ==
+          std::vector<size_t>{0, 1, 2}));
+  assert((ToastClientCompositionPromotions({gpu, hw, alpha}, 1) ==
+          std::vector<size_t>{1}));
+  assert(ToastClientCompositionPromotions({secure, alpha}, 1).empty());
+  assert(ToastClientCompositionPromotions({hw, secure}, 1).empty());
+  assert((ToastClientCompositionPromotions({hw, alpha, secure}, 1) ==
+          std::vector<size_t>{0, 1}));
+  using sdm::TranslucentClientCompositionPromotions;
+  assert(TranslucentClientCompositionPromotions({}).empty());
+  assert(TranslucentClientCompositionPromotions({hw, alpha, alpha}).empty());
+  assert((TranslucentClientCompositionPromotions({hw, gpu, alpha, hw}) ==
+          std::vector<size_t>{2}));
+  assert((TranslucentClientCompositionPromotions({alpha, gpu, hw, alpha, alpha}) ==
+          std::vector<size_t>{2, 3, 4}));
+  assert(TranslucentClientCompositionPromotions({hw, gpu, secure, alpha}).empty());
+  assert(TranslucentClientCompositionPromotions({hw, gpu, hw}).empty());
   assert(ClientCompositionPromotions({}).empty());
   assert(ClientCompositionPromotions({alpha, hw, alpha}).empty());
   assert(ClientCompositionPromotions({alpha, gpu, alpha}).empty());

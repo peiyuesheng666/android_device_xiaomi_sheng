@@ -1,0 +1,56 @@
+--- a/msm/dp/dp_catalog.c
++++ b/msm/dp/dp_catalog.c
+@@ -6,6 +6,7 @@
+ 
+ 
+ #include <linux/delay.h>
++#include <linux/moduleparam.h>
+ #include <linux/iopoll.h>
+ 
+ #include "dp_catalog.h"
+@@ -13,6 +14,12 @@
+ #include "dp_debug.h"
+ #include "dp_link.h"
+ #include "dp_lphw_hpd.h"
++
++/* Isolated diagnostic only. Reads may flush posted writes and perturb timing. */
++static bool sheng_dp_color_readback;
++module_param_named(sheng_dp_color_readback, sheng_dp_color_readback, bool, 0600);
++MODULE_PARM_DESC(sheng_dp_color_readback,
++        "Read bounded DP color/timing registers after SDP update (diagnostic)");
+ 
+ #define DP_GET_MSB(x)	(x >> 8)
+ #define DP_GET_LSB(x)	(x & 0xff)
+@@ -624,6 +631,32 @@
+ 
+ 	dp_write(MMSS_DP_SDP_CFG3 + sdp_cfg3_off, 0x01);
+ 	dp_write(MMSS_DP_SDP_CFG3 + sdp_cfg3_off, 0x00);
++
++	/* Stream 0 only; no interrupt, AUX, PHY, MISR, or whole-bank reads. */
++	if (READ_ONCE(sheng_dp_color_readback) &&
++	    panel->stream_id == DP_STREAM_0 &&
++	    (!strcmp(catalog->exe_mode, "hw") ||
++	     !strcmp(catalog->exe_mode, "all"))) {
++		static const u32 offsets[] = {
++			DP_MAINLINK_CTRL, DP_STATE_CTRL, DP_CONFIGURATION_CTRL,
++			DP_SOFTWARE_MVID, DP_SOFTWARE_NVID, DP_MISC1_MISC0,
++			DP_TOTAL_HOR_VER, DP_START_HOR_VER_FROM_SYNC,
++			DP_HSYNC_VSYNC_WIDTH_POLARITY, DP_ACTIVE_HOR_VER,
++			DP_VALID_BOUNDARY, DP_VALID_BOUNDARY_2, DP_TU,
++			MMSS_DP_SDP_CFG, MMSS_DP_SDP_CFG2, MMSS_DP_SDP_CFG3,
++			MMSS_DP_GENERIC0_0, MMSS_DP_GENERIC0_1,
++			MMSS_DP_GENERIC0_6,
++		};
++		u32 i;
++
++		for (i = 0; i < ARRAY_SIZE(offsets); i++) {
++			if (!io_data->io.base ||
++			    io_data->io.len < offsets[i] + sizeof(u32))
++				continue;
++			DP_INFO("sheng_dp_rb link off=0x%x value=0x%x\n",
++				offsets[i], dp_read(offsets[i]));
++		}
++	}
+ }
+ 
+ static void dp_catalog_panel_setup_vsif_infoframe_sdp(

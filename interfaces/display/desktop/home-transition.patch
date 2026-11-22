@@ -1,0 +1,48 @@
+--- a/frameworks/base/libs/WindowManager/Shell/src/com/android/wm/shell/transition/RemoteTransitionHandler.java
++++ b/frameworks/base/libs/WindowManager/Shell/src/com/android/wm/shell/transition/RemoteTransitionHandler.java
+@@ -71,6 +71,7 @@
+             new ArrayList<>();
+ 
+     private final ArrayMap<IBinder, RemoteDeathHandler> mDeathHandlers = new ArrayMap<>();
++    private final ArrayMap<IBinder, ShengDesktopHomeTransition> mDesktopHomeFades = new ArrayMap<>();
+ 
+     RemoteTransitionHandler(
+             @NonNull ShellExecutor mainExecutor,
+@@ -174,6 +175,14 @@
+ 
+         if (pendingRemote == null) return false;
+ 
++        final ShengDesktopHomeTransition homeFade = ShengDesktopHomeTransition.prepare(
++                pendingRemote, info, startTransaction, finishTransaction, mMainExecutor);
++        if (homeFade != null) mDesktopHomeFades.put(transition, homeFade);
++        final Transitions.TransitionFinishCallback homeFinishCallback = wct -> {
++            final ShengDesktopHomeTransition fade = mDesktopHomeFades.remove(transition);
++            if (fade != null) fade.finish();
++            finishCallback.onTransitionFinished(wct);
++        };
+         final Transitions.TransitionFinishCallback wrappedCallback;
+         if (addOneOffHandlerLeashes()) {
+             // Provide handler-specific leashes to make sure that animations remain contained to the
+@@ -181,11 +190,11 @@
+             // animation off to a remote, over which we have no control.
+             mTransitionLeashManager.setUpLeashes(transition, info, startTransaction);
+             wrappedCallback = wct -> {
+-                finishCallback.onTransitionFinished(wct);
++                homeFinishCallback.onTransitionFinished(wct);
+                 mTransitionLeashManager.cleanUp(transition);
+             };
+         } else {
+-            wrappedCallback = finishCallback;
++            wrappedCallback = homeFinishCallback;
+         }
+ 
+         final RemoteTransition remote = pendingRemote;
+@@ -261,6 +270,8 @@
+             @NonNull Transitions.TransitionFinishCallback finishCallback) {
+         final RemoteTransition remoteTransition = mRequestedRemotes.get(mergeTarget);
+         if (remoteTransition == null) return;
++        final ShengDesktopHomeTransition homeFade = mDesktopHomeFades.get(mergeTarget);
++        if (homeFade != null) homeFade.onMerge(info, startT);
+         if (shouldDeferEmbeddedLaunch(remoteTransition, info)) {
+             Log.i(TAG, "Deferring embedded launch merge for #" + info.getDebugId());
+             return;

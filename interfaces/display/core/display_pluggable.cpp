@@ -34,6 +34,7 @@
 #include <vector>
 
 #include "display_pluggable.h"
+#include "sheng_external_mode_policy.h"
 
 #define __CLASS__ "DisplayPluggable"
 
@@ -114,9 +115,9 @@ DisplayError DisplayPluggable::Init() {
                                     &hw_events_intf_);
   if (error != kErrorNone) {
     DisplayBase::Deinit();
-    HWInterface::Destroy(hw_intf_);
     DLOGE("Failed to create hardware events interface. Error = %d for display %d-%d", error,
           display_id_, display_type_);
+    return error;
   }
 
   InitializeColorModes();
@@ -202,6 +203,21 @@ DisplayError DisplayPluggable::GetOverrideConfig(uint32_t *mode_index) {
   if (!mode_index) {
     DLOGE("Invalid mode index parameter.");
     return kErrorParameters;
+  }
+
+  // sheng: prefer smooth output over the sink's resolution-first EDID preference.
+  // Run before DisplayBase::Init so the advertised initial mode agrees with hardware.
+  uint32_t count = 0;
+  if (hw_intf_->GetNumDisplayAttributes(&count) == kErrorNone) {
+    HWDisplayAttributes selected = {};
+    for (uint32_t index = 0; index < count; ++index) {
+      HWDisplayAttributes candidate = {};
+      if (hw_intf_->GetDisplayAttributes(index, &candidate) == kErrorNone &&
+          ShengPreferExternalMode(candidate, selected)) {
+        selected = candidate;
+        *mode_index = index;
+      }
+    }
   }
 
   char val[kPropertyMax] = {};

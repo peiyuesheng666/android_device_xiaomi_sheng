@@ -166,7 +166,9 @@ DEVICE_FRAMEWORK_MANIFEST_FILE += $(DEVICE_PATH)/configs/vintf/framework_manifes
 
 # Verified Boot
 BOARD_AVB_ENABLE := true
-BOARD_AVB_MAKE_VBMETA_IMAGE_ARGS += --flags 3
+# Keep verification enabled. Modified partitions need matching signed vbmeta
+# descriptors, not a global verification/verity bypass. Existing on-device
+# development vbmeta must not be replaced until its full image set is qualified.
 BOARD_MOVE_GSI_AVB_KEYS_TO_VENDOR_BOOT := true
 
 BOARD_AVB_VBMETA_SYSTEM := product system system_ext
@@ -231,6 +233,7 @@ ENABLE_VENDOR_RIL_SERVICE := false
 VENDOR_SECURITY_PATCH := 2026-02-01
 BOARD_VENDOR_SEPOLICY_DIRS += $(DEVICE_PATH)/sepolicy/vendor
 SYSTEM_EXT_PRIVATE_SEPOLICY_DIRS += $(DEVICE_PATH)/sepolicy/system_ext/private
+SYSTEM_EXT_PRIVATE_SEPOLICY_DIRS += $(DEVICE_PATH)/interfaces/compat/overlay-remounter/sepolicy/system_ext/private
 SYSTEM_EXT_PUBLIC_SEPOLICY_DIRS += $(DEVICE_PATH)/interfaces/input/touch/sepolicy/system_ext/public
 SYSTEM_EXT_PRIVATE_SEPOLICY_DIRS += $(DEVICE_PATH)/interfaces/input/touch/sepolicy/system_ext/private
 BOARD_VENDOR_SEPOLICY_DIRS += $(DEVICE_PATH)/interfaces/input/touch/sepolicy/vendor

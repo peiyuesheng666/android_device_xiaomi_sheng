@@ -1,0 +1,41 @@
+/* SPDX-License-Identifier: GPL-2.0-only */
+/* sheng's shipping PHY 6.0 tables, retained from its original display driver. */
+#include <linux/of.h>
+
+static bool sheng_dp_legacy_lt_values(u32 version, u32 phy_version,
+		u8 v_level, u8 p_level, bool high, u8 *swing, u8 *pre_emp)
+{
+	static const u8 swing_high[4][4] = {
+		{0x02, 0x12, 0x16, 0x1a},
+		{0x09, 0x19, 0x1f, 0xff},
+		{0x10, 0x1f, 0xff, 0xff},
+		{0x1f, 0xff, 0xff, 0xff},
+	};
+	static const u8 emp_high[4][4] = {
+		{0x00, 0x0c, 0x15, 0x1b},
+		{0x02, 0x0e, 0x16, 0xff},
+		{0x02, 0x11, 0xff, 0xff},
+		{0x04, 0xff, 0xff, 0xff},
+	};
+	static const u8 swing_low[4][4] = {
+		{0x08, 0x0f, 0x16, 0x1f},
+		{0x11, 0x1e, 0x1f, 0xff},
+		{0x16, 0x1f, 0xff, 0xff},
+		{0x1f, 0xff, 0xff, 0xff},
+	};
+	static const u8 emp_low[4][4] = {
+		{0x00, 0x0d, 0x14, 0x1a},
+		{0x00, 0x0e, 0x15, 0xff},
+		{0x00, 0x0e, 0xff, 0xff},
+		{0x02, 0xff, 0xff, 0xff},
+	};
+
+	if (version < 0x10020003 || phy_version < 0x60000000 ||
+			phy_version >= 0x70000000 || v_level >= 4 || p_level >= 4 ||
+			!of_root || of_property_match_string(of_root, "model",
+			"Qualcomm Technologies, Inc. 8550 sheng") < 0)
+		return false;
+	*swing = high ? swing_high[v_level][p_level] : swing_low[v_level][p_level];
+	*pre_emp = high ? emp_high[v_level][p_level] : emp_low[v_level][p_level];
+	return true;
+}

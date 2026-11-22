@@ -1,0 +1,99 @@
+--- a/soc/drivers/usb/dwc3/dwc3-msm-core.c
++++ b/soc/drivers/usb/dwc3/dwc3-msm-core.c
+@@ -3905,6 +3905,37 @@
+ 	mdwc->has_orientation_gpio = true;
+ }
+ 
++/* The UCSI role callback does not carry cable polarity.  On sheng,
++ * obtain a fresh matched firmware reply before PHY init/resume.  symbol_get
++ * keeps the optional provider alive without a hard module-load dependency.
++ */
++extern int sheng_usb_get_cc_orientation(int *orientation);
++
++static int sheng_dwc3_cc_orientation(struct dwc3_msm *mdwc)
++{
++	int (*get_orientation)(int *);
++	int cc, ret;
++
++	if (!of_root || of_property_match_string(of_root, "model",
++			"Qualcomm Technologies, Inc. 8550 sheng") < 0)
++		return -ENODEV;
++	mdwc->typec_orientation = 0;
++	get_orientation = symbol_get(sheng_usb_get_cc_orientation);
++	if (!get_orientation)
++		return -ENODEV;
++	ret = get_orientation(&cc);
++	symbol_put(sheng_usb_get_cc_orientation);
++	if (ret) {
++		dev_warn_ratelimited(mdwc->dev,
++			"sheng: CC orientation unavailable: %d\n", ret);
++		return ret;
++	}
++	if (cc != 1 && cc != 2)
++		return -EPROTO;
++	dev_info_ratelimited(mdwc->dev, "sheng: firmware CC%d to SS PHY\n", cc);
++	return cc == 1 ? PHY_LANE_A : PHY_LANE_B;
++}
++
+ static void dwc3_set_ssphy_orientation_flag(struct dwc3_msm *mdwc)
+ {
+ 	union extcon_property_value val;
+@@ -3935,6 +3966,9 @@
+ 				orientation = val.intval ? PHY_LANE_B : PHY_LANE_A;
+ 		}
+ 	}
++
++	if (orientation < 0)
++		orientation = sheng_dwc3_cc_orientation(mdwc);
+ 
+ 	if (orientation < 0)
+ 		return;
+--- a/soc/drivers/power/supply/qti_battery_charger.c
++++ b/soc/drivers/power/supply/qti_battery_charger.c
+@@ -824,6 +824,7 @@
+ #include "sheng_keyboard_charger.h"
+ #include "sheng_keyboard_charger_api.h"
+ #include "sheng_qti_fg_api.h"
++#include "sheng_usb_cc_orientation.h"
+ #include "sheng_qti_irq_api.h"
+ 
+ static int read_property_id(struct battery_chg_dev *bcdev,
+--- /dev/null
++++ b/soc/drivers/power/supply/sheng_usb_cc_orientation.h
+@@ -0,0 +1,36 @@
++/* SPDX-License-Identifier: GPL-2.0-only */
++/* Included after sheng_qti_pogo_api.h in the sheng QTI charger driver. */
++int sheng_usb_get_cc_orientation(int *orientation);
++
++int sheng_usb_get_cc_orientation(int *orientation)
++{
++	struct sheng_pogo_request request = {
++		.opcode = SHENG_POGO_GET,
++		.property = XM_PROP_CC_ORIENTATION,
++	};
++	u32 value;
++	int ret;
++
++	if (!orientation)
++		return -EINVAL;
++	if (!of_root || of_property_match_string(of_root, "model",
++			"Qualcomm Technologies, Inc. 8550 sheng") < 0)
++		return -ENODEV;
++	/* This owner is published only for the verified sheng panel identity.
++	 * Removal takes the same lock before releasing the GLINK transport.
++	 */
++	mutex_lock(&sheng_keyboard_charger_lock);
++	ret = sheng_keyboard_bcdev ?
++		sheng_pogo_transfer(sheng_keyboard_bcdev, &request, 0, &value) :
++		-ENODEV;
++	if (!ret) {
++		/* Never reuse a cached pre-disconnect direction or guess CC2. */
++		if (value == 1 || value == 2)
++			*orientation = value;
++		else
++			ret = value == 0 ? -ENODATA : -EPROTO;
++	}
++	mutex_unlock(&sheng_keyboard_charger_lock);
++	return ret;
++}
++EXPORT_SYMBOL_GPL(sheng_usb_get_cc_orientation);

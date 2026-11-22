@@ -1,0 +1,49 @@
+/* SPDX-License-Identifier: GPL-2.0-only */
+/* A class directory alone predates publication of the firmware API owner. */
+static ssize_t sheng_usb_cc_owner_ready_show(const struct class *class,
+		const struct class_attribute *attr, char *buf)
+{
+	struct battery_chg_dev *bcdev = container_of(class,
+			struct battery_chg_dev, battery_class);
+	bool ready;
+
+	mutex_lock(&sheng_keyboard_charger_lock);
+	ready = sheng_keyboard_bcdev == bcdev &&
+		READ_ONCE(bcdev->initialized) &&
+		atomic_read(&bcdev->state) == PMIC_GLINK_STATE_UP;
+	mutex_unlock(&sheng_keyboard_charger_lock);
+	return sysfs_emit(buf, "%u\n", ready);
+}
+static CLASS_ATTR_RO(sheng_usb_cc_owner_ready);
+
+static ssize_t sheng_usb_cc_fresh_orientation_show(const struct class *class,
+		const struct class_attribute *attr, char *buf)
+{
+	int cc, ret;
+
+	/* Owner publication alone can precede a nonzero firmware polarity.
+	 * Use the same matched, non-cached request and lifetime lock as DWC3.
+	 */
+	ret = sheng_usb_get_cc_orientation(&cc);
+	if (ret)
+		return ret;
+	return sysfs_emit(buf, "%d\n", cc);
+}
+static CLASS_ATTR_RO(sheng_usb_cc_fresh_orientation);
+
+static int sheng_usb_cc_readiness_register(struct battery_chg_dev *bcdev)
+{
+	int ret;
+
+	if (!bcdev->sheng_has_pen)
+		return 0;
+	/* Existing class_unregister paths remove and drain this callback before
+	 * freeing the class/transport. Never register before the class exists.
+	 */
+	ret = class_create_file(&bcdev->battery_class,
+			&class_attr_sheng_usb_cc_owner_ready);
+	if (ret)
+		return ret;
+	return class_create_file(&bcdev->battery_class,
+			&class_attr_sheng_usb_cc_fresh_orientation);
+}

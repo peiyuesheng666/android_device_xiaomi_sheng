@@ -15,6 +15,7 @@ final class KeyboardProtocol {
     static final int AUTH_TOKEN = 0x33;
     static final int TOUCHPAD = 0x21;
     static final int POWER = 0x25;
+    private static final int BACKLIGHT = 0x23;
 
     private static byte[] packet(int report, int protocol, int target, int command, byte[] data) {
         byte[] packet = new byte[68];
@@ -48,6 +49,12 @@ final class KeyboardProtocol {
         return packet(0x4e, 0x31, KEYBOARD, command, new byte[]{(byte) (enabled ? 1 : 0)});
     }
 
+    /** Encodes the stock IIC brightness percentage, with zero meaning off. */
+    static byte[] backlight(int wireValue) {
+        if (wireValue < 0 || wireValue > 100) throw new IllegalArgumentException("brightness percentage");
+        return packet(0x4e, 0x31, KEYBOARD, BACKLIGHT, new byte[]{(byte) wireValue});
+    }
+
     static int keyboardType(byte[] reply) {
         if (!validReply(reply) || reply[1] != 0x30 || reply[2] != KEYBOARD
                 || reply[4] != VERSION || (reply[5] & 0xff) < 8) return -1;
@@ -55,6 +62,9 @@ final class KeyboardProtocol {
     }
 
     static boolean hasTouchpad(int type) { return type == 16 || type == 32 || type == 33; }
+
+    // Stock IIC FeatureSupport marks these types with the backlight bit 0x200.
+    static boolean hasBacklight(int type) { return type == 16 || type == 32 || type == 33; }
 
     static byte[] challenge(byte[] metadata, byte[] challenge) {
         if (metadata.length != 4 || challenge.length != 16) throw new IllegalArgumentException("auth size");

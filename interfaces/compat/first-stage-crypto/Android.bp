@@ -1,0 +1,32 @@
+// Same non-FIPS static source/default configuration as libcrypto_static.
+// Public library visibility is deliberately unchanged.
+build = ["sources.bp", "defaults.bp"]
+package {
+    default_applicable_licenses: ["sheng_first_stage_crypto_license"],
+}
+license {
+    name: "sheng_first_stage_crypto_license",
+    visibility: [":__subpackages__"],
+    license_kinds: [
+        "SPDX-license-identifier-Apache-2.0",
+        "SPDX-license-identifier-BSD",
+        "SPDX-license-identifier-ISC",
+        "SPDX-license-identifier-MIT",
+        "SPDX-license-identifier-OpenSSL",
+        "legacy_unencumbered",
+    ],
+    license_text: ["NOTICE"],
+}
+cc_library_static {
+    name: "libsheng_crypto_first_stage",
+    defaults: [
+        "sheng_first_stage_libcrypto_bcm_sources",
+        "sheng_first_stage_libcrypto_sources",
+        "sheng_first_stage_libcrypto_defaults",
+        "sheng_first_stage_boringssl_defaults",
+        "sheng_first_stage_boringssl_flags",
+    ],
+    host_supported: false,
+    compile_multilib: "first",
+    min_sdk_version: "29",
+}

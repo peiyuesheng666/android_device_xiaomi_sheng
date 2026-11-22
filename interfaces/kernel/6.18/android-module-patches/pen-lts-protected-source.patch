@@ -1,0 +1,26 @@
+--- a/scripts/apply-pen-stability.py
++++ b/scripts/apply-pen-stability.py
+@@ -13,8 +13,12 @@
+ patch = project / receipt['patch']
+ sha = lambda path: hashlib.sha256(path.read_bytes()).hexdigest()
+ assert sha(patch) == receipt['patch_sha256'], 'Pen patch hash mismatch'
++from android_lts_contract import android_lts_matches
++protected_before = {}
+ for name, expected in receipt['unchanged_files'].items():
+-    assert sha(root / name) == expected, 'Protected r87 source differs: ' + name
++    got = sha(root / name)
++    assert got == expected or android_lts_matches(name, got), 'Protected base source differs: ' + name
++    protected_before[name] = got
+ states = set()
+ for name, entry in receipt['files'].items():
+     path = root / name
+@@ -33,6 +37,6 @@
+     subprocess.run(['patch', '--batch', '--forward', '-p1', '-i', str(patch)], cwd=root, check=True)
+ for name, entry in receipt['files'].items():
+     assert sha(root / name) == entry['after'], name
+-for name, expected in receipt['unchanged_files'].items():
+-    assert sha(root / name) == expected, 'Protected r87 source changed: ' + name
+-print('Verified pen stability patch; panic, reboot, traps and 32 ms filter sources unchanged', flush=True)
++for name, expected in protected_before.items():
++    assert sha(root / name) == expected, 'Protected base source changed: ' + name
++print('Verified pen stability patch; selected base panic, reboot, traps and 32 ms filter sources unchanged', flush=True)

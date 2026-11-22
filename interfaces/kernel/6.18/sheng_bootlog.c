@@ -6,6 +6,7 @@
 #include <linux/atomic.h>
 #include <linux/crc32.h>
 #include <linux/cpumask.h>
+#include <linux/capability.h>
 #include <linux/device.h>
 #include <linux/delay.h>
 #include <linux/err.h>
@@ -13,6 +14,8 @@
 #include <linux/fs.h>
 #include <linux/hrtimer.h>
 #include <linux/init.h>
+#include <linux/io.h>
+#include <linux/of_address.h>
 #include <linux/kernel.h>
 #include <linux/kmsg_dump.h>
 #include <linux/ktime.h>
@@ -28,12 +31,14 @@
 #include <linux/sheng_bootlog.h>
 #include <linux/smp.h>
 #include <linux/string.h>
+#include <linux/slab.h>
 #include <linux/vmalloc.h>
 #include <linux/workqueue.h>
 
 #define PART_BYTES (300ULL * 1024 * 1024)
 #define LOG_OFFSET (288ULL * 1024 * 1024)
-#define SLOT_BYTES (1024U * 1024)
+#define SLOT_BYTES (5U * 1024 * 1024)
+#define LEGACY_SLOT_BYTES (1024U * 1024)
 #define LIFE_MS 120000
 #define STEADY_INTERVAL_MS 10000
 #define EARLY_TRACE_BYTES (128U * 1024)
@@ -76,12 +81,36 @@ static size_t early_trace_bytes;
 static u64 early_next_seq;
 static u64 run_id, sequence;
 static unsigned long began;
-static void save_snapshot(struct work_struct *work);
 static void save_fault_snapshot(struct work_struct *work);
-static DECLARE_DELAYED_WORK(snapshot_work, save_snapshot);
 static DECLARE_WORK(fault_work, save_fault_snapshot);
 static DEFINE_MUTEX(snapshot_lock);
 static atomic_t fault_pause_used = ATOMIC_INIT(0);
+static bool boot_complete;
+static void capture_snapshot(void);
+
+/* One-way latch: userspace cannot restart recording after Android boots. */
+static int finish_boot(const char *value, const struct kernel_param *param)
+{
+    bool done;
+    int error = kstrtobool(value, &done);
+
+    if (error)
+        return error;
+    if (!done)
+        return -EINVAL;
+    mutex_lock(&snapshot_lock);
+    if (!boot_complete && enabled && snapshot)
+        capture_snapshot();
+    WRITE_ONCE(boot_complete, true);
+    mutex_unlock(&snapshot_lock);
+    return 0;
+}
+
+static const struct kernel_param_ops boot_complete_ops = {
+    .set = finish_boot,
+    .get = param_get_bool,
+};
+module_param_cb(boot_complete, &boot_complete_ops, &boot_complete, 0600);
 
 bool sheng_bootlog_test_mode(void)
 {
@@ -131,7 +160,8 @@ void sheng_bootlog_fault_pause(void)
 {
     unsigned int cpu;
 
-    if (!READ_ONCE(destination) || atomic_cmpxchg(&fault_pause_used, 0, 1))
+    if (READ_ONCE(boot_complete) || !READ_ONCE(destination) ||
+        atomic_cmpxchg(&fault_pause_used, 0, 1))
         return;
     cpu = cpumask_any_but(cpu_online_mask, raw_smp_processor_id());
     if (cpu >= nr_cpu_ids)
@@ -174,7 +204,7 @@ static void open_destination(void)
         return;
     }
     destination = file;
-    pr_notice("sheng_bootlog: rawdump %u:%u, bounded region 288..290 MiB\n",
+    pr_notice("sheng_bootlog: rawdump %u:%u, bounded region 288..298 MiB\n",
               MAJOR(bdev->bd_dev), MINOR(bdev->bd_dev));
 }
 
@@ -200,7 +230,9 @@ static void capture_early_trace(void)
             strstr(line, "k618_load:") || strstr(line, "init first stage") ||
             strstr(line, "init second stage") || strstr(line, "Wait for '") ||
             strstr(line, "Direct firmware load") ||
-            strstr(line, "SHENG_EARLY_TRACE_TEST")) {
+            strstr(line, "SHENG_EARLY_TRACE_TEST") || strstr(line, "KernelSU") ||
+            strstr(line, "kernelsu") || strstr(line, "ksuinit") ||
+            strstr(line, "ksu:")) {
             bytes = min(bytes, sizeof(line) - 1);
             if (bytes > EARLY_TRACE_BYTES - early_trace_bytes)
                 break;
@@ -221,6 +253,8 @@ static void capture_snapshot(void)
     ssize_t written;
     int error;
 
+    if (READ_ONCE(boot_complete))
+        return;
     capture_early_trace();
     if (!destination)
         open_destination();
@@ -248,7 +282,7 @@ static void capture_snapshot(void)
     total = ALIGN(sizeof(*header) + text_bytes + sizeof(*end), 4096);
     header = (struct bootlog_header *)snapshot;
     memcpy(header->magic, "SH618LOG", 8);
-    header->version = cpu_to_le32(1);
+    header->version = cpu_to_le32(2);
     header->header_bytes = cpu_to_le32(sizeof(*header));
     header->run = cpu_to_le64(run_id);
     header->sequence = cpu_to_le64(++sequence);
@@ -360,22 +394,74 @@ static enum hrtimer_restart test_restart_fallback(struct hrtimer *timer)
     return HRTIMER_NORESTART;
 }
 
-static void save_snapshot(struct work_struct *work)
+void sheng_bootlog_before_restart(const char *cmd)
 {
-    bool fast;
-    unsigned int interval;
-
-    mutex_lock(&snapshot_lock);
-    capture_snapshot();
-    fast = time_before(jiffies, began + msecs_to_jiffies(
-            test_timeout ? (test_timeout + 20) * 1000 : LIFE_MS));
-    /* Keep the bounded slots and exception writer available after boot.
-     * Slow down steady-state I/O instead of losing every late fault.
-     */
-    interval = fast ? (destination ? 250 : 100) : STEADY_INTERVAL_MS;
-    queue_delayed_work(system_unbound_wq, &snapshot_work, msecs_to_jiffies(interval));
-    mutex_unlock(&snapshot_lock);
+    if (!enabled || !snapshot || READ_ONCE(boot_complete))
+        return;
+    pr_emerg("sheng_bootlog: RESTART_REQUEST pid=%d comm=%s original_cmd=%s\n",
+             task_pid_nr(current), current->comm, cmd ? cmd : "(null)");
+    dump_stack();
+    if (mutex_trylock(&snapshot_lock)) {
+        capture_snapshot();
+        mutex_unlock(&snapshot_lock);
+    } else {
+        pr_emerg("sheng_bootlog: final snapshot busy; recorder may be in I/O\n");
+    }
 }
+
+static int snapshot_thread(void *unused)
+{
+    while (!kthread_should_stop() && !READ_ONCE(boot_complete)) {
+        bool fast;
+        unsigned int interval;
+
+        mutex_lock(&snapshot_lock);
+        capture_snapshot();
+        fast = time_before(jiffies, began + msecs_to_jiffies(
+                test_timeout ? (test_timeout + 20) * 1000 : LIFE_MS));
+        interval = fast ? (destination ? 250 : 100) : STEADY_INTERVAL_MS;
+        mutex_unlock(&snapshot_lock);
+        msleep(interval);
+    }
+    return 0;
+}
+
+/* Same DT resource and bootloader magic as this device's shipping 5.15
+ * msm-poweroff.c. Arm before external PMIC modules can fail to load. Only
+ * explicit diagnostic test mode uses this and requests a warm reset so the
+ * bootloader can read IMEM. No raw physical address or retry-count edits.
+ */
+static int __init sheng_bootlog_arm_imem(void)
+{
+    struct device_node *node;
+    struct resource resource;
+    void __iomem *reason;
+    bool verified;
+
+    if (!sheng_bootlog_test_mode())
+        return 0;
+    node = of_find_compatible_node(NULL, NULL, "qcom,msm-imem-restart_reason");
+    if (!node)
+        return -ENODEV;
+    if (of_address_to_resource(node, 0, &resource) || resource_size(&resource) != 4) {
+        of_node_put(node);
+        return -EINVAL;
+    }
+    reason = of_iomap(node, 0);
+    of_node_put(node);
+    if (!reason)
+        return -ENOMEM;
+    writel_relaxed(0x77665500, reason);
+    wmb();
+    verified = readl_relaxed(reason) == 0x77665500;
+    iounmap(reason);
+    if (!verified)
+        return -EIO;
+    reboot_mode = REBOOT_WARM;
+    pr_notice("sheng_bootlog: TEST_ONLY early IMEM bootloader reason armed; warm reset selected\n");
+    return 0;
+}
+arch_initcall(sheng_bootlog_arm_imem);
 
 static int __init sheng_bootlog_init(void)
 {
@@ -399,7 +485,12 @@ static int __init sheng_bootlog_init(void)
     run_id = get_random_u64();
     began = jiffies;
     pr_notice("sheng_bootlog: built-in capture armed, run %016llx; waiting for rawdump\n", run_id);
-    queue_delayed_work(system_unbound_wq, &snapshot_work, msecs_to_jiffies(100));
+    {
+        struct task_struct *writer = kthread_run(snapshot_thread, NULL, "sheng-log");
+
+        if (IS_ERR(writer))
+            return PTR_ERR(writer);
+    }
     if (test_timeout) {
         struct task_struct *reset;
 

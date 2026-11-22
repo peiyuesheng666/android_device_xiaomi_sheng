@@ -1,0 +1,29 @@
+{
+  "kind": "reviewed-stock-sheng-mipp-profile",
+  "device": "sheng",
+  "stock_apk": {
+    "path": "/root/sheng-lineage/firmware-dump/partitions/system_ext/app/BluetoothExtension/BluetoothExtension.apk",
+    "sha256": "804386e7631baa208292507d72b352f3b86b7c327e2829827bdbb3e6cff9cfc3"
+  },
+  "stock_overlay": {
+    "path": "/root/sheng-lineage/firmware-dump/partitions/product/overlay/MiuiBtRRODeviceConfigOverlay.apk",
+    "sha256": "a8ad37f6fc070b322968e3abe992c60d2f59658c59a20ef6bcdf8dac06c536f1",
+    "time_stamp": 1692773138,
+    "resource_evidence": [
+      "    resource 0x7f010000 array/TIME_STAMP",
+      "      () (array) size=1",
+      "        [\"1692773138\"]"
+    ]
+  },
+  "reviewed_helper_class": "com.android.bluetooth.ble.h",
+  "default_branch_reason": "TIME_STAMP differs from 1729760400, 1733291853, 1733283422",
+  "parameter_total_bytes": 32,
+  "basic_hex": "a01e3e171a041a",
+  "sequence_hex": "00000d680000052800000d68",
+  "footer_hex": "f401",
+  "frequency_index0_hex": "9b6fef43",
+  "voltage_value": 40,
+  "source_modified": false,
+  "firmware_update_performed": false,
+  "writing_verified": false
+}

@@ -2,6 +2,19 @@
 ro.product.model=24018RPACC
 ro.product.marketname=Xiaomi Pad 6S Pro 12.4
 
+# First-boot time zone; persisted user selections take precedence on later boots.
+persist.sys.timezone=Asia/Shanghai
+
+# The bundled tablet Pixel Launcher embeds private framework resource IDs from
+# another framework revision. Its desktop eligibility ID resolves to
+# config_hideNavBarForKeyboard here. Use the supported eligibility override;
+# sheng_desktop_enabled still controls whether the internal display uses windows.
+persist.wm.debug.desktop_mode_enforce_device_restrictions=false
+
+# Keep block-backed APEX mounts while sheng uses overlayfs on /product.
+# The file-backed probe on /system does not cover APEX files on that overlay.
+apexd.config.erofs_file_backed_mount=false
+
 # CameraX
 ro.camerax.extensions.enabled=true
 

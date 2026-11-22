@@ -74,6 +74,9 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <cerrno>
+#include <cstdlib>
+#include <limits>
 #include <string>
 #include <vector>
 #include <map>
@@ -171,29 +174,50 @@ DisplayError HWTVDRM::SetDisplayAttributes(uint32_t index) {
 }
 
 DisplayError HWTVDRM::GetConfigIndex(char *mode, uint32_t *index) {
-  uint32_t width = 0, height = 0, fps = 0;
-  std::string str(mode);
+  if (!mode || !index) {
+    return kErrorParameters;
+  }
 
-  // mode should be in width:height:fps:format
-  // TODO(user): it is not fully robust, User needs to provide in above format only
-  if (str.length() != 0) {
-    width = UINT32(stoi(str));
-    height = UINT32(stoi(str.substr(str.find(':') + 1)));
-    std::string str3 = str.substr(str.find(':') + 1);
-    fps = UINT32(stoi(str3.substr(str3.find(':')  + 1)));
-    std::string str4 = str3.substr(str3.find(':') + 1);
+  // Accept width:height:fps[:format] without throwing in the composer process.
+  // The optional format is retained for compatibility; mode selection uses timing.
+  uint32_t timing[3] = {};
+  const char *cursor = mode;
+  for (size_t field = 0; field < 4; field++) {
+    if (*cursor < '0' || *cursor > '9') {
+      return kErrorParameters;
+    }
+    char *end = nullptr;
+    errno = 0;
+    unsigned long value = std::strtoul(cursor, &end, 10);
+    if (errno == ERANGE || value > std::numeric_limits<uint32_t>::max() ||
+        (field < 3 && value == 0)) {
+      return kErrorParameters;
+    }
+    if (field < 3) {
+      timing[field] = static_cast<uint32_t>(value);
+    }
+    if (field < 2) {
+      if (*end != ':') {
+        return kErrorParameters;
+      }
+    } else if (*end == '\0') {
+      break;
+    } else if (field == 3 || *end != ':') {
+      return kErrorParameters;
+    }
+    cursor = end + 1;
   }
 
   for (size_t idex = 0; idex < connector_info_.modes.size(); idex ++) {
-    if ((height == connector_info_.modes[idex].mode.vdisplay) &&
-        (width == connector_info_.modes[idex].mode.hdisplay) &&
-        (fps == connector_info_.modes[idex].mode.vrefresh)) {
+    if ((timing[1] == connector_info_.modes[idex].mode.vdisplay) &&
+        (timing[0] == connector_info_.modes[idex].mode.hdisplay) &&
+        (timing[2] == connector_info_.modes[idex].mode.vrefresh)) {
         *index = UINT32(idex);
-        break;
+        return kErrorNone;
     }
   }
 
-  return kErrorNone;
+  return kErrorNotSupported;
 }
 
 DisplayError HWTVDRM::Flush(HWLayersInfo *hw_layers_info) {

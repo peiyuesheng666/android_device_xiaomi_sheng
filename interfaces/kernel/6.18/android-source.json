@@ -20,7 +20,7 @@
   "kernel_stage": "buildkernel-lts.sh; release mode; CONFIG_INITRAMFS_SOURCE=\"\"",
   "module_stage": "buildmodules-lts.sh; rebuild and qualify all external modules against this kernel",
   "android_config_fragment": "interfaces/kernel/6.18/android.config",
-  "android_config_runtime_validated": true,
+  "android_config_runtime_validated": false,
   "android_source_patches": [
     "interfaces/kernel/6.18/patches/0001-gsi-use-core-rndis.patch",
     "interfaces/kernel/6.18/patches/0002-android-module-providers.patch",
@@ -59,7 +59,9 @@
     "interfaces/kernel/6.18/patches/0034-hall-direct-lid-wakeup.patch",
     "interfaces/kernel/6.18/patches/0035-lts-smmu-iotlb-gather.patch",
     "interfaces/kernel/6.18/patches/0036-keyboard-cached-connection-state.patch",
-    "interfaces/kernel/6.18/patches/0037-keyboard-timeout-firmware-recovery.patch"
+    "interfaces/kernel/6.18/patches/0037-keyboard-timeout-firmware-recovery.patch",
+    "interfaces/kernel/6.18/patches/0038-keyboard-panel-state.patch",
+    "interfaces/kernel/6.18/patches/0039-keyboard-boot-readiness.patch"
   ],
   "keyboard_recovery_runtime_validation": {
     "passed": true,
@@ -120,7 +122,7 @@
   "required_kernel_command_line": [
     "sched_proxy_exec=0"
   ],
-  "integration_scope": "Selected Android official 6.18 LTS with restored morning hardware ports, verified DSI clock export, external modules, and release diagnostics disabled. PixelOS and LineageOS share device sources; runtime validation is per ROM.",
+  "integration_scope": "Selected Android official 6.18 LTS with native-layout source-matched root integration and boot-only pystore. Current pystore changes require fresh matched kernel/module build, AVB qualification and runtime validation; historical ROM validation does not qualify these changes.",
   "boot_image_kernel_compression": "gzip, matching the selected source pack-boot.sh",
   "android_lts": {
     "repository": "https://android.googlesource.com/kernel/common",
@@ -132,5 +134,12 @@
     "apply_tool": "git apply (upstream overlay includes the pinned AFDO binary profile)",
     "adaptation_contract": "provenance/android-lts-adaptation.json"
   },
-  "kernel_release": "6.18.39-android17-0-peiyuesheng-sheng-kernel"
+  "kernel_release": "6.18.39-android17-0-peiyuesheng-sheng-kernel",
+  "pystore": {
+    "slot_bytes": 5242880,
+    "slots": 2,
+    "stop_on_android_boot_completed": true,
+    "current_linked_build_verified": false,
+    "runtime_verified": false
+  }
 }

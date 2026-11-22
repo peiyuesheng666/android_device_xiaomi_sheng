@@ -1,6 +1,6 @@
 # Device tree for Xiaomi Pad 6S Pro 12.4 (`sheng`)
 
-小米平板 6S Pro 12.4 设备树，支持 PixelOS / LineageOS
+小米平板 6S Pro 12.4 设备树，支持 PixelOS / LineageOS 产品入口。
 
 ![Xiaomi Pad 6S Pro 12.4](https://i02.appmifile.com/mi-com-product/fly-birds/xiaomi-pad-6s-pro-124/pc/e22707982190cc2587fde3afa3d54567.jpg)
 
@@ -26,10 +26,13 @@
 | 重量 | 590 g |
 | 出厂系统 | Xiaomi HyperOS，基于 Android 14 |
 
+规格参考[小米官方参数](https://www.mi.com/global/product/xiaomi-pad-6s-pro-124/specs/)。
+表中为硬件规格，不代表第三方 ROM 已实现全部原厂功能。
+
 ## 源码布局
 
 设备树放在 `device/xiaomi/sheng`，厂商文件放在 `vendor/xiaomi/sheng`。
 当前内核为 Android 17 Linux 6.18.39，源码项目放在 `kernel/xiaomi/sheng-build`；
 `kernel/xiaomi/sheng` 链接到该项目的 `sources/k618/ws/common`。
 
-完整构建步骤见 [BUILD.md](BUILD.md)。
+完整构建步骤见交付包根目录的 `BUILD.md`。

@@ -1,0 +1,17 @@
+--- a/frameworks/base/libs/WindowManager/Shell/src/com/android/wm/shell/desktopmode/desktopfirst/DesktopDisplayModeController.kt
++++ b/frameworks/base/libs/WindowManager/Shell/src/com/android/wm/shell/desktopmode/desktopfirst/DesktopDisplayModeController.kt
+@@ -239,6 +239,14 @@
+     // Do not directly use this method to check the state of desktop-first mode. Use
+     // [isDisplayDesktopFirst] instead.
+     private fun canDesktopFirstModeBeEnabledOnDefaultDisplay(): Boolean {
++        // Input devices are re-announced on wake. The tablet's explicit choice
++        // must take priority over automatic keyboard/touchpad and dock policy.
++        if (android.os.Build.DEVICE == "sheng") {
++            return Settings.Global.getInt(
++                context.contentResolver, "sheng_desktop_enabled", 0
++            ) == 1 && isDefaultDisplayDesktopEligible()
++        }
++
+         if (FORCE_DESKTOP_FIRST_ON_DEFAULT_DISPLAY) {
+             logW(
+                 "FORCE_DESKTOP_FIRST_ON_DEFAULT_DISPLAY is enabled. Forcing desktop-first for " +

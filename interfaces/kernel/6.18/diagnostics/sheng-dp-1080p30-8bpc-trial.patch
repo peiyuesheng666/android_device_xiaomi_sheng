@@ -1,0 +1,36 @@
+--- a/msm/dp/dp_panel.c
++++ b/msm/dp/dp_panel.c
+@@ -2036,6 +2036,15 @@
+ 	dp_mode->timing.bpp =
+ 		dp_panel->connector->display_info.bpc * num_components;
+ 	if (!dp_mode->timing.bpp)
++		dp_mode->timing.bpp = default_bpp;
++
++	/* Diagnostic only: isolate RGB depth at the same 1080p30 timing. */
++	if (!dsc_en && !dp_panel->video_test &&
++	    !drm_mode_is_420_only(&dp_panel->connector->display_info, drm_mode) &&
++	    dp_mode->timing.h_active == 1920 &&
++	    dp_mode->timing.v_active == 1080 &&
++	    dp_mode->timing.pixel_clk_khz == 74250 &&
++	    dp_mode->timing.refresh_rate == 30 && dp_mode->timing.bpp == 30)
+ 		dp_mode->timing.bpp = default_bpp;
+ 
+ 	dp_mode->timing.widebus_en = dp_panel->widebus_en;
+--- a/msm/dp/dp_display.c
++++ b/msm/dp/dp_display.c
+@@ -2525,6 +2525,15 @@
+ 	mode->timing.bpp =
+ 		dp_panel->connector->display_info.bpc * num_components;
+ 	if (!mode->timing.bpp)
++		mode->timing.bpp = default_bpp;
++
++	/* Diagnostic only: isolate RGB depth at the same 1080p30 timing. */
++	if (!dsc_en && !dp_panel->video_test &&
++	    mode->output_format == DP_OUTPUT_FORMAT_RGB &&
++	    mode->timing.h_active == 1920 &&
++	    mode->timing.v_active == 1080 &&
++	    mode->timing.pixel_clk_khz == 74250 &&
++	    mode->timing.refresh_rate == 30 && mode->timing.bpp == 30)
+ 		mode->timing.bpp = default_bpp;
+ 
+ 	mode->timing.bpp = dp->panel->get_mode_bpp(dp->panel,

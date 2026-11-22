@@ -1,0 +1,11 @@
+--- a/soc/drivers/power/supply/qti_battery_charger.c
++++ b/soc/drivers/power/supply/qti_battery_charger.c
+@@ -2171,7 +2171,7 @@
+ 		return -EINVAL;
+ 	}
+ 
+-	return 0;
++	return rc;
+ }
+ 
+ static int battery_psy_prop_is_writeable(struct power_supply *psy,

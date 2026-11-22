@@ -8,7 +8,6 @@ cc_binary {
         "service.cpp",
         "HalProxy.cpp",
         "HalProxyCallback.cpp",
-        "ShengSensorFrame.cpp",
     ],
     header_libs: [
         "android.hardware.sensors@2.X-multihal.header",
@@ -31,7 +30,6 @@ cc_binary {
         "libhidlbase",
     ],
     static_libs: [
-        "libjsoncpp",
         "libaidlcommonsupport",
         "android.hardware.sensors@1.0-convert",
         "android.hardware.sensors@2.X-multihal",

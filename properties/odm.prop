@@ -28,7 +28,8 @@ ro.camerax.extensions.enabled=true
 # Display
 vendor.display.idle_time=0
 vendor.display.idle_time_inactive=0
-debug.sf.set_idle_timer_ms=1100
+# External DP modesets are non-seamless: do not downshift on UI inactivity.
+debug.sf.set_idle_timer_ms=0
 persist.vendor.dc_backlight.enable=false
 persist.vendor.dc_backlight.threshold=0
 ro.vendor.all_modes.colorpick_adjust=true

@@ -1,0 +1,12 @@
+        <service
+            android:name="com.android.settings.sheng.DesktopModeSettings$DesktopTileService"
+            android:label="@string/sheng_desktop_title"
+            android:icon="@drawable/tile_icon_desktop_mode"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+            <meta-data android:name="android.service.quicksettings.TOGGLEABLE_TILE"
+                android:value="true" />
+        </service>

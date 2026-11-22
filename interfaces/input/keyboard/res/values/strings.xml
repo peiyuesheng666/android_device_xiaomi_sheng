@@ -1,0 +1,9 @@
+<resources>
+    <string name="sheng_keyboard_backlight_title">Keyboard backlight</string>
+    <string name="sheng_keyboard_backlight_value">Brightness: %1$d%%</string>
+    <string name="sheng_keyboard_backlight_off">Brightness: Off</string>
+    <string name="sheng_keyboard_backlight_hint">Applies to supported Xiaomi keyboards when connected and awake.</string>
+    <string name="sheng_keyboard_backlight_unset">Brightness: Not set</string>
+    <string name="sheng_keyboard_backlight_failed">Could not save keyboard brightness.</string>
+</resources>
+

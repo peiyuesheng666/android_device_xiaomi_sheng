@@ -1,0 +1,9 @@
+{
+  "scope": "owned pen and keyboard source only; no deletion or public repository changes",
+  "files": 84,
+  "synced": [
+    "interfaces/input/keyboard/tests/KeyboardStartupWakeTest.java"
+  ],
+  "full_product_built": false,
+  "temporary_keyboard_trial_user_accepted": true
+}

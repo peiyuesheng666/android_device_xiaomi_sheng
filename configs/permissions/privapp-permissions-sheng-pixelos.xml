@@ -8,4 +8,7 @@
         <permission name="android.permission.QUERY_USERS" />
         <permission name="android.permission.START_FOREGROUND_SERVICES_FROM_BACKGROUND" />
     </privapp-permissions>
+    <privapp-permissions package="org.lineageos.sheng.keyboard">
+        <permission name="android.permission.WRITE_SECURE_SETTINGS" />
+    </privapp-permissions>
 </permissions>

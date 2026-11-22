@@ -1,0 +1,29 @@
+--- a/fs/namespace.c
++++ b/fs/namespace.c
+@@ -2832,9 +2832,23 @@
+ 		if (!shorter && is_mnt_ns_file(top->mnt.mnt_root))
+ 			shorter = top->mnt_mp;
+ 	}
+-	err = get_mountpoint(top->mnt.mnt_root, &root);
+-	if (err)
+-		return err;
++	/*
++	 * A source-root mountpoint is only needed if existing destination mounts
++	 * can be tucked above it.  Allocating it unconditionally also rejects
++	 * moving an otherwise valid bind whose backing inode has been unlinked.
++	 * namespace_sem is held, so the destination cannot change between this
++	 * check and attachment. Shared destinations still need preallocation for
++	 * propagation, and occupied destinations retain all existing checks.
++	 */
++	bool need_root_mountpoint;
++	scoped_guard(mount_locked_reader)
++		need_root_mountpoint = IS_MNT_SHARED(dest_mnt) ||
++			__lookup_mnt(&dest_mnt->mnt, dest_mp->m_dentry);
++	if (need_root_mountpoint) {
++		err = get_mountpoint(top->mnt.mnt_root, &root);
++		if (err)
++			return err;
++	}
+ 
+ 	/* Is there space to add these mounts to the mount namespace? */
+ 	if (!moving) {

@@ -1,0 +1,11 @@
+Connected=true
+id=14 name=Xiaomi Consumer keyboardType=1 enabled=true
+id=13 name=Xiaomi Touch keyboardType=0 enabled=true
+id=12 name=Xiaomi Mouse keyboardType=0 enabled=true
+id=11 name=Xiaomi Keyboard keyboardType=2 enabled=true
+Connected=true
+id=14 name=Xiaomi Consumer keyboardType=1 enabled=true
+id=13 name=Xiaomi Touch keyboardType=0 enabled=true
+id=12 name=Xiaomi Mouse keyboardType=0 enabled=true
+id=11 name=Xiaomi Keyboard keyboardType=2 enabled=true
+New 120s window: 2026-11-07T13:04:42.2258227+08:00

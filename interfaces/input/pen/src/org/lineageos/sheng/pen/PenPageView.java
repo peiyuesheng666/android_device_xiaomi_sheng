@@ -53,17 +53,20 @@ final class PenPageView extends ScrollView {
     private final boolean dark;
     private final int ink, muted, surface, tint, accent;
     private boolean wide;
+    private final java.util.ArrayList<View> penSections = new java.util.ArrayList<>();
+    private KeyboardPageView keyboardPage;
+    private TextView penTab, keyboardTab;
 
     PenPageView(Activity context) {
         super(context);
         dark = (getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK)
                 == Configuration.UI_MODE_NIGHT_YES;
-        ink = dark ? 0xFFF0F2F8 : 0xFF202A3C;
-        muted = dark ? 0xFFADB8CA : 0xFF657187;
-        surface = dark ? 0xFF1C2430 : 0xFFFFFFFF;
-        tint = dark ? 0xFF282E46 : 0xFFEBEEFF;
-        accent = dark ? 0xFFBCC7FF : 0xFF4F61B8;
-        int background = dark ? 0xFF111721 : 0xFFF4F6FA;
+        ink = getResources().getColor(dark ? android.R.color.system_neutral1_50 : android.R.color.system_neutral1_900, context.getTheme());
+        muted = getResources().getColor(dark ? android.R.color.system_neutral2_200 : android.R.color.system_neutral2_700, context.getTheme());
+        surface = getResources().getColor(dark ? android.R.color.system_neutral1_900 : android.R.color.system_neutral1_10, context.getTheme());
+        tint = getResources().getColor(dark ? android.R.color.system_accent1_800 : android.R.color.system_accent1_100, context.getTheme());
+        accent = getResources().getColor(dark ? android.R.color.system_accent1_200 : android.R.color.system_accent1_600, context.getTheme());
+        int background = getResources().getColor(dark ? android.R.color.system_neutral1_1000 : android.R.color.system_neutral1_50, context.getTheme());
         setBackgroundColor(background); setFillViewport(true); setClipToPadding(false);
         setVerticalScrollBarEnabled(false);
         FrameLayout frame = new FrameLayout(context);
@@ -81,9 +84,25 @@ final class PenPageView extends ScrollView {
         back.setContentDescription(getResources().getString(R.string.back));
         back.setBackground(buttonBackground(surface)); back.setOnClickListener(v -> context.finish());
         toolbar.addView(back, new LinearLayout.LayoutParams(dp(48), dp(48)));
-        TextView title = text(getResources().getString(R.string.app_name), 26, ink); title.setPadding(dp(16), 0, 0, 0);
+        TextView title = text(getResources().getString(R.string.accessories_title), 26, ink); title.setPadding(dp(16), 0, 0, 0);
         title.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
-        toolbar.addView(title); content.addView(toolbar);
+        toolbar.addView(title, new LinearLayout.LayoutParams(0, -2, 1)); content.addView(toolbar);
+        LinearLayout tabs = new LinearLayout(context);
+        tabs.setGravity(Gravity.CENTER_HORIZONTAL);
+        tabs.setPadding(0, dp(18), 0, dp(6));
+        penTab = text(getResources().getString(R.string.accessories_pen), 15, ink);
+        keyboardTab = text(getResources().getString(R.string.accessories_keyboard), 15, ink);
+        for (TextView tab : new TextView[]{penTab, keyboardTab}) {
+            tab.setGravity(Gravity.CENTER); tab.setFocusable(true); tab.setMinimumHeight(dp(48));
+            tab.setPadding(dp(24), 0, dp(24), 0);
+            LinearLayout.LayoutParams tabParams = new LinearLayout.LayoutParams(dp(200), dp(48));
+            tabParams.setMarginStart(dp(6)); tabParams.setMarginEnd(dp(6));
+            tabs.addView(tab, tabParams);
+        }
+        penTab.setOnClickListener(v -> selectKeyboard(false));
+        keyboardTab.setOnClickListener(v -> selectKeyboard(true));
+        content.addView(tabs);
+        final int penStart = content.getChildCount();
         TextView subtitle = text(getResources().getString(R.string.page_subtitle), 14, muted);
         subtitle.setPadding(0, dp(18), 0, dp(22)); content.addView(subtitle);
 
@@ -109,7 +128,7 @@ final class PenPageView extends ScrollView {
         percentage.setSingleLine(true);
         percentage.setPadding(0, dp(14), 0, dp(8));
         batteryRow.addView(percentage, new LinearLayout.LayoutParams(0, -2, 1));
-        wave = new WavyChargeView(context, accent, dark ? 0xFF424B60 : 0xFFD8DFEC);
+        wave = new WavyChargeView(context, accent, tint);
         battery = new Field(percentage, () -> {
             String value = percentage.getText().toString();
             try { batteryLevel = value.endsWith("%") ? Integer.parseInt(value.substring(0, value.length() - 1)) : -1; }
@@ -144,7 +163,23 @@ final class PenPageView extends ScrollView {
         actions.addView(manage, first); actions.addView(refresh, new LinearLayout.LayoutParams(0, -2, 1));
         LinearLayout.LayoutParams actionParams = new LinearLayout.LayoutParams(-1, -2); actionParams.topMargin = dp(22);
         content.addView(actions, actionParams);
+        for (int i = penStart; i < content.getChildCount(); i++) penSections.add(content.getChildAt(i));
+        keyboardPage = new KeyboardPageView(context, surface, ink, muted, tint, accent);
+        content.addView(keyboardPage, new LinearLayout.LayoutParams(-1, -2));
+        selectKeyboard(false);
         layoutOverview(false);
+    }
+
+    private void selectKeyboard(boolean keyboard) {
+        for (View section : penSections) section.setVisibility(keyboard ? GONE : VISIBLE);
+        keyboardPage.setVisibility(keyboard ? VISIBLE : GONE);
+        penTab.setSelected(!keyboard); keyboardTab.setSelected(keyboard);
+        penTab.setBackground(buttonBackground(keyboard ? surface : tint));
+        keyboardTab.setBackground(buttonBackground(keyboard ? tint : surface));
+        penTab.setTextColor(keyboard ? muted : accent);
+        keyboardTab.setTextColor(keyboard ? accent : muted);
+        if (keyboard) keyboardPage.refresh();
+        smoothScrollTo(0, 0);
     }
 
     void setActions(Runnable bluetooth, Runnable reload) {

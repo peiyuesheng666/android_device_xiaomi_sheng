@@ -1,0 +1,104 @@
+--- a/soc/drivers/usb/phy/phy-msm-ssusb-qmp.c
++++ b/soc/drivers/usb/phy/phy-msm-ssusb-qmp.c
+@@ -379,22 +379,41 @@
+ 	return rc < 0 ? rc : 0;
+ }
+ 
+-static int configure_phy_regs(struct usb_phy *uphy,
+-				const struct qmp_reg_val *reg)
++static int configure_phy_regs(struct usb_phy *uphy)
+ {
+ 	struct msm_ssphy_qmp *phy = container_of(uphy, struct msm_ssphy_qmp,
+ 					phy);
+-	int i;
+-
+-	if (!reg) {
+-		dev_err(uphy->dev, "NULL PHY configuration\n");
++	struct platform_device *pdev = to_platform_device(uphy->dev);
++	const struct resource *res;
++	const __be32 *cells;
++	resource_size_t last_offset;
++	int len, i;
++
++	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "qmp_phy_base");
++	if (!res || resource_size(res) < sizeof(u32))
+ 		return -EINVAL;
+-	}
+-
+-	for (i = 0; i < phy->init_seq_len/2; i++) {
+-		writel_relaxed(reg->val, phy->base + reg->offset);
+-		reg++;
+-	}
++	last_offset = resource_size(res) - sizeof(u32);
++	cells = of_get_property(uphy->dev->of_node, "qcom,qmp-phy-init-seq", &len);
++	if (!cells || len <= 0 || len % (2 * sizeof(*cells))) {
++		dev_err(uphy->dev, "invalid QMP PHY init property\n");
++		return -EINVAL;
++	}
++	len /= sizeof(*cells);
++
++	/* Validate the whole OF table before performing any write. */
++	for (i = 0; i < len; i += 2) {
++		u32 offset = be32_to_cpup(&cells[i]);
++
++		if (!IS_ALIGNED(offset, sizeof(u32)) || offset > last_offset) {
++			dev_err(uphy->dev, "invalid QMP PHY offset %#x at pair %d\n",
++				offset, i / 2);
++			return -EINVAL;
++		}
++	}
++	dev_info_once(uphy->dev, "validated %d QMP PHY init pairs\n", len / 2);
++	for (i = 0; i < len; i += 2)
++		writel_relaxed(be32_to_cpup(&cells[i + 1]),
++			       phy->base + be32_to_cpup(&cells[i]));
+ 	return 0;
+ }
+ 
+@@ -525,7 +544,6 @@
+ 					phy);
+ 	int ret;
+ 	unsigned int init_timeout_usec = INIT_MAX_TIME_USEC;
+-	const struct qmp_reg_val *reg = NULL;
+ 
+ 	dev_dbg(uphy->dev, "Initializing QMP phy\n");
+ 
+@@ -555,10 +573,8 @@
+ 	/* power up PHY */
+ 	usb_qmp_powerup_phy(phy);
+ 
+-	reg = (struct qmp_reg_val *)phy->qmp_phy_init_seq;
+-
+ 	/* Main configuration */
+-	ret = configure_phy_regs(uphy, reg);
++	ret = configure_phy_regs(uphy);
+ 	if (ret) {
+ 		dev_err(uphy->dev, "Failed the main PHY configuration\n");
+ 		goto fail;
+@@ -1179,27 +1195,6 @@
+ 		}
+ 	}
+ 
+-	of_get_property(dev->of_node, "qcom,qmp-phy-init-seq", &size);
+-	if (size) {
+-		if (size % sizeof(*phy->qmp_phy_init_seq)) {
+-			dev_err(dev, "invalid init_seq_len\n");
+-			return -EINVAL;
+-		}
+-
+-		phy->qmp_phy_init_seq = devm_kzalloc(dev, size, GFP_KERNEL);
+-		if (!phy->qmp_phy_init_seq)
+-			return -ENOMEM;
+-
+-		phy->init_seq_len = (size / sizeof(*phy->qmp_phy_init_seq));
+-		of_property_read_u32_array(dev->of_node,
+-				"qcom,qmp-phy-init-seq",
+-				phy->qmp_phy_init_seq,
+-				phy->init_seq_len);
+-	} else {
+-		dev_err(dev, "error need qmp-phy-init-seq\n");
+-		return -EINVAL;
+-	}
+-
+ 	/* Set default core voltage values */
+ 	phy->core_voltage_levels[CORE_LEVEL_NONE] = 0;
+ 	phy->core_voltage_levels[CORE_LEVEL_MIN] = USB_SSPHY_1P2_VOL_MIN;

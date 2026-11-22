@@ -597,6 +597,20 @@ void HWCDisplay::UpdateConfigs() {
     hwc2_config_t active_config = hwc_config_map_.at(0);
     GetActiveConfig(&active_config);
     SetActiveConfigIndex(active_config);
+    if (type_ == kPluggable) {
+      // SDM selects the sink's highest-refresh mode before initialization.
+      // Publish only that mode: restored preferences and idle votes must not
+      // silently change external resolution/rate behind the automatic policy.
+      // Retain raw config IDs and the complete SDM-to-HWC mapping.
+      auto selected = variable_config_map_.find(active_config);
+      if (selected != variable_config_map_.end()) {
+        const auto selected_info = selected->second;
+        variable_config_map_.clear();
+        variable_config_map_.emplace(active_config, selected_info);
+      } else {
+        DLOGE("External automatic mode %u missing; retaining available modes", active_config);
+      }
+    }
   }
 
   // Update num config count.
@@ -917,6 +931,42 @@ void HWCDisplay::BuildLayerStack() {
   // in SurfaceFlinger's client target. Use a stable input-only fallback for
   // this combination, before the strategy caches a plane allocation.
   bool promoted_client_range = false;
+  if (property_get_bool("vendor.display.toast_client_fallback", true)) {
+    std::vector<ClientCompositionLayer> composition;
+    size_t toast = layer_set_.size();
+    for (auto hwc_layer : layer_set_) {
+      Layer *layer = hwc_layer->GetSDMLayer();
+      if (IsToastCompositionLayer(hwc_layer->GetName())) toast = composition.size();
+      composition.push_back({
+          hwc_layer->GetOrigClientRequestedCompositionType() == HWC2::Composition::Client,
+          layer->blending != kBlendingOpaque || layer->plane_alpha != 255,
+          hwc_layer->IsProtected() || bool(layer->input_buffer.flags.secure_display)});
+    }
+    for (size_t index : ToastClientCompositionPromotions(composition, toast)) {
+      Layer *layer = layer_stack_.layers.at(index);
+      layer->flags.skip = true;
+      layer->update_mask.set(kClientCompRequest);
+      layer_stack_.flags.skip_present = true;
+      promoted_client_range = true;
+    }
+  }
+  if (property_get_bool("vendor.display.translucent_client_fallback", true)) {
+    std::vector<ClientCompositionLayer> composition;
+    for (auto hwc_layer : layer_set_) {
+      Layer *layer = hwc_layer->GetSDMLayer();
+      composition.push_back({
+          hwc_layer->GetOrigClientRequestedCompositionType() == HWC2::Composition::Client,
+          layer->blending != kBlendingOpaque || layer->plane_alpha != 255,
+          hwc_layer->IsProtected() || bool(layer->input_buffer.flags.secure_display)});
+    }
+    for (size_t index : TranslucentClientCompositionPromotions(composition)) {
+      Layer *layer = layer_stack_.layers.at(index);
+      layer->flags.skip = true;
+      layer->update_mask.set(kClientCompRequest);
+      layer_stack_.flags.skip_present = true;
+      promoted_client_range = true;
+    }
+  }
   if (property_get_bool("vendor.display.client_range_fallback", true)) {
     std::vector<DisplayCompositionInput> composition;
     for (auto hwc_layer : layer_set_) {
@@ -2850,15 +2900,22 @@ void HWCDisplay::UpdateActiveConfig() {
     return;
   }
 
-  DisplayError error = display_intf_->SetActiveConfig(pending_config_index_);
-  if (error != kErrorNone) {
-    DLOGI("Failed to set %d config", INT(pending_config_index_));
-  } else {
-    SetActiveConfigIndex(pending_config_index_);
-  }
-
-  // Reset pending config.
+  // The legacy pending-config path must update the client-target crop and
+  // framebuffer geometry too. Otherwise a 4K -> 1080p switch feeds a 4K ROI
+  // into the new 1080p client buffer and the scaler rejects every frame.
+  // Reuse the same transition as setActiveConfigWithConstraints.
+  // Consume the pending request; SubmitDisplayConfig snapshots the actual
+  // previous SDM mode rather than the HWC-facing pending/public mode ID.
+  const hwc2_config_t config = pending_config_index_;
   pending_config_ = false;
+  bool deferred = false;
+  HWC2::Error error = SubmitDisplayConfig(config, &deferred);
+  if (error != HWC2::Error::None) {
+    // SDM may defer a switch while the previous frame is in flight. Keep
+    // the request for the next validation instead of silently losing it.
+    pending_config_ = deferred;
+    DLOGI("Failed to set %d config", INT(pending_config_index_));
+  }
 }
 
 int32_t HWCDisplay::GetDisplayConfigGroup(DisplayConfigGroupInfo variable_config) {
@@ -3101,14 +3158,25 @@ bool HWCDisplay::AllowSeamless(hwc2_config_t config) {
   return IsSameGroup(active_config, config);
 }
 
-HWC2::Error HWCDisplay::SubmitDisplayConfig(hwc2_config_t config) {
+HWC2::Error HWCDisplay::SubmitDisplayConfig(hwc2_config_t config, bool *deferred) {
   DTRACE_SCOPED();
 
+  if (deferred) {
+    *deferred = false;
+  }
+
   hwc2_config_t current_config = 0;
-  GetActiveConfig(&current_config);
+  // config and GetDisplayAttributesForConfig use SDM indices. The HWC-facing
+  // getter may return a pending mode and remaps indices to public config IDs.
+  if (GetActiveDisplayConfig(&current_config)) {
+    return HWC2::Error::BadConfig;
+  }
 
   DisplayError error = display_intf_->SetActiveConfig(config);
   if (error == kErrorDeferred) {
+    if (deferred) {
+      *deferred = true;
+    }
     DLOGW("Failed to set new config:%d from current config:%d! Error: %d",
           config, current_config, error);
     return HWC2::Error::BadConfig;

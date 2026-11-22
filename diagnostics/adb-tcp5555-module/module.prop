@@ -1,0 +1,6 @@
+id=sheng_adb_tcp5555
+name=Sheng Wireless ADB 5555
+version=1.0
+versionCode=1
+author=sheng
+description=Enable authenticated ADB TCP port 5555 at boot. Disable module to stop enabling it.

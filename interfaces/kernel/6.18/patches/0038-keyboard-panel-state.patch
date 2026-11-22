@@ -1,0 +1,280 @@
+Subject: [PATCH] sheng: restore factory keyboard panel-state packets
+
+Send the primary panel blank/resume packets used by the factory keyboard
+driver. Serialize notifications and preserve the existing IRQ wake path.
+
+diff --git a/k618/soc/include/linux/soc/qcom/panel_event_notifier.h b/k618/soc/include/linux/soc/qcom/panel_event_notifier.h
+--- a/k618/soc/include/linux/soc/qcom/panel_event_notifier.h
++++ b/k618/soc/include/linux/soc/qcom/panel_event_notifier.h
+@@ -9,6 +9,7 @@
+ 
+ #include <linux/err.h>
+ #include <linux/errno.h>
++#include <linux/notifier.h>
+ #include <linux/types.h>
+ #include <drm/drm_panel.h>
+ 
+@@ -95,6 +96,12 @@
+ 				struct panel_event_notification *notification,
+ 					void *pvt_data);
+ 
++/* Tag-wide primary events for devices that are not tied to one panel node.
++ * Unregister waits for any callback already being invoked.
++ */
++int panel_event_notifier_register_primary(struct notifier_block *nb);
++int panel_event_notifier_unregister_primary(struct notifier_block *nb);
++
+ #if IS_ENABLED(CONFIG_QCOM_PANEL_EVENT_NOTIFIER)
+ void *panel_event_notifier_register(enum panel_event_notifier_tag tag,
+ 		enum panel_event_notifier_client client_handle,
+diff --git a/k618/soc/drivers/soc/qcom/panel_event_notifier.c b/k618/soc/drivers/soc/qcom/panel_event_notifier.c
+--- a/k618/soc/drivers/soc/qcom/panel_event_notifier.c
++++ b/k618/soc/drivers/soc/qcom/panel_event_notifier.c
+@@ -15,6 +15,20 @@
+ 	struct drm_panel *panel;
+ 	enum panel_event_notifier_tag tag;
+ };
++
++static BLOCKING_NOTIFIER_HEAD(primary_panel_events);
++
++int panel_event_notifier_register_primary(struct notifier_block *nb)
++{
++	return blocking_notifier_chain_register(&primary_panel_events, nb);
++}
++EXPORT_SYMBOL_GPL(panel_event_notifier_register_primary);
++
++int panel_event_notifier_unregister_primary(struct notifier_block *nb)
++{
++	return blocking_notifier_chain_unregister(&primary_panel_events, nb);
++}
++EXPORT_SYMBOL_GPL(panel_event_notifier_unregister_primary);
+ 
+ static DEFINE_MUTEX(panel_event_notifier_entries_lock);
+ static struct panel_event_notifier_entry
+@@ -136,6 +150,10 @@
+ 		return;
+ 	}
+ 
++	if (tag == PANEL_EVENT_NOTIFICATION_PRIMARY)
++		blocking_notifier_call_chain(&primary_panel_events,
++					     notification->notif_type, notification);
++
+ 	for (i = 0; i < PANEL_EVENT_NOTIFIER_CLIENT_MAX; i++) {
+ 		mutex_lock(&panel_event_notifier_entries_lock);
+ 		entry = &panel_event_notifier_entries[i];
+diff --git a/k618/sheng-ports/keyboard/Kbuild b/k618/sheng-ports/keyboard/Kbuild
+--- a/k618/sheng-ports/keyboard/Kbuild
++++ b/k618/sheng-ports/keyboard/Kbuild
+@@ -1,5 +1,6 @@
+ # SPDX-License-Identifier: GPL-2.0-only
+ obj-m += nanosic_driver.o
+ nanosic_driver-y := sheng_nanosic.o
++CFLAGS_sheng_nanosic.o += -I$(SOC)/include
+ obj-m += xiaomi_keyboard_driver.o
+ xiaomi_keyboard_driver-y := sheng_touchpad_filter.o
+diff --git a/k618/sheng-ports/keyboard/sheng_nanosic.c b/k618/sheng-ports/keyboard/sheng_nanosic.c
+--- a/k618/sheng-ports/keyboard/sheng_nanosic.c
++++ b/k618/sheng-ports/keyboard/sheng_nanosic.c
+@@ -23,6 +23,7 @@
+ #include <linux/module.h>
+ #include <linux/of.h>
+ #include <linux/regmap.h>
++#include <linux/soc/qcom/panel_event_notifier.h>
+ #include <linux/workqueue.h>
+ 
+ #define WN8030_HEADER_ADDR 0x7FC0
+@@ -32,6 +33,12 @@
+ #define XM_WN8030_I2C_WRITE (66)
+ 
+ #define WN8030_NUM_SUPPLIES 2
++
++enum sheng_nano_panel_state {
++	SHENG_NANO_PANEL_UNKNOWN,
++	SHENG_NANO_PANEL_OFF,
++	SHENG_NANO_PANEL_ON,
++};
+ 
+ struct nanosic_wn8030 {
+ 	struct device *dev;
+@@ -64,6 +71,10 @@
+ 	struct mutex clients_lock;
+ 	struct list_head clients;
+ 	struct mutex io_lock;
++	struct notifier_block panel_notifier;
++	struct work_struct panel_worker;
++	enum sheng_nano_panel_state panel_state;
++	enum sheng_nano_panel_state panel_state_sent;
+ 	struct delayed_work fw_worker;
+ 	unsigned int fw_attempts;
+ 	struct delayed_work plugin_worker;
+@@ -75,6 +86,7 @@
+ };
+ 
+ #include "sheng_nanosic_wake.h"
++#include "sheng_nanosic_panel.h"
+ #include "sheng_nanosic_recovery.h"
+ #include "sheng_nano_hid_requests.h"
+ #include "sheng_nanosic_bridge.h"
+@@ -273,6 +285,68 @@
+ 		checksum += data[i];
+ 
+ 	return checksum;
++}
++
++/* The OEM screen-sleep/resume packet template and 5D00/5E01 tail
++ * are recovered from the read-only factory driver.
++ */
++static void sheng_nano_sync_panel_locked(struct nanosic_wn8030 *nano)
++{
++	enum sheng_nano_panel_state state = READ_ONCE(nano->panel_state);
++	u8 buf[XM_WN8030_I2C_WRITE];
++	int ret;
++
++	lockdep_assert_held(&nano->io_lock);
++	if (state == SHENG_NANO_PANEL_UNKNOWN || state == nano->panel_state_sent ||
++	    !nano->ready || nano->suspended || nano->removing)
++		return;
++
++	sheng_nano_panel_packet(buf, state == SHENG_NANO_PANEL_ON);
++	ret = sheng_nano_wake_locked(nano);
++	if (!ret)
++		ret = regmap_bulk_write(nano->regmap, 0x5c, buf, sizeof(buf));
++	if (!ret) {
++		nano->panel_state_sent = state;
++		dev_dbg(nano->dev, "MCU panel state sent: %u\n", buf[8]);
++	} else {
++		dev_warn_ratelimited(nano->dev, "MCU panel state %u failed: %d\n",
++				     buf[8], ret);
++	}
++}
++
++static void sheng_nano_panel_worker(struct work_struct *work)
++{
++	struct nanosic_wn8030 *nano = container_of(work, struct nanosic_wn8030,
++						   panel_worker);
++
++	mutex_lock(&nano->io_lock);
++	sheng_nano_sync_panel_locked(nano);
++	mutex_unlock(&nano->io_lock);
++}
++
++static int sheng_nano_panel_event(struct notifier_block *nb, unsigned long event, void *data)
++{
++	struct nanosic_wn8030 *nano = container_of(nb, struct nanosic_wn8030, panel_notifier);
++	const struct panel_event_notification *notification = data;
++	enum sheng_nano_panel_state state;
++
++	switch (event) {
++	case DRM_PANEL_EVENT_BLANK:
++	case DRM_PANEL_EVENT_BLANK_LP:
++		state = SHENG_NANO_PANEL_OFF;
++		break;
++	case DRM_PANEL_EVENT_UNBLANK:
++		if (notification->notif_data.early_trigger)
++			return NOTIFY_DONE;
++		state = SHENG_NANO_PANEL_ON;
++		break;
++	default:
++		return NOTIFY_DONE;
++	}
++
++	WRITE_ONCE(nano->panel_state, state);
++	queue_work(system_freezable_wq, &nano->panel_worker);
++	return NOTIFY_OK;
+ }
+ 
+ static int nanosic_wn8030_set_caps_led(struct nanosic_wn8030 *nanosic, bool enable)
+@@ -767,7 +841,9 @@
+ 		nano->ready = true;
+ 		/* Original HAL discovery/authentication restores feature state after boot. */
+ 		enable_irq(nano->client->irq);
+-		do { } while (0);
++		nano->panel_state_sent = SHENG_NANO_PANEL_UNKNOWN;
++		if (READ_ONCE(nano->panel_state) != SHENG_NANO_PANEL_UNKNOWN)
++			queue_work(system_freezable_wq, &nano->panel_worker);
+ 	} else if ((ret == -ENOENT || ret == -EAGAIN) && nano->fw_attempts < 60) {
+ 		/* /odm may not be mounted, or PM may still block firmware requests. */
+ 		schedule_delayed_work(&nano->fw_worker, HZ);
+@@ -803,6 +879,8 @@
+ 	if (ret)
+ 		goto free;
+ 	INIT_DELAYED_WORK(&nano->fw_worker, sheng_nano_firmware_worker);
++	INIT_WORK(&nano->panel_worker, sheng_nano_panel_worker);
++	nano->panel_notifier.notifier_call = sheng_nano_panel_event;
+ 	INIT_DELAYED_WORK(&nano->plugin_worker, sheng_nano_plugin_worker);
+ 	nano->plugin_requested = -1;
+ 	nano->plugin_sent = -1;
+@@ -896,6 +974,14 @@
+ 			ret = -EPROBE_DEFER;
+ 		goto free_irq;
+ 	}
++	ret = panel_event_notifier_register_primary(&nano->panel_notifier);
++	if (ret) {
++		Nanosic_charge_i2c_write_callback_unregister();
++		WRITE_ONCE(charge_nano, NULL);
++		device_init_wakeup(dev, false);
++		misc_deregister(&nano->raw_misc);
++		goto free_irq;
++	}
+ 	schedule_delayed_work(&nano->fw_worker, HZ);
+ 	return 0;
+ 
+@@ -922,7 +1008,9 @@
+ 	Nanosic_charge_i2c_write_callback_unregister();
+ 	WRITE_ONCE(charge_nano, NULL);
+ 	misc_deregister(&nano->raw_misc);
++	panel_event_notifier_unregister_primary(&nano->panel_notifier);
+ 	cancel_delayed_work_sync(&nano->fw_worker);
++	cancel_work_sync(&nano->panel_worker);
+ 	if (ready && !nano->suspended)
+ 		disable_irq(client->irq);
+ 	/* Drop the wake reference before releasing the IRQ descriptor. */
+@@ -944,6 +1032,11 @@
+ 	int ret;
+ 
+ 	cancel_delayed_work_sync(&nano->fw_worker);
++	/* The freezable worker may not have run before system suspend. */
++	mutex_lock(&nano->io_lock);
++	if (READ_ONCE(nano->panel_state) == SHENG_NANO_PANEL_OFF)
++		sheng_nano_sync_panel_locked(nano);
++	mutex_unlock(&nano->io_lock);
+ 	if (nano->ready) {
+ 		disable_irq(nano->client->irq);
+ 		ret = sheng_nano_set_irq_wake(nano, device_may_wakeup(dev));
+@@ -979,6 +1072,8 @@
+ 	mutex_unlock(&nano->io_lock);
+ 	/* Deliver the first real packet; never discard it as a wake acknowledgement. */
+ 	enable_irq(nano->client->irq);
++	if (!wake_ret)
++		queue_work(system_freezable_wq, &nano->panel_worker);
+ 	if (wake_ret)
+ 		dev_warn(dev, "MCU resume handshake failed: %d\n", wake_ret);
+ 	return ret ? ret : wake_ret;
+diff --git a/k618/sheng-ports/keyboard/sheng_nanosic_panel.h b/k618/sheng-ports/keyboard/sheng_nanosic_panel.h
+new file mode 100644
+--- /dev/null
++++ b/k618/sheng-ports/keyboard/sheng_nanosic_panel.h
+@@ -0,0 +1,23 @@
++/* SPDX-License-Identifier: GPL-2.0-only */
++/* Panel packets match keyboard_early_suspend_work/resume_work in stock. */
++#define SHENG_NANO_PANEL_PACKET_SIZE 66
++
++static inline void sheng_nano_panel_packet(u8 *buf, bool screen_on)
++{
++	unsigned int i;
++
++	for (i = 0; i < SHENG_NANO_PANEL_PACKET_SIZE; i++)
++		buf[i] = 0;
++
++	buf[0] = 0x32;
++	buf[1] = 0x00;
++	buf[2] = 0x4e;
++	buf[3] = 0x31;
++	buf[4] = 0x80;
++	buf[5] = 0x38;
++	buf[6] = 0x25;
++	buf[7] = 0x01;
++	/* Little-endian 0x5d00 sleep and 0x5e01 resume OEM commands. */
++	buf[8] = screen_on ? 0x01 : 0x00;
++	buf[9] = screen_on ? 0x5e : 0x5d;
++}

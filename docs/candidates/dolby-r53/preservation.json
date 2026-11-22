@@ -1,0 +1,10 @@
+{
+  "installed_revision": 52,
+  "candidate_installed": false,
+  "sources": {
+    "AndroidManifest.xml": "2fa39f0e7381ff4fc00c706015974bb2fe8cdf02d55201d7f73bfe00e304c6ab",
+    "src/org/lineageos/sheng/dolby/AtmosApplication.java": "3601d71fee642db1b0b56f54ff4e985156208a2e24aa5d2a4d942723b59c073c",
+    "src/org/lineageos/sheng/dolby/AtmosActivity.java": "47d3f463e800a947c973b309d4b5390bf144b940b6c413b427124b9f12c5b795",
+    "src/org/lineageos/sheng/dolby/ParameterEdits.java": "11633190517086a70f146cb935aeedbd7b13bd09afaf54a4477dcb9de8eac0aa"
+  }
+}

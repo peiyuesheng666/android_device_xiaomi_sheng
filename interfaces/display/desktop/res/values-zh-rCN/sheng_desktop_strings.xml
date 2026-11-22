@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="sheng_desktop_title">桌面模式</string>
+    <string name="sheng_desktop_enable">启用桌面模式</string>
+    <string name="sheng_desktop_enable_summary">在平板屏幕上使用可调整大小的窗口</string>
+    <string name="sheng_desktop_failed">无法更改桌面模式，请重试。</string>
+</resources>

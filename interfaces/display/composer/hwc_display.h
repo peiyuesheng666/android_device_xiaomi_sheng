@@ -536,7 +536,7 @@ class HWCDisplay : public DisplayEventHandler {
   bool IsSameGroup(hwc2_config_t config_id1, hwc2_config_t config_id2);
   bool AllowSeamless(hwc2_config_t request_config);
   void SetVsyncsApplyRateChange(uint32_t vsyncs) { vsyncs_to_apply_rate_change_ = vsyncs; }
-  HWC2::Error SubmitDisplayConfig(hwc2_config_t config);
+  HWC2::Error SubmitDisplayConfig(hwc2_config_t config, bool *deferred = nullptr);
   HWC2::Error GetCachedActiveConfig(hwc2_config_t *config);
   void SetActiveConfigIndex(int active_config_index);
   HWC2::Error PostPrepareLayerStack(uint32_t *out_num_types, uint32_t *out_num_requests);

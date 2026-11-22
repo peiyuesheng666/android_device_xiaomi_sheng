@@ -1,0 +1,70 @@
+--- a/frameworks/base/libs/WindowManager/Shell/src/com/android/wm/shell/desktopmode/DesktopTasksController.kt
++++ b/frameworks/base/libs/WindowManager/Shell/src/com/android/wm/shell/desktopmode/DesktopTasksController.kt
+@@ -4413,8 +4413,7 @@
+                 // The tablet switch also governs restored freeform tasks. These bypass
+                 // the fullscreen-launch path and may still belong to a remembered desk.
+                 android.os.Build.DEVICE == "sheng" && targetDisplayId == DEFAULT_DISPLAY ->
+-                    android.provider.Settings.Global.getInt(
+-                        context.contentResolver, "sheng_desktop_enabled", 0) == 1
++                    com.android.wm.shell.desktopmode.desktopfirst.isShengInternalDesktopRequested(context)
+                 // TODO: b/456091097 - Check if we can remove this by merging TO_FRONT and lock task
+                 // transitions.
+                 Flags.enablePreventDesktopInLocktaskmodeBugfix() &&
+@@ -4753,8 +4752,7 @@
+ 
+     private fun shouldFreeformTaskLaunchSwitchToFullscreen(task: RunningTaskInfo): Boolean =
+         (android.os.Build.DEVICE == "sheng" && task.displayId == DEFAULT_DISPLAY &&
+-            android.provider.Settings.Global.getInt(
+-                context.contentResolver, "sheng_desktop_enabled", 0) == 0) ||
++            !com.android.wm.shell.desktopmode.desktopfirst.isShengInternalDesktopRequested(context)) ||
+             !isAnyDeskActive(task.displayId, task.userId)
+ 
+     private fun shouldFullscreenTaskLaunchSwitchToDesktop(
+@@ -4764,8 +4762,7 @@
+         // sheng's live switch owns the internal display. Shell must not infer
+         // the user's choice from a stale desk or a restored task's window mode.
+         if (android.os.Build.DEVICE == "sheng" && task.displayId == DEFAULT_DISPLAY) {
+-            return android.provider.Settings.Global.getInt(
+-                context.contentResolver, "sheng_desktop_enabled", 0) == 1
++            return com.android.wm.shell.desktopmode.desktopfirst.isShengInternalDesktopRequested(context)
+         }
+         if (isDesktopFirstLegacy(task.displayId)) {
+             // We're in desktop-first mode.
+--- a/frameworks/base/libs/WindowManager/Shell/src/com/android/wm/shell/windowdecor/common/CaptionVisibilityHelper.kt
++++ b/frameworks/base/libs/WindowManager/Shell/src/com/android/wm/shell/windowdecor/common/CaptionVisibilityHelper.kt
+@@ -64,8 +64,7 @@
+         if (android.os.Build.DEVICE == "sheng" && display.type == Display.TYPE_INTERNAL &&
+             taskInfo.windowingMode != WINDOWING_MODE_FREEFORM) {
+             val context = displayController.getDisplayContext(taskInfo.displayId) ?: return false
+-            if (android.provider.Settings.Global.getInt(
+-                    context.contentResolver, "sheng_desktop_enabled", 0) == 0) return false
++            if (!com.android.wm.shell.desktopmode.desktopfirst.isShengInternalDesktopRequested(context)) return false
+         }
+ 
+         if (!ENABLE_PROJECTED_DISPLAY_DESKTOP_MODE.isTrue) {
+--- a/frameworks/base/libs/WindowManager/Shell/src/com/android/wm/shell/desktopmode/desktopfirst/DesktopDisplayModeController.kt
++++ b/frameworks/base/libs/WindowManager/Shell/src/com/android/wm/shell/desktopmode/desktopfirst/DesktopDisplayModeController.kt
+@@ -238,12 +238,8 @@
+     // Do not directly use this method to check the state of desktop-first mode. Use
+     // [isDisplayDesktopFirst] instead.
+     private fun canDesktopFirstModeBeEnabledOnDefaultDisplay(): Boolean {
+-        // Input devices are re-announced on wake. The tablet's explicit choice
+-        // must take priority over automatic keyboard/touchpad and dock policy.
+         if (android.os.Build.DEVICE == "sheng") {
+-            return Settings.Global.getInt(
+-                context.contentResolver, "sheng_desktop_enabled", 0
+-            ) == 1 && isDefaultDisplayDesktopEligible()
++            return isDefaultDisplayDesktopEligible() && isShengInternalDesktopRequested(context)
+         }
+ 
+         if (FORCE_DESKTOP_FIRST_ON_DEFAULT_DISPLAY) {
+@@ -393,3 +389,9 @@
+         private const val TAG = "DesktopDisplayModeController"
+     }
+ }
++
++internal fun isShengInternalDesktopRequested(context: Context): Boolean {
++    return Settings.Global.getInt(
++        context.contentResolver, "sheng_desktop_enabled", 0
++    ) == 1
++}

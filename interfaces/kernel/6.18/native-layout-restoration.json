@@ -1,0 +1,26 @@
+{
+  "scope": "Restore pinned pre-legacy-KSU native kernel layout and scheduler code; requires full kernel and module rebuild before deployment",
+  "patch": "remove-legacy-ksu-layout.patch",
+  "patch_sha256": "cd2b1673bf2e2f466d968eac24d5205bc883152ebe6f68888fcd75067e7a8a85",
+  "files": {
+    "k618/ws/common/arch/arm64/include/asm/thread_info.h": {
+      "legacy_sha256": "cd6935c9abbfde7a464a49e6c8f3401cd8917529830721fe0f0cf4324c5b2264",
+      "native_sha256": "d26fee9532fa9450880a7013676a6d70f9caac38995744692ca908db8231e984"
+    },
+    "k618/ws/common/include/linux/mm_types.h": {
+      "legacy_sha256": "b6c7246da8b27e0fe6d4efa2c33f06e7915f78c28fc928c745e339b90db8f771",
+      "native_sha256": "f7a479ae24b8d6b9334e391ada80a4fa70b3bb73b16001f5291460637035f4ea"
+    },
+    "k618/ws/common/include/linux/sched.h": {
+      "legacy_sha256": "4cc63d8f3c20ab300d00e84b931a85b32d82186fe611263157282e56c73978a3",
+      "native_sha256": "0c8b6d063263657c76b1be094c6702fbca4747dce69212ed2a044012c5548910"
+    },
+    "k618/ws/common/kernel/sched/fair.c": {
+      "legacy_sha256": "72a6637055d9059534bfad52e1e7a56625392759669dbdca0514f9f6c526d7c4",
+      "native_sha256": "7c5561a5a43b51ec9f61c43d33a0cb6e049696696b60a83499525713e71e81bd"
+    }
+  },
+  "standalone_layout_probe_only": true,
+  "full_kernel_rebuild_passed": false,
+  "runtime_verified": false
+}

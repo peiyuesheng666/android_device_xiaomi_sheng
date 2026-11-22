@@ -1,0 +1,17 @@
+<resources>
+    <string name="app_name">USB reverse charging</string>
+    <string name="battery_switch_title">USB reverse power supply</string>
+    <string name="connect_device">Connect a USB-C device</string>
+    <string name="supplying">Supplying power</string>
+    <string name="receiving">Receiving power</string>
+    <string name="switching">Switching power direction…</string>
+    <string name="unsupported">Connected device does not support switching power direction</string>
+    <string name="failed">Could not switch USB power direction</string>
+    <string name="page_summary">Supply power to a phone or another USB-C device</string>
+    <string name="enable">Charge connected device</string>
+    <string name="help">Connect a phone using a USB-C cable, then enable this switch. Availability depends on the connected device. Switching off requests power from the connected device. Disconnect the cable to stop all power transfer.</string>
+    <string name="notification_channel">USB power connection</string>
+    <string name="notification_receiving">Charging this tablet via USB</string>
+    <string name="notification_supplying">Charging connected device via USB</string>
+    <string name="notification_detail">Tap to change USB power direction</string>
+</resources>

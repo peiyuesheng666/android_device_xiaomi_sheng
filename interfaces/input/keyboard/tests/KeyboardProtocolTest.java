@@ -46,6 +46,17 @@ public final class KeyboardProtocolTest {
                 hex("aa4232004e3180382501015e")));
         try { KeyboardProtocol.feature(0x20, true); throw new AssertionError(); }
         catch (IllegalArgumentException expected) { ++checks; }
+        // Stock percentage endpoints; intermediate UI steps are a separate concern.
+        byte[] backlight = KeyboardProtocol.backlight(100);
+        check(Arrays.equals(Arrays.copyOf(backlight, 12), hex("aa4232004e318038230164bf")));
+        check(backlight.length == 68);
+        for (int i = 12; i < backlight.length; ++i) check(backlight[i] == 0);
+        check(Arrays.equals(Arrays.copyOf(KeyboardProtocol.backlight(0), 12),
+                hex("aa4232004e3180382301005b")));
+        for (int value : new int[]{-1, 101, 256}) {
+            try { KeyboardProtocol.backlight(value); throw new AssertionError(); }
+            catch (IllegalArgumentException expected) { ++checks; }
+        }
         byte[] info = new byte[32];
         System.arraycopy(hex("23303880010b41019c0e00261221000000"),0,info,0,16);
         info[17] = KeyboardProtocol.sum(info,0,17);
@@ -55,6 +66,9 @@ public final class KeyboardProtocolTest {
         check(KeyboardProtocol.hasTouchpad(32));
         check(!KeyboardProtocol.hasTouchpad(1));
         check(!KeyboardProtocol.hasTouchpad(-1));
+        for (int type = -1; type <= 255; ++type) {
+            check(KeyboardProtocol.hasBacklight(type) == (type == 16 || type == 32 || type == 33));
+        }
         info[5] = 5;
         info[11] = KeyboardProtocol.sum(info,0,11);
         check(KeyboardProtocol.keyboardType(info) == -1);

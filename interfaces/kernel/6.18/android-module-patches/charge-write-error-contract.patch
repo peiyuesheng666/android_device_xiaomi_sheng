@@ -1,0 +1,11 @@
+--- a/scripts/android_source_contract.py
++++ b/scripts/android_source_contract.py
+@@ -8,4 +8,8 @@
+ 
++# Android's device-owned setter fix preserves firmware write errors.
++EXPECTED['k618/soc/drivers/power/supply/qti_battery_charger.c'] = \
++    '968e3af1ec92f467f764b9ab377e396bb0507de9666deaf80aba66a7e66f7825'
++
+ def android_interface_matches(name, got):
+     from android_lts_contract import android_lts_matches
+     if android_lts_matches(name, got):

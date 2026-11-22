@@ -1,0 +1,5 @@
+# The asynchronous Recovery role gate publishes this after the actual UDC exists.
+# Do not grant access to vendor_default_prop or add a permissive domain.
+recovery_only(`
+set_prop(recovery, vendor_sheng_recovery_usb_ready_prop)
+')

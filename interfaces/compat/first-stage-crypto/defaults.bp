@@ -1,0 +1,65 @@
+cc_defaults {
+    // This contains the common options between boringssl_flags and
+    // boringssl_flags_baremetal. Nothing else should include this target
+    // directly.
+    name: "sheng_first_stage_boringssl_flags_common",
+
+    cflags: [
+        "-fvisibility=hidden",
+        "-DBORINGSSL_SHARED_LIBRARY",
+        "-DOPENSSL_SMALL",
+        "-Werror",
+        "-Wno-unused-parameter",
+    ],
+
+    cppflags: [
+        "-Wall",
+        "-Werror",
+    ],
+
+    // Build BoringSSL and its tests against the same STL.
+    stl: "libc++_static",
+}
+
+cc_defaults {
+    name: "sheng_first_stage_boringssl_flags",
+    vendor_available: true,
+    product_available: true,
+    cflags: ["-DBORINGSSL_ANDROID_SYSTEM"],
+    defaults: ["sheng_first_stage_boringssl_flags_common"],
+    sdk_version: "9",
+}
+
+cc_defaults {
+    name: "sheng_first_stage_boringssl_defaults",
+
+    local_include_dirs: ["src/include"],
+    export_include_dirs: ["src/include"],
+    cflags: ["-DBORINGSSL_IMPLEMENTATION"],
+
+    cmake_snapshot_supported: true,
+}
+
+cc_defaults {
+    name: "sheng_first_stage_libcrypto_defaults",
+    host_supported: true,
+    ramdisk_available: true,
+    vendor_ramdisk_available: true,
+
+    target: {
+        windows: {
+            enabled: true,
+            host_ldlibs: ["-lws2_32"],
+        },
+        host: {
+            host_ldlibs: ["-lpthread"],
+        },
+        android: {
+            // On FIPS builds (i.e. Android only) prevent other libraries
+            // from pre-empting symbols in libcrypto which could affect FIPS
+            // compliance and cause integrity checks to fail. See b/160231064.
+            ldflags: ["-Wl,-Bsymbolic"],
+        },
+    },
+    stl: "libc++_static",
+}

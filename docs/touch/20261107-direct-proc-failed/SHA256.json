@@ -1,0 +1,22 @@
+[
+  {
+    "file": "dt2w-proc-enabled-event6.txt",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "file": "dt2w-proc-enabled-kernel-after-restore.txt",
+    "bytes": 120297,
+    "sha256": "ea044931c9c339de9ed86edcfdd61fb66775a5aca2c7ae51868f53790188b6df"
+  },
+  {
+    "file": "dt2w-proc-enabled-logcat-after-restore.txt",
+    "bytes": 21696,
+    "sha256": "528b0992b9c508d4b6447a7c03526e095b36934abd78720f116446c2a3c59996"
+  },
+  {
+    "file": "dt2w-proc-enabled-power.txt",
+    "bytes": 8941,
+    "sha256": "a552f09c216b8095e3cb3378069728bb019ce46e7232b94647b6b6f8eed3c973"
+  }
+]

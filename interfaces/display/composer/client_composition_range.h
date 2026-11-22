@@ -3,6 +3,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <string>
 #include <vector>
 
 namespace sdm {
@@ -34,6 +35,45 @@ struct ClientCompositionLayer {
   bool blends;
   bool protected_content;
 };
+
+inline bool IsToastCompositionLayer(const std::string &name) {
+  return name.compare(0, 10, "VRI[Toast]") == 0 ||
+         name.compare(0, 9, "VRI-Toast") == 0;
+}
+
+// A toast can be hardware eligible even when its backdrop needs the legacy
+// compositor workaround. Keep the backdrop and toast in one blend operation.
+// Layers above the toast are unaffected; protected content stays on hardware.
+inline std::vector<size_t> ToastClientCompositionPromotions(
+    const std::vector<ClientCompositionLayer> &layers, size_t toast) {
+  if (toast >= layers.size()) return {};
+  for (size_t i = 0; i <= toast; ++i)
+    if (layers[i].protected_content) return {};
+  std::vector<size_t> result;
+  for (size_t i = 0; i <= toast; ++i)
+    if (!layers[i].client) result.push_back(i);
+  return result;
+}
+
+// Use original client requirements, not the composition accepted from the last
+// validate. Desktop shadows require a client target even in a single dataspace.
+// Keep translucent overlays above that target in the same blend operation on
+// legacy SDM; adding/removing a toast must not switch its backdrop's blend path.
+inline std::vector<size_t> TranslucentClientCompositionPromotions(
+    const std::vector<ClientCompositionLayer> &layers) {
+  size_t first = layers.size(), last = 0;
+  for (size_t i = 0; i < layers.size(); ++i) {
+    if (layers[i].client && first == layers.size()) first = i;
+    if (layers[i].blends || layers[i].client) last = i;
+  }
+  if (first >= last) return {};
+  for (size_t i = first; i <= last; ++i)
+    if (layers[i].protected_content) return {};
+  std::vector<size_t> result;
+  for (size_t i = first; i <= last; ++i)
+    if (!layers[i].client) result.push_back(i);
+  return result;
+}
 
 // A single client target cannot interleave its lower and upper contents with
 // a translucent hardware layer. SurfaceFlinger intentionally does not punch a

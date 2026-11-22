@@ -1,0 +1,42 @@
+// Preserve no-DEX unwinding, Rust demangling, and zstd support.
+build = ["defaults.bp"]
+package {
+    default_applicable_licenses: ["Android-Apache-2.0", "sheng_first_stage_unwind_license"],
+}
+license {
+    name: "sheng_first_stage_unwind_license",
+    visibility: [":__subpackages__"],
+    license_kinds: ["SPDX-license-identifier-BSD"],
+    license_text: ["LICENSE_BSD"],
+}
+cc_library_static {
+    name: "libsheng_unwind_first_stage",
+    defaults: ["sheng_first_stage_libunwindstack_defaults", "rust_static_std"],
+    host_supported: false,
+    compile_multilib: "first",
+    ramdisk_available: true,
+    recovery_available: true,
+    vendor_ramdisk_available: true,
+    srcs: ["LogAndroid.cpp"],
+}
+
+license {
+    name: "sheng_first_stage_bionic_headers_license",
+    visibility: [":__subpackages__"],
+    license_kinds: [
+        "SPDX-license-identifier-Apache-2.0", "SPDX-license-identifier-BSD",
+        "SPDX-license-identifier-ISC", "SPDX-license-identifier-MIT",
+        "legacy_notice", "legacy_unencumbered",
+    ],
+    license_text: ["BIONIC_NOTICE"],
+}
+cc_library_headers {
+    name: "libsheng_bionic_platform_headers",
+    defaults: ["linux_bionic_supported"],
+    licenses: ["sheng_first_stage_bionic_headers_license"],
+    ramdisk_available: true,
+    recovery_available: true,
+    vendor_ramdisk_available: true,
+    export_include_dirs: ["bionic-platform"],
+    system_shared_libs: [],
+}

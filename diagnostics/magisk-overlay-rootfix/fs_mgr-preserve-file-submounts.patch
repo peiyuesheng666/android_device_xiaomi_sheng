@@ -1,0 +1,146 @@
+--- a/fs_mgr_overlayfs_mount.cpp
++++ b/fs_mgr_overlayfs_mount.cpp
+@@ -314,9 +314,14 @@
+     struct MoveEntry {
+         std::string mount_point;
+         std::string dir;
++        std::string target;
+         bool shared_flag;
+     };
+     std::vector<MoveEntry> moved_mounts;
++    const auto remove_target = [](const MoveEntry& entry) {
++        if (entry.target != entry.dir) unlink(entry.target.c_str());
++        rmdir(entry.dir.c_str());
++    };
+ 
+     bool retval = true;
+     bool move_dir_shared = true;
+@@ -332,6 +337,7 @@
+     // overshadowed and only the filesystem mounted with the last entry participates in file
+     // pathname resolution.
+     auto mountinfo = ReadMountinfoFromFile("/proc/self/mountinfo");
++    if (mountinfo.empty()) return false;
+     std::stable_sort(mountinfo.begin(), mountinfo.end(), [](const auto& lhs, const auto& rhs) {
+         return lhs.mount_point < rhs.mount_point;
+     });
+@@ -362,8 +368,12 @@
+ 
+     // Precondition is that kMoveMountTempDir is MS_PRIVATE, otherwise don't try to move any
+     // submount in to or out of it.
+-    if (move_dir_shared) {
+-        mountinfo.clear();
++    if (move_dir_shared && std::any_of(mountinfo.begin(), mountinfo.end(),
++            [&mount_point](const auto& entry) {
++                return android::base::StartsWith(entry.mount_point, mount_point + "/");
++            })) {
++        LOG(ERROR) << "Cannot preserve submounts without private " << kMoveMountTempDir;
++        return false;
+     }
+ 
+     // Need to make the original mountpoint MS_PRIVATE, so that the overlayfs can be MS_MOVE.
+@@ -393,24 +403,60 @@
+         // mountinfo is in lexical order, so no need to worry about |entry| being a parent mount of
+         // entries of |moved_mounts|.
+ 
++        struct stat st;
++        if (stat(entry.mount_point.c_str(), &st)) {
++            PERROR << "stat submount " << entry.mount_point;
++            retval = false;
++            break;
++        }
+         MoveEntry new_entry{entry.mount_point, kMoveMountTempDir + "/TemporaryDir-XXXXXX"s,
+-                            entry.shared_flag};
++                            {}, entry.shared_flag};
+         {
+             AutoSetFsCreateCon createcon;
+-            auto new_context = fs_mgr_get_context(entry.mount_point);
+-            if (new_context.empty() || !createcon.Set(new_context)) {
+-                continue;
++            char* raw_context = nullptr;
++            const int context_size = getfilecon(entry.mount_point.c_str(), &raw_context);
++            if (context_size < 0) {
++                const int context_error = errno;
++                // Before policy load, a rootfs bind may legitimately have no xattr.
++                // The placeholder does not replace the mounted inode or its label.
++                // Kernel mount permission checks remain in force on every MS_MOVE.
++                if (context_error != ENODATA && context_error != EOPNOTSUPP) {
++                    PERROR << "getfilecon submount " << entry.mount_point;
++                    retval = false;
++                    break;
++                }
++            } else {
++                const std::string context = raw_context ? raw_context : "";
++                freecon(raw_context);
++                if (context.empty() || !createcon.Set(context)) {
++                    retval = false;
++                    break;
++                }
+             }
+-            const auto target = mkdtemp(new_entry.dir.data());
+-            if (!target) {
++            if (!mkdtemp(new_entry.dir.data())) {
+                 retval = false;
+                 PERROR << "temporary directory for MS_MOVE";
+-                continue;
++                break;
++            }
++            new_entry.target = new_entry.dir;
++            // MS_MOVE requires directory/non-directory types to match.
++            if (!S_ISDIR(st.st_mode)) {
++                new_entry.target += "/File-XXXXXX";
++                const int fd = mkstemp(new_entry.target.data());
++                if (fd < 0) {
++                    PERROR << "temporary file for MS_MOVE";
++                    retval = false;
++                    // mkstemp did not create a file; never unlink a colliding name.
++                    new_entry.target = new_entry.dir;
++                    remove_target(new_entry);
++                    break;
++                }
++                close(fd);
+             }
+             if (!createcon.Restore()) {
+                 retval = false;
+-                rmdir(new_entry.dir.c_str());
+-                continue;
++                remove_target(new_entry);
++                break;
+             }
+         }
+         if (!parent_made_private) {
+@@ -426,28 +472,29 @@
+         if (new_entry.shared_flag) {
+             new_entry.shared_flag = fs_mgr_overlayfs_set_shared_mount(new_entry.mount_point, false);
+         }
+-        if (!fs_mgr_overlayfs_move_mount(new_entry.mount_point, new_entry.dir)) {
++        if (!fs_mgr_overlayfs_move_mount(new_entry.mount_point, new_entry.target)) {
+             retval = false;
+             if (new_entry.shared_flag) {
+                 fs_mgr_overlayfs_set_shared_mount(new_entry.mount_point, true);
+             }
+-            rmdir(new_entry.dir.c_str());
+-            continue;
++            remove_target(new_entry);
++            break;
+         }
+         moved_mounts.push_back(std::move(new_entry));
+     }
+ 
+-    retval &= fs_mgr_overlayfs_mount(mount_point, options);
++    // A failure to preserve any child must not hide that child beneath an overlay.
++    if (retval) retval = fs_mgr_overlayfs_mount(mount_point, options);
+ 
+     // Move submounts back.
+     for (const auto& entry : moved_mounts) {
+-        if (!fs_mgr_overlayfs_move_mount(entry.dir, entry.mount_point)) {
++        if (!fs_mgr_overlayfs_move_mount(entry.target, entry.mount_point)) {
+             retval = false;
+         } else if (entry.shared_flag &&
+                    !fs_mgr_overlayfs_set_shared_mount(entry.mount_point, true)) {
+             retval = false;
+         }
+-        rmdir(entry.dir.c_str());
++        remove_target(entry);
+     }
+     // If the original (overridden) mount was MS_SHARED, then set the overlayfs mount to MS_SHARED.
+     if (parent_shared && parent_made_private) {

@@ -82,6 +82,12 @@
         android:order="-380">
 
         <Preference
+            android:key="sheng_desktop_mode"
+            android:title="@*com.android.settings:string/sheng_desktop_title"
+            android:icon="@*com.android.settings:drawable/tile_icon_desktop_mode"
+            android:fragment="com.android.settings.sheng.DesktopModeSettings" />
+
+        <Preference
             android:key="gesture_system_navigation_input_summary"
             android:title="@*com.android.settings:string/system_navigation_title"
             android:icon="@*com.android.settings:drawable/ic_hand_gesture"

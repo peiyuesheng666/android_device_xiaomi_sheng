@@ -1,0 +1,14 @@
+--- a/frameworks/base/services/core/java/com/android/server/audio/AudioService.java
++++ b/frameworks/base/services/core/java/com/android/server/audio/AudioService.java
+@@ -5880,7 +5880,10 @@
+                 //   check since it might be obsolete
+                 if ((absDev == AudioSystem.DEVICE_OUT_BLUETOOTH_SCO
+-                        || absDev == AudioSystem.DEVICE_IN_BLUETOOTH_SCO_HEADSET)
++                        || absDev == AudioSystem.DEVICE_IN_BLUETOOTH_SCO_HEADSET
++                        // The sheng policy routes HFP playback to the headset variant.
++                        || (Build.DEVICE.equals("sheng")
++                            && absDev == AudioSystem.DEVICE_OUT_BLUETOOTH_SCO_HEADSET))
+                         && mMode.get() != MODE_ASSISTANT_CONVERSATION) {
+                     newStreamType = AudioManager.STREAM_VOICE_CALL;
+                 }
+                 if (stream != newStreamType) {

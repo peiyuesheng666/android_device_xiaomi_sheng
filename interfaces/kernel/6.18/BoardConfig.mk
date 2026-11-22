@@ -24,6 +24,11 @@ TARGET_KERNEL_ADDITIONAL_FLAGS := -j4 \
     PAHOLE=$(SHENG_KERNEL_PREBUILTS)/kernel-build-tools/linux_musl-x86/bin/pahole \
     KBUILD_GENDWARFKSYMS_STABLE=1 LOCALVERSION=
 BOARD_KERNEL_CMDLINE += sched_proxy_exec=0
+# build/make appends these after INTERNAL_RECOVERYIMAGE_ARGS. mkbootimg's last
+# --cmdline wins, including for a kernel-less Recovery sharing the boot kernel.
+# Recursive expansion retains the final common boot arguments without changing
+# normal Android's default-enabled boot-only logger or adding a reset deadline.
+BOARD_RECOVERY_MKBOOTIMG_ARGS = $(BOARD_MKBOOTIMG_ARGS) --cmdline "$(INTERNAL_KERNEL_CMDLINE) sheng_bootlog.enable=0 sheng_bootlog.test_timeout=0"
 BOOT_KERNEL_MODULES :=
 RECOVERY_KERNEL_MODULES :=
 BOOT_KERNEL_MODULES_FINDER := $(DEVICE_PATH)/tools/find_sheng_source_boot_modules.py

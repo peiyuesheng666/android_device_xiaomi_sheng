@@ -11,6 +11,7 @@ parser.add_argument('--install-root',type=Path)
 args=parser.parse_args()
 core=args.kernel_out.resolve()
 tools=Path(__file__).resolve().parent
+kernel_overlays=tools.parent/'interfaces/kernel/6.18'
 rom=tools.parents[3]
 source_project=rom/'kernel/xiaomi/sheng-build'
 deps=rom.parent/'diagnostics/kernel618-android-deps'
@@ -33,6 +34,13 @@ env.pop('MAKEFLAGS',None)
 def run(argv):
     subprocess.run(list(map(str,argv)),cwd=rom,env=env,check=True)
 if args.install_root is None:
+    # A WSL virtual disk can report plenty of guest space even with a full C:.
+    # Fail before copying sources or compiling if the backing host is too low.
+    host_c = Path('/mnt/c')
+    if host_c.is_mount() and 'microsoft' in os.uname().release.lower():
+        free_gib = shutil.disk_usage(host_c).free / (1 << 30)
+        if free_gib < 12:
+            parser.exit(1, f'Windows C: only has {free_gib:.2f} GiB free; reclaim space before this build (minimum 12 GiB).\n')
     # Standalone driver scripts create logs, provenance and dist files below
     # their project. Run a writable copy under OUT_DIR, keeping source inputs RO.
     project.mkdir(parents=True,exist_ok=True)
@@ -46,10 +54,31 @@ if args.install_root is None:
     if not sources.exists():
         sources.symlink_to(source_project/'sources',target_is_directory=True)
     assert sources.is_symlink() and sources.resolve()==(source_project/'sources').resolve()
-    for patch in sorted((tools.parent/'interfaces/kernel/6.18/android-module-patches').glob('*.patch')):
+    for patch in sorted((kernel_overlays/'android-module-patches').glob('*.patch')):
         subprocess.run(['git','apply','--check',str(patch)],cwd=project,env=env,check=True)
         subprocess.run(['git','apply',str(patch)],cwd=project,env=env,check=True)
     run(['bash',project/'scripts/prepare.sh'])
+    # Clean R2 inputs can predate the keyboard state/recovery overlays.
+    # Later patches edit their headers; the final source contract pins the files.
+    keyboard = b/'k618/sheng-ports/keyboard'
+    for header, name in (
+            ('sheng_nanosic_state.h', '0036-keyboard-cached-connection-state.patch'),
+            ('sheng_nanosic_recovery.h', '0037-keyboard-timeout-firmware-recovery.patch')):
+        if not (keyboard/header).is_file():
+            patch = kernel_overlays/'patches'/name
+            subprocess.run(['git','apply','--check',str(patch)],cwd=b,env=env,check=True)
+            subprocess.run(['git','apply',str(patch)],cwd=b,env=env,check=True)
+    for name in ("0038-keyboard-panel-state.patch", "0039-keyboard-boot-readiness.patch",
+                 "0040-keyboard-sleep-caps.patch"):
+        patch = kernel_overlays/'patches'/name
+        applied = subprocess.run(['git','apply','--reverse','--check',str(patch)],
+                                 cwd=b,env=env,capture_output=True).returncode == 0
+        if not applied:
+            subprocess.run(['git','apply','--check',str(patch)],cwd=b,env=env,check=True)
+            subprocess.run(['git','apply',str(patch)],cwd=b,env=env,check=True)
+    run([sys.executable, tools/'prepare_sheng_dp_usb.py', '--source-root', b/'k618'])
+    run([sys.executable, tools/'prepare_sheng_charge_error_contract.py', '--source-root', b/'k618'])
+    run([sys.executable, tools/'prepare_sheng_wlan_response.py', '--source-root', b/'k618'])
     out=b/'k618/out-gki'
     if not out.exists():
         out.symlink_to(core,target_is_directory=True)
@@ -61,6 +90,13 @@ if args.install_root is None:
                walt_source_receipt_sha256=sha(project/'provenance/walt-compatibility.json'))
     (core/'.kernel-ready.json').write_text(json.dumps(ready,indent=2)+'\n')
     run(['bash',project/'buildmodules.sh'])
+    # `make modules` can relink vmlinux. Its split-BTF base and all modules
+    # now refer to that final link, not the Image copied before this stage.
+    # Derive Image again, preserving the superseded bytes/receipt as evidence.
+    import time
+    run([sys.executable, tools/'sheng_kernel_image.py', '--kernel-out', core,
+         '--objcopy', shutil.which('llvm-objcopy', path=env['PATH']), '--finalize',
+         '--evidence', b/('image-finalization-'+str(time.time_ns()))])
     # Qualification and OTA preparation require fresh generated directories.
     # Regenerate them after successful module compilation on incremental builds.
     for name in ('qualified','android-modules'):
@@ -72,6 +108,8 @@ if args.install_root is None:
     run([sys.executable,tools/'prepare_source_kernel_ota.py',
          '--build-root',b,'--project',project,'--output',b/'android-modules'])
 else:
+    run([sys.executable, tools/'sheng_kernel_image.py', '--kernel-out', core,
+         '--objcopy', shutil.which('llvm-objcopy', path=env['PATH'])])
     validation=json.loads((b/'qualified/verification.json').read_text())
     assert validation['passed']
     release=(core/'include/config/kernel.release').read_text().strip()

@@ -1,0 +1,55 @@
+--- a/frameworks/base/libs/WindowManager/Shell/src/com/android/wm/shell/desktopmode/DesktopTasksController.kt
++++ b/frameworks/base/libs/WindowManager/Shell/src/com/android/wm/shell/desktopmode/DesktopTasksController.kt
+@@ -4410,6 +4410,11 @@
+                 // If there is no desk on the target display, then it is not capable of handling
+                 // desktop tasks.
+                 targetDeskId == null -> false
++                // The tablet switch also governs restored freeform tasks. These bypass
++                // the fullscreen-launch path and may still belong to a remembered desk.
++                android.os.Build.DEVICE == "sheng" && targetDisplayId == DEFAULT_DISPLAY ->
++                    android.provider.Settings.Global.getInt(
++                        context.contentResolver, "sheng_desktop_enabled", 0) == 1
+                 // TODO: b/456091097 - Check if we can remove this by merging TO_FRONT and lock task
+                 // transitions.
+                 Flags.enablePreventDesktopInLocktaskmodeBugfix() &&
+@@ -4747,12 +4752,21 @@
+     }
+ 
+     private fun shouldFreeformTaskLaunchSwitchToFullscreen(task: RunningTaskInfo): Boolean =
+-        !isAnyDeskActive(task.displayId, task.userId)
++        (android.os.Build.DEVICE == "sheng" && task.displayId == DEFAULT_DISPLAY &&
++            android.provider.Settings.Global.getInt(
++                context.contentResolver, "sheng_desktop_enabled", 0) == 0) ||
++            !isAnyDeskActive(task.displayId, task.userId)
+ 
+     private fun shouldFullscreenTaskLaunchSwitchToDesktop(
+         task: RunningTaskInfo,
+         @WindowManager.TransitionType requestType: Int,
+     ): Boolean {
++        // sheng's live switch owns the internal display. Shell must not infer
++        // the user's choice from a stale desk or a restored task's window mode.
++        if (android.os.Build.DEVICE == "sheng" && task.displayId == DEFAULT_DISPLAY) {
++            return android.provider.Settings.Global.getInt(
++                context.contentResolver, "sheng_desktop_enabled", 0) == 1
++        }
+         if (isDesktopFirstLegacy(task.displayId)) {
+             // We're in desktop-first mode.
+             val forceEnterDesktop = shouldForceEnterDesktopByDesktopFirstPolicy(task, requestType)
+--- a/frameworks/base/libs/WindowManager/Shell/src/com/android/wm/shell/windowdecor/common/CaptionVisibilityHelper.kt
++++ b/frameworks/base/libs/WindowManager/Shell/src/com/android/wm/shell/windowdecor/common/CaptionVisibilityHelper.kt
+@@ -58,6 +58,15 @@
+         // If DisplayController doesn't have it tracked, it could be a private/managed display, so
+         // return false if display is null
+         val display = displayController.getDisplay(taskInfo.displayId) ?: return false
++
++        // Keep ordinary tablet applications free of the desktop drag handle.
++        // Freeform desktop windows retain their normal title bar and controls.
++        if (android.os.Build.DEVICE == "sheng" && display.type == Display.TYPE_INTERNAL &&
++            taskInfo.windowingMode != WINDOWING_MODE_FREEFORM) {
++            val context = displayController.getDisplayContext(taskInfo.displayId) ?: return false
++            if (android.provider.Settings.Global.getInt(
++                    context.contentResolver, "sheng_desktop_enabled", 0) == 0) return false
++        }
+ 
+         if (!ENABLE_PROJECTED_DISPLAY_DESKTOP_MODE.isTrue) {
+             return allowedForTask(taskInfo, display, isKeyguardVisAndOccluded)

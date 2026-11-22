@@ -1,0 +1,196 @@
+
+11-07 04:43:10.474  1399  1399 I QTI PowerHAL: Power setMode: 5 to: 0
+11-07 04:43:10.682  1399  1399 I QTI PowerHAL: Power setMode: 5 to: 1
+11-07 04:43:12.201  1399  1399 I QTI PowerHAL: Power setMode: 5 to: 0
+11-07 04:43:12.376  1399  1399 I QTI PowerHAL: Power setMode: 5 to: 1
+11-07 04:43:13.626  1399  1399 I QTI PowerHAL: Power setMode: 5 to: 0
+11-07 04:43:13.785  1399  1399 I QTI PowerHAL: Power setMode: 5 to: 1
+11-07 04:43:15.066  1399  1399 I QTI PowerHAL: Power setMode: 5 to: 0
+11-07 04:43:15.251  1399  1399 I QTI PowerHAL: Power setMode: 5 to: 1
+11-07 04:43:16.321  1399  1399 I QTI PowerHAL: Power setMode: 5 to: 0
+11-07 04:43:16.707  1399  1399 I QTI PowerHAL: Power setMode: 5 to: 1
+11-07 04:43:17.698  5791  5791 I adbd    : adbd service requested 'shell,v2,TERM=dumb,raw:echo 0 > /proc/xm_htc_gesture_switch; echo 0 > /proc/xm_htc_gesture_dbclk; input keyevent KEYCODE_SLEEP; sleep 1; input keyevent KEYCODE_WAKEUP; cat /proc/xm_htc_gesture_switch; cat /proc/xm_htc_gesture_dbclk; getprop init.svc.vendor.xiaomi.touch_report; dumpsys power | grep -E "mWakefulness=|mDisplayPowerRequest="'
+11-07 04:43:17.740 27801 27801 E         : [04:43:17.713] [NVT-ts] xm_htc_gesture_switch_proc_write 2046: ++
+11-07 04:43:17.740 27801 27801 E         : [04:43:17.713] [NVT-ts] xm_htc_gesture_switch_proc_write 2073: gesture_switch = 0
+11-07 04:43:17.740 27801 27801 E         : [04:43:17.713] [NVT-ts] nvt_xm_htc_set_gesture_switch 1979: ++
+11-07 04:43:17.740 27801 27801 E         : [04:43:17.713] [NVT-ts] nvt_xm_htc_set_gesture_switch 1981: set gesture_switch: 0
+11-07 04:43:17.740 27801 27801 E         : [04:43:17.713] [NVT-ts] nvt_xm_htc_set_gesture_switch 1984: ts->gesture = 0
+11-07 04:43:17.740 27801 27801 E         : [04:43:17.713] [NVT-ts] nvt_xm_htc_set_gesture_switch 1986: --
+11-07 04:43:17.740 27801 27801 E         : [04:43:17.713] [NVT-ts] xm_htc_gesture_switch_proc_write 2080: --
+11-07 04:43:17.740 27801 27801 E         : [04:43:17.713] [NVT-ts] xm_htc_gesture_dbclk_proc_write 3616: ++
+11-07 04:43:17.740 27801 27801 E         : [04:43:17.713] [NVT-ts] xm_htc_gesture_dbclk_proc_write 3643: gesture_dbclk = 0
+11-07 04:43:17.740 27801 27801 E         : [04:43:17.713] [NVT-ts] nvt_xm_htc_set_gesture_dbclk 3531: ++
+11-07 04:43:17.740 27801 27801 E         : [04:43:17.713] [NVT-ts] nvt_xm_htc_set_gesture_dbclk 3533: set gesture_dbclk 0
+11-07 04:43:17.783 27801 27801 E         : [04:43:17.756] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x11, value: 0
+11-07 04:43:17.805 27801 27801 E         : [04:43:17.778] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+11-07 04:43:17.805 27801 27801 E         : [04:43:17.778] [NVT-ts] nvt_xm_htc_set_gesture_dbclk 3541: --
+11-07 04:43:17.805 27801 27801 E         : [04:43:17.778] [NVT-ts] xm_htc_gesture_dbclk_proc_write 3662: --
+11-07 04:43:17.842  1399  1399 I QTI PowerHAL: Power setMode: 5 to: 0
+11-07 04:43:18.895 27823 27823 E         : [04:43:18.868] [NVT-ts] xm_htc_gesture_switch_proc_read 2012: ++
+11-07 04:43:18.895 27823 27823 E         : [04:43:18.868] [NVT-ts] nvt_xm_htc_get_gesture_switch 1995: ++
+11-07 04:43:18.895 27823 27823 E         : [04:43:18.868] [NVT-ts] nvt_xm_htc_get_gesture_switch 1999: --
+11-07 04:43:18.895 27823 27823 E         : [04:43:18.868] [NVT-ts] xm_htc_gesture_switch_proc_read 2035: --
+11-07 04:43:18.895 27823 27823 E         : [04:43:18.869] [NVT-ts] xm_htc_gesture_switch_proc_read 2012: ++
+11-07 04:43:18.895 27823 27823 E         : [04:43:18.869] [NVT-ts] xm_htc_gesture_switch_proc_read 2020: read END
+11-07 04:43:18.907 27824 27824 E         : [04:43:18.880] [NVT-ts] xm_htc_gesture_dbclk_proc_read 3571: ++
+11-07 04:43:18.907 27824 27824 E         : [04:43:18.880] [NVT-ts] nvt_xm_htc_get_gesture_dbclk 3549: ++
+11-07 04:43:18.947 27824 27824 E         : [04:43:18.920] [NVT-ts] nvt_get_extend_custom_cmd 1159: ++, cmd: 0xBF, sub_cmd: 0x11
+11-07 04:43:18.969 27824 27824 E         : [04:43:18.942] [NVT-ts] nvt_get_extend_custom_cmd 1203: send cmd success, tried 0 times
+11-07 04:43:18.969 27824 27824 E         : [04:43:18.942] [NVT-ts] nvt_get_extend_custom_cmd 1205: get value: 0
+11-07 04:43:18.969 27824 27824 E         : [04:43:18.942] [NVT-ts] nvt_get_extend_custom_cmd 1211: --
+11-07 04:43:18.969 27824 27824 E         : [04:43:18.942] [NVT-ts] nvt_xm_htc_get_gesture_dbclk 3556: get gesture_dbclk: 0
+11-07 04:43:18.969 27824 27824 E         : [04:43:18.942] [NVT-ts] nvt_xm_htc_get_gesture_dbclk 3559: --
+11-07 04:43:18.969 27824 27824 E         : [04:43:18.942] [NVT-ts] xm_htc_gesture_dbclk_proc_read 3605: --
+11-07 04:43:18.970 27824 27824 E         : [04:43:18.943] [NVT-ts] xm_htc_gesture_dbclk_proc_read 3571: ++
+11-07 04:43:18.970 27824 27824 E         : [04:43:18.943] [NVT-ts] xm_htc_gesture_dbclk_proc_read 3579: read END
+11-07 04:43:32.508  1915  3108 I sysui_multi_action: [757,804,799,power_double_tap_interval,801,74258,802,1]
+11-07 04:43:33.241  1915  3108 I InputReader: Disabling NVTCapacitivePenP81c (device 10) because the associated viewport is not active
+11-07 04:43:33.241  1915  3108 I InputReader: Device reconfigured: id=10, name='NVTCapacitivePenP81c', size 20320x30480, orientation Rotation0, mode DISABLED, display id 0
+11-07 04:43:33.241  1915  3108 I InputReader: Disabling NVTCapacitivePenM80p (device 9) because the associated viewport is not active
+11-07 04:43:33.241  1915  3108 I InputReader: Device reconfigured: id=9, name='NVTCapacitivePenM80p', size 20320x30480, orientation Rotation0, mode DISABLED, display id 0
+11-07 04:43:33.241  1915  3108 I InputReader: Disabling NVTCapacitiveTouchScreen (device 8) because the associated viewport is not active
+11-07 04:43:33.241  1915  3108 I InputReader: Device reconfigured: id=8, name='NVTCapacitiveTouchScreen', size 20320x30480, orientation Rotation0, mode DISABLED, display id 0
+11-07 04:43:33.248  1400  1400 E sensors.xiaomi: Failed to write enable to /sys/class/touch/touch_dev/gesture_double_tap_enabled
+11-07 04:43:33.255  3297  3480 D StylusManager: Stylus InputDevice changed: 10 NVTCapacitivePenP81c
+11-07 04:43:33.256  3297  3480 D StylusManager: Stylus InputDevice changed: 9 NVTCapacitivePenM80p
+11-07 04:43:33.289  1044  1044 E         : [04:43:33.262] [NVT-ts] nvt_ts_suspend 6113: start, gesture_command:00
+11-07 04:43:33.289  1044  1044 E         : [04:43:33.262] [NVT-ts] nvt_irq_enable 702: enable=0, desc->depth=1
+11-07 04:43:33.290  1044  1044 E         : [04:43:33.263] [NVT-ts] nvt_enable_gesture_mode 3921: Enter deep sleep mode
+11-07 04:43:33.300  1412  1840 I [THP-ALG]: alg_pass_suspend_state_core:suspend:1
+11-07 04:43:33.301  1412  1840 I [THP-APP]: edge_filter_enter_suspend:edge_filter_enter_suspend:is supsend: 1
+11-07 04:43:33.301  1412  1840 I [THP-DAE]: send_touch_sensor_cmd:touch sensor cmd id:0, cmd:0 value:0
+11-07 04:43:33.301  1412  1840 I [THP-DAE]: 
+11-07 04:43:33.301  1412  1840 I [THP-HAL]: release_all:force:1
+11-07 04:43:33.383  1044  1044 E         : [04:43:33.356] [NVT-ts] nvt_ts_suspend 6155: end
+11-07 04:43:33.532  1915  3108 I sysui_multi_action: [757,804,799,power_double_tap_interval,801,1025,802,1]
+11-07 04:43:33.576  1399  1399 I QTI PowerHAL: Power setMode: 7 to: 0
+11-07 04:43:33.577  1399  1399 I QTI PowerHAL: Power setMode: 7 to: 1
+11-07 04:43:33.580  1915  3108 I InputReader: Device reconfigured: id=10, name='NVTCapacitivePenP81c', size 3048x2032, orientation Rotation0, mode DIRECT, display id 0
+11-07 04:43:33.580  1915  3108 I InputReader: Device reconfigured: id=9, name='NVTCapacitivePenM80p', size 3048x2032, orientation Rotation0, mode DIRECT, display id 0
+11-07 04:43:33.580  1915  3108 I InputReader: Device reconfigured: id=8, name='NVTCapacitiveTouchScreen', size 3048x2032, orientation Rotation90, mode DIRECT, display id 0
+11-07 04:43:33.618  3297  3480 D StylusManager: Stylus InputDevice changed: 10 NVTCapacitivePenP81c
+11-07 04:43:33.619  3297  3480 D StylusManager: Stylus InputDevice changed: 9 NVTCapacitivePenM80p
+11-07 04:43:33.818   221   221 E         : [04:43:33.791] [NVT-ts] nvt_ts_resume 6186: start
+11-07 04:43:33.818   221   221 E         : [04:43:33.791] [NVT-ts] update_firmware_request 324: filename is novatek_nt36532_n81a_fw_csot.bin
+11-07 04:43:33.818   221   221 W NVT-ts spi0.0: Direct firmware load for novatek_nt36532_n81a_fw_csot.bin failed with error -2
+11-07 04:43:33.818   221   221 W NVT-ts spi0.0: Falling back to sysfs fallback for: novatek_nt36532_n81a_fw_csot.bin
+11-07 04:43:33.830   221   221 E         : [04:43:33.804] [NVT-ts] nvt_get_fw_need_write_size 55: fw_need_write_size = 245760(0x3c000), NVT end flag
+11-07 04:43:33.830   221   221 E         : [04:43:33.804] [NVT-ts] nvt_bin_header_parser 147: cascade_2nd_header_info = 1
+11-07 04:43:33.830   221   221 E         : [04:43:33.804] [NVT-ts] nvt_bin_header_parser 179: ovly_info = 0, ilm_dlm_num = 2, ovly_sec_num = 0, info_sec_num = 14, partition = 16
+11-07 04:43:33.836   221   221 E         : [04:43:33.809] [NVT-ts] nvt_bootloader_reset 1859: end
+11-07 04:43:33.837   221   221 E         : [04:43:33.810] [NVT-ts] nvt_tx_auto_copy_mode 1688: tx auto copy mode 2 enable
+11-07 04:43:33.835  1400  1400 E sensors.xiaomi: Failed to write enable to /sys/class/touch/touch_dev/gesture_double_tap_enabled
+11-07 04:43:33.932   221   221 E         : [04:43:33.905] [NVT-ts] nvt_update_firmware 861: Update firmware success! <101345 us>
+11-07 04:43:33.932   221   221 E         : [04:43:33.906] [NVT-ts] nvt_get_fw_info 2033: fw_ver=0x13, fw_type=0x01, PID=0x5981, abs_x_max=30480, abs_y_max=20320, max_button_num=0
+11-07 04:43:33.917  1412  1840 I [THP-ALG]: alg_pass_suspend_state_core:suspend:0
+11-07 04:43:33.917  1412  1840 I [THP-APP]: edge_filter_enter_suspend:edge_filter_enter_suspend:is supsend: 0
+11-07 04:43:33.917  1412  1840 I [THP-DAE]: send_touch_sensor_cmd:touch sensor cmd id:0, cmd:0 value:5
+11-07 04:43:33.917  1412  1840 I [THP-DAE]: 
+11-07 04:43:33.917  1412  1840 I [THP-DAE]: send_touch_sensor_cmd:touch sensor cmd id:0, cmd:0 value:300
+11-07 04:43:33.917  1412  1840 I [THP-DAE]: 
+11-07 04:43:33.917  1412  1840 I [THP-HAL]: hal_send_touchsensor_result:Enter hal send cmd
+11-07 04:43:33.917  1412  1840 I [THP-DAE]: update_normal_edgefilter: filter_value:1700, orientation:0
+11-07 04:43:33.943   221   221 E         : [04:43:33.916] [NVT-ts] nvt_irq_enable 702: enable=1, desc->depth=0
+11-07 04:43:33.943   221   221 E         : [04:43:33.917] [NVT-ts] update_pen_status 3982: ++, enforce_send_cmd:1, bluetooth:0, charge:1, gamemode:0, enable_last_time:0
+11-07 04:43:33.983   221   221 E         : [04:43:33.956] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x04, value: 0
+11-07 04:43:34.007  1412  1412 I [THP-ALG]: alg_fod_get_poweron_base:fod base bak, ic_frame_cnt: 1, framedata_type: 14
+11-07 04:43:34.007  1412  1412 I [THP-ALG]: alg_fod_get_poweron_base:get fod base, resumed ic cnt: 1
+11-07 04:43:34.007  1412  1412 I [THP-ALG]: get_base_delta:get base ready
+11-07 04:43:34.007  1412  1412 I [THP-APP]: add_zone_range:add zone 0: type=0, (0, 26479, 1800, 30479), orientation is 2
+11-07 04:43:34.007  1412  1412 I [THP-APP]: add_zone_range:add zone 1: type=0, (17819, 27599, 20319, 30479), orientation is 2
+11-07 04:43:34.007  1412  1412 I [THP-APP]: add_zone_range:add zone 2: type=1, (0, 0, 390, 30479), orientation is 2
+11-07 04:43:34.007  1412  1412 I [THP-APP]: add_zone_range:add zone 3: type=1, (19929, 0, 20319, 30479), orientation is 2
+11-07 04:43:34.007  1412  1412 I [THP-APP]: add_zone_range:add zone 4: type=1, (0, 0, 20319, 100), orientation is 1
+11-07 04:43:34.007  1412  1412 I [THP-APP]: add_zone_range:add zone 5: type=1, (0, 30379, 20319, 30479), orientation is 1
+11-07 04:43:34.007  1412  1412 I [THP-APP]: print_zone_range_info:zone type=0, zone = (0, 26479, 1800, 30479)
+11-07 04:43:34.007  1412  1412 I [THP-APP]: print_zone_range_info:zone type=0, zone = (17819, 27599, 20319, 30479)
+11-07 04:43:34.007  1412  1412 I [THP-APP]: print_zone_range_info:zone type=1, zone = (0, 0, 390, 30479)
+11-07 04:43:34.007  1412  1412 I [THP-APP]: print_zone_range_info:zone type=1, zone = (19929, 0, 20319, 30479)
+11-07 04:43:34.007  1412  1412 I [THP-APP]: print_zone_range_info:zone type=1, zone = (0, 0, 20319, 100)
+11-07 04:43:34.007  1412  1412 I [THP-APP]: print_zone_range_info:zone type=1, zone = (0, 30379, 20319, 30479)
+11-07 04:43:34.022  1412  1840 I [THP-DAE]: user_cmd_set_cur_value:charging status:1
+11-07 04:43:34.048   221   221 E         : [04:43:34.021] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 2 times
+11-07 04:43:34.048   221   221 E         : [04:43:34.021] [NVT-ts] update_pen_status 4012: enable_last_time = 0, enable = 0, enforce_send_cmd = 1, skip notify surfaceflinger
+11-07 04:43:34.048   221   221 E         : [04:43:34.021] [NVT-ts] update_pen_status 4037: --
+11-07 04:43:34.048   221   221 E         : [04:43:34.021] [NVT-ts] nvt_ts_resume 6262: end
+11-07 04:43:34.112  1412  1412 I [THP-ALG]: alg_input_report:Touch Down: id: 0
+11-07 04:43:34.048   221   221 E         : [04:43:34.022] [NVT-ts] nvt_power_supply_work 4447: Power_supply_event:1
+11-07 04:43:34.320  1412  1412 I [THP-HAL]: release_all:force:0
+11-07 04:43:34.590  1839  1839 E         : [04:43:34.563] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+11-07 04:43:34.627  1839  1839 E         : [04:43:34.600] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+11-07 04:43:34.648  1839  1839 E         : [04:43:34.621] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+11-07 04:43:34.840  1838  1838 E         : [04:43:34.813] [NVT-ts] nvt_set_cur_value 4119: mode:1000, value:1, bTouchIsAwake:1
+11-07 04:43:34.879  1838  1838 E         : [04:43:34.852] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x01, value: 2
+11-07 04:43:34.875  1412  1838 I [THP-DAE]: thp_set_doze_mode_func:enable doze mode
+11-07 04:43:34.902  1838  1838 E         : [04:43:34.875] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+11-07 04:43:34.911  1412  1412 I [THP-ALG]: alg_input_report:Touch Down: id: 0
+11-07 04:43:34.973  1412  1412 I [THP-HAL]: release_all:force:0
+11-07 04:43:35.092  1412  1412 I [THP-ALG]: alg_input_report:Touch Down: id: 0
+11-07 04:43:35.140  1412  1412 I [THP-HAL]: release_all:force:0
+11-07 04:43:35.259  1412  1412 I [THP-ALG]: alg_input_report:Touch Down: id: 0
+11-07 04:43:35.320  1412  1412 I [THP-HAL]: release_all:force:0
+11-07 04:43:35.377  1412  1412 I [THP-ALG]: alg_input_report:Touch Down: id: 0
+11-07 04:43:35.446  1412  1412 I [THP-HAL]: release_all:force:0
+11-07 04:43:35.536  1412  1412 I [THP-ALG]: alg_input_report:Touch Down: id: 0
+11-07 04:43:35.605  1412  1412 I [THP-HAL]: release_all:force:0
+11-07 04:43:35.655  1412  1412 I [THP-ALG]: alg_input_report:Touch Down: id: 0
+11-07 04:43:35.730  1412  1412 I [THP-HAL]: release_all:force:0
+11-07 04:43:36.001  1839  1839 E         : [04:43:35.974] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+11-07 04:43:36.039  1839  1839 E         : [04:43:36.012] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+11-07 04:43:36.060  1839  1839 E         : [04:43:36.033] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+11-07 04:43:36.251  1838  1838 E         : [04:43:36.224] [NVT-ts] nvt_set_cur_value 4119: mode:1000, value:1, bTouchIsAwake:1
+11-07 04:43:36.287  1838  1838 E         : [04:43:36.260] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x01, value: 2
+11-07 04:43:36.281  1412  1838 I [THP-DAE]: thp_set_doze_mode_func:enable doze mode
+11-07 04:43:36.308  1838  1838 E         : [04:43:36.281] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+11-07 04:43:38.038  1412  1412 I [THP-ALG]: alg_input_report:Touch Down: id: 0
+11-07 04:43:38.129  1412  1412 I [THP-HAL]: touch_report_down:edge point: 0 remedy down
+11-07 04:43:38.183  1412  1412 I [THP-HAL]: release_all:force:0
+11-07 04:43:38.454  1839  1839 E         : [04:43:38.427] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+11-07 04:43:38.491  1839  1839 E         : [04:43:38.464] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+11-07 04:43:38.515  1839  1839 E         : [04:43:38.489] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+11-07 04:43:38.704  1838  1838 E         : [04:43:38.677] [NVT-ts] nvt_set_cur_value 4119: mode:1000, value:1, bTouchIsAwake:1
+11-07 04:43:38.743  1838  1838 E         : [04:43:38.716] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x01, value: 2
+11-07 04:43:38.739  1412  1838 I [THP-DAE]: thp_set_doze_mode_func:enable doze mode
+11-07 04:43:38.766  1838  1838 E         : [04:43:38.739] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+11-07 04:43:39.011  1412  1412 I [THP-ALG]: alg_input_report:Touch Down: id: 0
+11-07 04:43:39.107  1412  1412 I [THP-HAL]: release_all:force:0
+11-07 04:43:39.378  1839  1839 E         : [04:43:39.351] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+11-07 04:43:39.415  1839  1839 E         : [04:43:39.388] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+11-07 04:43:39.436  1839  1839 E         : [04:43:39.409] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+11-07 04:43:39.627  1838  1838 E         : [04:43:39.601] [NVT-ts] nvt_set_cur_value 4119: mode:1000, value:1, bTouchIsAwake:1
+11-07 04:43:39.667  1838  1838 E         : [04:43:39.640] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x01, value: 2
+11-07 04:43:39.663  1412  1838 I [THP-DAE]: thp_set_doze_mode_func:enable doze mode
+11-07 04:43:39.690  1838  1838 E         : [04:43:39.663] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+11-07 04:43:40.046  1412  1412 I [THP-ALG]: alg_input_report:Touch Down: id: 0
+11-07 04:43:40.123  1412  1412 I [THP-HAL]: touch_report_down:edge point: 0 remedy down
+11-07 04:43:40.134  1399  1399 I QTI PowerHAL: Power setMode: 5 to: 1
+11-07 04:43:40.198  1412  1412 I [THP-HAL]: release_all:force:0
+11-07 04:43:40.468  1839  1839 E         : [04:43:40.441] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+11-07 04:43:40.507  1839  1839 E         : [04:43:40.480] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+11-07 04:43:40.530  1839  1839 E         : [04:43:40.503] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+11-07 04:43:40.718  1838  1838 E         : [04:43:40.691] [NVT-ts] nvt_set_cur_value 4119: mode:1000, value:1, bTouchIsAwake:1
+11-07 04:43:40.755  1838  1838 E         : [04:43:40.728] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x01, value: 2
+11-07 04:43:40.749  1412  1838 I [THP-DAE]: thp_set_doze_mode_func:enable doze mode
+11-07 04:43:40.775  1838  1838 E         : [04:43:40.749] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+11-07 04:43:41.179  1399  1399 I QTI PowerHAL: Power setMode: 5 to: 0
+11-07 04:43:55.622  1915  3108 I InputReader: Disabling NVTCapacitivePenP81c (device 10) because the associated viewport is not active
+11-07 04:43:55.622  1915  3108 I InputReader: Device reconfigured: id=10, name='NVTCapacitivePenP81c', size 20320x30480, orientation Rotation0, mode DISABLED, display id 0
+11-07 04:43:55.622  1915  3108 I InputReader: Disabling NVTCapacitivePenM80p (device 9) because the associated viewport is not active
+11-07 04:43:55.622  1915  3108 I InputReader: Device reconfigured: id=9, name='NVTCapacitivePenM80p', size 20320x30480, orientation Rotation0, mode DISABLED, display id 0
+11-07 04:43:55.622  1915  3108 I InputReader: Disabling NVTCapacitiveTouchScreen (device 8) because the associated viewport is not active
+11-07 04:43:55.622  1915  3108 I InputReader: Device reconfigured: id=8, name='NVTCapacitiveTouchScreen', size 20320x30480, orientation Rotation0, mode DISABLED, display id 0
+11-07 04:43:55.653  1044  1044 E         : [04:43:55.626] [NVT-ts] nvt_ts_suspend 6113: start, gesture_command:00
+11-07 04:43:55.653  1044  1044 E         : [04:43:55.626] [NVT-ts] nvt_irq_enable 702: enable=0, desc->depth=1
+11-07 04:43:55.653  1044  1044 E         : [04:43:55.627] [NVT-ts] nvt_enable_gesture_mode 3921: Enter deep sleep mode
+11-07 04:43:55.661  3297  3480 D StylusManager: Stylus InputDevice changed: 10 NVTCapacitivePenP81c
+11-07 04:43:55.662  3297  3480 D StylusManager: Stylus InputDevice changed: 9 NVTCapacitivePenM80p
+11-07 04:43:55.668  1412  1840 I [THP-ALG]: alg_pass_suspend_state_core:suspend:1
+11-07 04:43:55.668  1412  1840 I [THP-APP]: edge_filter_enter_suspend:edge_filter_enter_suspend:is supsend: 1
+11-07 04:43:55.668  1412  1840 I [THP-DAE]: send_touch_sensor_cmd:touch sensor cmd id:0, cmd:0 value:0
+11-07 04:43:55.668  1412  1840 I [THP-DAE]: 
+11-07 04:43:55.668  1412  1840 I [THP-HAL]: release_all:force:1
+11-07 04:43:55.751  1044  1044 E         : [04:43:55.724] [NVT-ts] nvt_ts_suspend 6155: end
+11-07 04:43:55.940  1399  1399 I QTI PowerHAL: Power setMode: 7 to: 0
+11-07 04:43:55.971  1400  1400 E sensors.xiaomi: Failed to write enable to /sys/class/touch/touch_dev/gesture_double_tap_enabled
+11-07 04:44:50.589  5791  5791 I adbd    : adbd service requested 'shell,v2,TERM=dumb,raw:dmesg | grep -E "NVT-ts|THP|touch_report|xiaomi_touch|touch-socket"'
+

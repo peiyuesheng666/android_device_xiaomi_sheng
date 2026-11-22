@@ -1,0 +1,98 @@
+{
+  "archive": "E:\\6\\玩机资源\\修复方案\\source_focuspen.zip",
+  "archive_sha256": "5fd4ec3469e73b8573059babe4953ebcf94ebe13c02b108782ebe0f80ca6e21b",
+  "reference_only": true,
+  "selected": [
+    {
+      "path": "README.md",
+      "sha256": "e7d45ae12a292584073d933d6c3631ff29c4a9a96fcee3853d7bb5c8fae7d116",
+      "release_hash_status": "matched",
+      "not_executed": true
+    },
+    {
+      "path": "RELEASE.json",
+      "sha256": "b798ef1044e3e8f6b94aa0adc13b480d3b628e503f4931d2992c52f8c7f81297",
+      "release_hash_status": "matched",
+      "not_executed": true
+    },
+    {
+      "path": "SHA256SUMS.txt",
+      "sha256": "097853d23aef47ec88eddaef1b9216db484883f02d5e5319ea8c89fa3069e19e",
+      "release_hash_status": "not_listed",
+      "not_executed": true
+    },
+    {
+      "path": "src/c/focuspen_guard.c",
+      "sha256": "38a0b5ede81fd51fe12fe585f61e357f40c32e3c3f18f8064e85b1f3362bdb29",
+      "release_hash_status": "matched",
+      "not_executed": true
+    },
+    {
+      "path": "src/c/focuspen_identity.h",
+      "sha256": "7c582566beccfd15949d18c268bf37629e56d181a911d32946adaff9966a1f60",
+      "release_hash_status": "matched",
+      "not_executed": true
+    },
+    {
+      "path": "src/c/pressure_bridge.c",
+      "sha256": "95512cf22b55c1075a1e5c392449276e861d5317d57717fa08cea3b161830f5d",
+      "release_hash_status": "matched",
+      "not_executed": true
+    },
+    {
+      "path": "src/java/FocusPenBridge.java",
+      "sha256": "ee3a032287aef431ada0c7aeafbcbf274111c0b60654934018e6e4013d5e7251",
+      "release_hash_status": "matched",
+      "not_executed": true
+    },
+    {
+      "path": "src/java/PenInputIdentity.java",
+      "sha256": "e831da60c833520962ff74cd700d18f45b38fff57fc6c06151339394546a41d8",
+      "release_hash_status": "matched",
+      "not_executed": true
+    },
+    {
+      "path": "src/java/TouchAwakeGate.java",
+      "sha256": "87b708a97307e5c0d3bd99e31d9c04bbad95c99dcfb77bfd70296216631681d1",
+      "release_hash_status": "matched",
+      "not_executed": true
+    },
+    {
+      "path": "src/java/TouchNodeReader.java",
+      "sha256": "967cc36d826ffa43371f789c2eb16bc5d3384416bfa01451cab7291dcadd322f",
+      "release_hash_status": "matched",
+      "not_executed": true
+    },
+    {
+      "path": "src/java/ipe/FocusPenDeviceIdentity.java",
+      "sha256": "0d10301ed30a82836823f996b737d262223cc8de180a78100aa0001ce5f74d4f",
+      "release_hash_status": "matched",
+      "not_executed": true
+    },
+    {
+      "path": "src/java/ipe/FocusPenVisualCompat.java",
+      "sha256": "ad9fac8a08385e8e8894cad777606e457753c4484bd90c18f109f509b438f216",
+      "release_hash_status": "matched",
+      "not_executed": true
+    },
+    {
+      "path": "verification/device-test.txt",
+      "sha256": "0a435319407103f2a2f15904b7d76f0b73fb30a09c5741098b0d50de91ed9b0b",
+      "release_hash_status": "matched",
+      "not_executed": true
+    },
+    {
+      "path": "build/out/Xiaomipen",
+      "sha256": "da6612573fee9ba4311f24fab4c3c15ae47e725c0447319d599590e2c82270f5",
+      "release_hash_status": "not_listed",
+      "not_executed": true
+    }
+  ],
+  "local_documentation": {
+    "archive_member": "README.md",
+    "original_local_path": "reports/device/20261114-media-display/documentation-cleanup/docs/candidates/coloros-focuspen-reference-20261111/README.md.before.txt",
+    "original_sha256": "e7d45ae12a292584073d933d6c3631ff29c4a9a96fcee3853d7bb5c8fae7d116",
+    "replacement_local_path": "device/xiaomi/sheng/docs/candidates/coloros-focuspen-reference-20261111/README.md",
+    "replacement_sha256": "2a8c0fff4621e112d3b6fc5d30dd45e6e448943e0459a8be47a69cf7244de646"
+  }
+}

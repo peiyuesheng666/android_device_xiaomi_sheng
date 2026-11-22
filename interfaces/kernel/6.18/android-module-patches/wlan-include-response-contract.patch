@@ -1,0 +1,11 @@
+--- a/scripts/android_source_contract.py
++++ b/scripts/android_source_contract.py
+@@ -8,4 +8,8 @@
+ 
++# Pin the complete prepared WLAN Kbuild, including response-file tracking.
++EXPECTED['k618/vendor/qcom/opensource/wlan/qcacld-3.0/Kbuild'] = \
++    'cd232861341af14c44037f1e1227da211fbff38d3480a679f9db579448e62137'
++
+ def android_interface_matches(name, got):
+     from android_lts_contract import android_lts_matches
+     if android_lts_matches(name, got):

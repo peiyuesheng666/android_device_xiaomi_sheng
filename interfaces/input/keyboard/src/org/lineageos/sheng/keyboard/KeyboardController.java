@@ -32,10 +32,17 @@ final class KeyboardController implements KeyboardHal.Listener {
     private boolean needsWake = true;
     private boolean featuresDirty = true;
     private boolean touchpadEnabled;
+    private final KeyboardBacklight backlight = new KeyboardBacklight();
+    private final KeyboardAutomaticBacklight automaticBacklight;
+    private String lastBacklightGate;
+    private final KeyboardBacklightWake backlightWake = new KeyboardBacklightWake();
+    private final KeyboardStartupWake startupWake = new KeyboardStartupWake();
+    private boolean lightUsable;
 
     KeyboardController(Context context) {
         HandlerThread thread = new HandlerThread("sheng-keyboard-link"); thread.start();
         worker = new Handler(thread.getLooper());
+        automaticBacklight = new KeyboardAutomaticBacklight(context, worker);
         HandlerThread authThread = new HandlerThread("sheng-keyboard-auth"); authThread.start();
         authWorker = new Handler(authThread.getLooper());
         power = context.getSystemService(PowerManager.class);
@@ -48,11 +55,28 @@ final class KeyboardController implements KeyboardHal.Listener {
         auth = new MiDevAuthClient(context, () -> worker.post(() -> { nextAttempt = 0; attempts = 0; }));
     }
 
-    void update(Boolean connection, boolean enableTouchpad) {
+    void update(Boolean connection, boolean enableTouchpad, int brightness, int tabletMode) {
         worker.post(() -> {
+            boolean usableForLight = Boolean.TRUE.equals(connection)
+                    && tabletMode == 0 && power.isInteractive();
+            lightUsable = usableForLight;
+            if (startupWake.update(usableForLight, android.os.SystemClock.uptimeMillis())) {
+                needsWake = true;
+                Log.i("ShengKeyboard", "Stock bounded startup activation");
+            }
+            if (backlightWake.update(brightness, automaticBacklight.enabled(), usableForLight, awake)) {
+                // The MCU idles independently of screen state. An explicit user
+                // adjustment needs a normal activation and its real awake reply.
+                // Do not set awake optimistically or wake for ambient lux changes.
+                needsWake = true;
+                startupWake.resumed(usableForLight, android.os.SystemClock.uptimeMillis());
+            }
             if (touchpadEnabled != enableTouchpad) {
                 touchpadEnabled = enableTouchpad; featuresDirty = true;
             }
+            int requested = automaticBacklight.resolve(Boolean.TRUE.equals(connection)
+                    && tabletMode == 0 && power.isInteractive(), brightness);
+            backlight.update(connection, requested, tabletMode);
             // An unreadable state is not evidence that the keyboard was detached.
             updateOnWorker(connection == null ? attached : connection);
         });
@@ -80,7 +104,7 @@ final class KeyboardController implements KeyboardHal.Listener {
             if (++attempts == 1) Log.w("ShengKeyboard", "Original keyboard HAL unavailable");
             return;
         }
-        // One normal activation request, never a keep-awake loop or a reset.
+        // Initial activation; subsequent startup refreshes are bounded to 120s.
         if (!wakeIfNeeded()) return;
         auth.bind();
         if (!auth.available()) return;
@@ -102,7 +126,7 @@ final class KeyboardController implements KeyboardHal.Listener {
         Pending request = pending;
         if (request != null) request.done.countDown();
         pending = null;
-        features.clear(); featuresDirty = true;
+        features.clear(); featuresDirty = true; backlight.invalidate();
         // The single auth worker serializes in-flight Binder calls across reconnects.
         // A stale result cannot change the new attachment's state.
     }
@@ -115,7 +139,9 @@ final class KeyboardController implements KeyboardHal.Listener {
         int command = reply[4] & 0xff;
         boolean fromKeyboard = (reply[2] & 0xff) == KeyboardProtocol.KEYBOARD;
         if (fromKeyboard && reply[1] == 0x30 && command == KeyboardProtocol.VERSION) {
-            keyboardType = KeyboardProtocol.keyboardType(reply);
+            int nextType = KeyboardProtocol.keyboardType(reply);
+            if (nextType != keyboardType) backlight.invalidate();
+            keyboardType = nextType;
             featuresDirty = true;
         }
         if (fromKeyboard && reply[1] == 0x31 && reply[5] == 1) {
@@ -124,7 +150,18 @@ final class KeyboardController implements KeyboardHal.Listener {
             if ((command == KeyboardProtocol.SLEEP || command == KeyboardProtocol.POWER)
                     && (value == 0 || value == 1)) {
                 boolean nowAwake = value == 1;
-                if (awake != nowAwake) { awake = nowAwake; features.clear(); featuresDirty = true; }
+                if (awake != nowAwake) {
+                    // A real MCU sleep-status wake starts a fresh bounded window.
+                    // POWER acknowledgements from our 12s refresh must never renew it.
+                    if (nowAwake && command == KeyboardProtocol.SLEEP) {
+                        startupWake.resumed(lightUsable, android.os.SystemClock.uptimeMillis());
+                        Log.i("ShengKeyboard", "MCU input wake: restart bounded light window");
+                    }
+                    awake = nowAwake;
+                    features.clear();
+                    featuresDirty = true;
+                    backlight.invalidate();
+                }
             }
         }
         Pending request = pending;
@@ -150,9 +187,24 @@ final class KeyboardController implements KeyboardHal.Listener {
     }
 
     private void applyFeatures() {
-        if (!featuresDirty || !active || !awake || !verified
-                || !KeyboardProtocol.hasTouchpad(keyboardType)) return;
-        if (features.send(KeyboardProtocol.TOUCHPAD, touchpadEnabled)) featuresDirty = false;
+        String gate = "active=" + active + " awake=" + awake + " verified=" + verified
+                + " type=" + keyboardType + " capable=" + KeyboardProtocol.hasBacklight(keyboardType);
+        if (!gate.equals(lastBacklightGate)) {
+            lastBacklightGate = gate;
+            Log.i("ShengKeyboard", "Backlight gate " + gate);
+        }
+        if (!active || !awake || !verified) return;
+        if (KeyboardProtocol.hasTouchpad(keyboardType) && featuresDirty
+                && features.send(KeyboardProtocol.TOUCHPAD, touchpadEnabled)) {
+            featuresDirty = false;
+        }
+        backlight.apply(KeyboardProtocol.hasBacklight(keyboardType),
+                value -> {
+                    boolean submitted = hal.send(KeyboardProtocol.backlight(value));
+                    if (submitted) automaticBacklight.submitted(value);
+                    Log.i("ShengKeyboard", "Backlight percent=" + value + " submitted=" + submitted);
+                    return submitted;
+                });
     }
 
     private boolean wakeIfNeeded() {

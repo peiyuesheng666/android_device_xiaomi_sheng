@@ -1,0 +1,32 @@
+// SPDX-License-Identifier: Apache-2.0
+// Selected only for debug products; runtime acceptance remains pending.
+cc_binary {
+    name: "sheng_overlay_remounter",
+    // Only the preferred canonical-path installer below may deploy this output.
+    stem: "sheng_overlay_remounter",
+    installable: false,
+    srcs: ["overlay_remounter.cpp"],
+    cflags: ["-D_FILE_OFFSET_BITS=64", "-Wall", "-Werror"],
+    static_libs: ["libbase", "liblog"],
+    system_shared_libs: [],
+    static_executable: true,
+}
+
+// This is an adapter for THIS build's source output, not an opaque prebuilt.
+// prefer replaces the public source provider before Make/symbol installation;
+// overrides alone leaves conflicting installation rules in this build system.
+cc_prebuilt_binary {
+    name: "overlay_remounter",
+    srcs: [":sheng_overlay_remounter"],
+    prefer: true,
+    enabled: select(soong_config_variable("sheng", "first_stage_rootfix"), {
+        "true": true,
+        default: false,
+    }),
+    static_executable: true,
+    system_shared_libs: [],
+    stl: "none",
+    install_in_xbin: true,
+    // The compiler has already stripped its output; ELF checks stay enabled.
+    strip: { none: true },
+}

@@ -1,0 +1,17 @@
+<resources>
+    <string name="app_name">USB 反向充电</string>
+    <string name="battery_switch_title">USB 反向供电</string>
+    <string name="connect_device">请连接 USB-C 设备</string>
+    <string name="supplying">正在向连接的设备供电</string>
+    <string name="receiving">正在受电</string>
+    <string name="switching">正在切换供电方向…</string>
+    <string name="unsupported">连接的设备不支持切换供电方向</string>
+    <string name="failed">无法切换 USB 供电方向</string>
+    <string name="page_summary">为手机等 USB-C 设备供电</string>
+    <string name="enable">为连接的设备充电</string>
+    <string name="help">使用 USB-C 线连接手机后开启。能否切换取决于连接的设备。关闭开关会请求由对方供电；如需完全停止供电，请拔下连接线。</string>
+    <string name="notification_channel">USB 供电连接</string>
+    <string name="notification_receiving">正在通过 USB 为此平板充电</string>
+    <string name="notification_supplying">正在通过 USB 为连接的设备充电</string>
+    <string name="notification_detail">点按可更改 USB 供电方向</string>
+</resources>

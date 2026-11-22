@@ -61,6 +61,21 @@ public final class AtmosApplication extends ContextWrapper {
         worker = new Handler(thread.getLooper()); worker.post(reconcile);
     }
     public State getState() { return state; }
+    private final Handler ui = new Handler(android.os.Looper.getMainLooper());
+    private final java.util.concurrent.CopyOnWriteArrayList<java.util.function.Consumer<State>>
+            listeners = new java.util.concurrent.CopyOnWriteArrayList<>();
+    public void addListener(java.util.function.Consumer<State> listener) {
+        listeners.addIfAbsent(listener);
+    }
+    public void removeListener(java.util.function.Consumer<State> listener) {
+        listeners.remove(listener);
+    }
+    private void publishState() {
+        final State value = state;
+        ui.post(() -> {
+            for (java.util.function.Consumer<State> listener : listeners) listener.accept(value);
+        });
+    }
     public void setRequested(boolean enabled) {
         requested = enabled;
         preferences.edit().putBoolean("enabled", enabled).apply();
@@ -147,12 +162,14 @@ public final class AtmosApplication extends ContextWrapper {
                 StockDms.getParameter(effect, profile, StockDms.DIALOG)[0] != 0,
                 StockDms.getParameter(effect, profile, StockDms.DIALOG_AMOUNT)[0],
                 StockDms.getParameter(effect, profile, StockDms.GAINS));
+        publishState();
     }
     private void reportError(Exception error) {
         Log.w("ShengDolby", "Unable to apply Dolby setting", error);
         State old = state;
         state = new State(++version, requested, false, old.ready, true,
                 old.profile, old.ieq, old.dialog, old.dialogAmount, old.gains);
+        publishState();
     }
     private void applyEffect() {
         worker.removeCallbacks(reconcile);

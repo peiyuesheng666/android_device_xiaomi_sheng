@@ -1,5 +1,8 @@
 # SPDX-License-Identifier: Apache-2.0
 # Paths verified in the supplied firmware's init.mfp-daemon.rc.
+on property:sys.boot_completed=1
+    write /sys/module/sheng_bootlog/parameters/boot_complete 1
+
 service vendor.sheng-touch-report /vendor/bin/sheng-touch-report
     class hal
     user system

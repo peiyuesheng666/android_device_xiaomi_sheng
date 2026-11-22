@@ -1,0 +1,33 @@
+// SPDX-License-Identifier: Apache-2.0
+// Preserve upstream sources, flags and dependencies. Only overlay child-mount
+// preservation differs; source/provenance identities are pinned in the lock.
+package {
+    default_applicable_licenses: [
+        "Android-Apache-2.0",
+        "sheng_fs_mgr_first_stage_upstream_license",
+    ],
+}
+
+license {
+    name: "sheng_fs_mgr_first_stage_upstream_license",
+    visibility: [":__subpackages__"],
+    license_kinds: ["SPDX-license-identifier-MIT"],
+    license_text: ["NOTICE"],
+}
+
+cc_library_static {
+    name: "libsheng_fs_mgr_first_stage",
+    defaults: ["libfs_mgr_defaults"],
+    // Preserve upstream private sibling includes (e.g. libfstab/fstab_priv.h).
+    // The local copied headers still take precedence; no public file is edited.
+    include_dirs: ["system/fs/fs_mgr"],
+    ramdisk_available: true,
+    vendor_ramdisk_available: true,
+    recovery_available: true,
+    srcs: [":libfiemap_passthrough_srcs"],
+    target: {
+        recovery: {
+            cflags: ["-DSKIP_SET_BLK_RO"],
+        },
+    },
+}

@@ -1,0 +1,1185 @@
+[  671.870666] [04:16:37.012] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  671.906908] [04:16:37.048] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  671.927625] [04:16:37.069] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  672.120613] [04:16:37.262] [NVT-ts] nvt_set_cur_value 4119: mode:1000, value:1, bTouchIsAwake:1
+[  672.158945] [04:16:37.300] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x01, value: 2
+[  672.179944] [04:16:37.321] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  673.858205] [04:16:38.999] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  673.894991] [04:16:39.036] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  673.915853] [04:16:39.057] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  674.108083] [04:16:39.249] [NVT-ts] nvt_set_cur_value 4119: mode:1000, value:1, bTouchIsAwake:1
+[  674.147004] [04:16:39.288] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x01, value: 2
+[  674.169802] [04:16:39.311] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  682.195657] [04:16:47.337] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  682.234956] [04:16:47.376] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  682.257634] [04:16:47.399] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  682.445706] [04:16:47.587] [NVT-ts] nvt_set_cur_value 4119: mode:1000, value:1, bTouchIsAwake:1
+[  682.483020] [04:16:47.624] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x01, value: 2
+[  682.503860] [04:16:47.645] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  689.880034] [04:16:55.021] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  689.918898] [04:16:55.060] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  689.942038] [04:16:55.083] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  690.421877] [04:16:55.563] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  690.458898] [04:16:55.600] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  690.479479] [04:16:55.621] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  690.671876] [04:16:55.813] [NVT-ts] nvt_set_cur_value 4119: mode:1000, value:1, bTouchIsAwake:1
+[  690.710896] [04:16:55.852] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x01, value: 2
+[  690.734037] [04:16:55.875] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  691.304377] [04:16:56.445] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  691.342901] [04:16:56.484] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  691.366573] [04:16:56.508] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  691.554370] [04:16:56.695] [NVT-ts] nvt_set_cur_value 4119: mode:1000, value:1, bTouchIsAwake:1
+[  691.594891] [04:16:56.736] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x01, value: 2
+[  691.616393] [04:16:56.757] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  692.144938] [04:16:57.286] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  692.182886] [04:16:57.324] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  692.203458] [04:16:57.345] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  692.394937] [04:16:57.536] [NVT-ts] nvt_set_cur_value 4119: mode:1000, value:1, bTouchIsAwake:1
+[  692.434892] [04:16:57.576] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x01, value: 2
+[  692.457098] [04:16:57.598] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  699.843671] [04:17:04.985] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  699.882931] [04:17:05.024] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  699.905688] [04:17:05.047] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  700.093663] [04:17:05.235] [NVT-ts] nvt_set_cur_value 4119: mode:1000, value:1, bTouchIsAwake:1
+[  700.131010] [04:17:05.272] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x01, value: 2
+[  700.151755] [04:17:05.293] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  701.032224] [04:17:06.173] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  701.070989] [04:17:06.212] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  701.093816] [04:17:06.235] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  701.282209] [04:17:06.423] [NVT-ts] nvt_set_cur_value 4119: mode:1000, value:1, bTouchIsAwake:1
+[  701.318972] [04:17:06.460] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x01, value: 2
+[  701.339918] [04:17:06.481] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  701.928082] [04:17:07.069] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  701.967125] [04:17:07.108] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  701.990273] [04:17:07.131] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  702.178113] [04:17:07.319] [NVT-ts] nvt_set_cur_value 4119: mode:1000, value:1, bTouchIsAwake:1
+[  702.214915] [04:17:07.356] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x01, value: 2
+[  702.236020] [04:17:07.377] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  702.518959] [04:17:07.660] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  702.558922] [04:17:07.700] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  702.580807] [04:17:07.722] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  702.977527] [04:17:08.119] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  703.015060] [04:17:08.156] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  703.036403] [04:17:08.177] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  703.644230] [04:17:08.785] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  703.682945] [04:17:08.824] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  703.707046] [04:17:08.848] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  704.887959] [04:17:10.029] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  704.926901] [04:17:10.068] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  704.949858] [04:17:10.091] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  705.478490] [04:17:10.620] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  705.514865] [04:17:10.656] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  705.535489] [04:17:10.677] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  705.728495] [04:17:10.870] [NVT-ts] nvt_set_cur_value 4119: mode:1000, value:1, bTouchIsAwake:1
+[  705.766902] [04:17:10.908] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x01, value: 2
+[  705.787645] [04:17:10.929] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  706.214946] [04:17:11.356] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  706.254950] [04:17:11.396] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  706.276990] [04:17:11.418] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  706.464927] [04:17:11.606] [NVT-ts] nvt_set_cur_value 4119: mode:1000, value:1, bTouchIsAwake:1
+[  706.502946] [04:17:11.644] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x01, value: 2
+[  706.523573] [04:17:11.665] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  706.951545] [04:17:12.093] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  706.990917] [04:17:12.132] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  707.013504] [04:17:12.155] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  707.201541] [04:17:12.343] [NVT-ts] nvt_set_cur_value 4119: mode:1000, value:1, bTouchIsAwake:1
+[  707.238917] [04:17:12.380] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x01, value: 2
+[  707.259542] [04:17:12.401] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  713.031675] [04:17:18.173] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  713.071068] [04:17:18.212] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  713.093285] [04:17:18.234] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  713.281617] [04:17:18.423] [NVT-ts] nvt_set_cur_value 4119: mode:1000, value:1, bTouchIsAwake:1
+[  713.318925] [04:17:18.460] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x01, value: 2
+[  713.339782] [04:17:18.481] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  713.802494] [04:17:18.944] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  713.838964] [04:17:18.980] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  713.859919] [04:17:19.001] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  714.052490] [04:17:19.194] [NVT-ts] nvt_set_cur_value 4119: mode:1000, value:1, bTouchIsAwake:1
+[  714.091130] [04:17:19.232] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x01, value: 2
+[  714.114676] [04:17:19.256] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  714.615456] [04:17:19.757] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  714.654942] [04:17:19.796] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  714.677513] [04:17:19.819] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  714.865403] [04:17:20.006] [NVT-ts] nvt_set_cur_value 4119: mode:1000, value:1, bTouchIsAwake:1
+[  714.902931] [04:17:20.044] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x01, value: 2
+[  714.923664] [04:17:20.065] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  715.435290] [04:17:20.576] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  715.474992] [04:17:20.616] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  715.497664] [04:17:20.639] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  715.685284] [04:17:20.826] [NVT-ts] nvt_set_cur_value 4119: mode:1000, value:1, bTouchIsAwake:1
+[  715.722997] [04:17:20.864] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x01, value: 2
+[  715.743707] [04:17:20.885] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  716.644427] [04:17:21.785] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  716.682999] [04:17:21.824] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  716.706297] [04:17:21.847] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  716.894547] [04:17:22.036] [NVT-ts] nvt_set_cur_value 4119: mode:1000, value:1, bTouchIsAwake:1
+[  716.931045] [04:17:22.072] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x01, value: 2
+[  716.952339] [04:17:22.093] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  723.363024] [04:17:28.504] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  723.403021] [04:17:28.544] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  723.424945] [04:17:28.566] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  723.608219] type=1400 audit(1794025048.746:9511): avc:  denied  { write } for  comm="touch-m-Film" name="property_service" dev="tmpfs" ino=1148 scontext=u:r:vendor_sheng_touch_report:s0 tcontext=u:object_r:property_socket:s0 tclass=sock_file permissive=0
+[  723.891021] [04:17:29.032] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  723.930897] [04:17:29.072] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  723.952931] [04:17:29.094] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  724.141032] [04:17:29.282] [NVT-ts] nvt_set_cur_value 4119: mode:1000, value:1, bTouchIsAwake:1
+[  724.178914] [04:17:29.320] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x01, value: 2
+[  724.199445] [04:17:29.340] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  724.537330] [04:17:29.678] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  724.574924] [04:17:29.716] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  724.595582] [04:17:29.737] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  724.988852] [04:17:30.130] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  725.026964] [04:17:30.168] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  725.051053] [04:17:30.192] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  725.238910] [04:17:30.380] [NVT-ts] nvt_set_cur_value 4119: mode:1000, value:1, bTouchIsAwake:1
+[  725.278918] [04:17:30.420] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x01, value: 2
+[  725.300862] [04:17:30.442] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  726.552116] [04:17:31.693] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  726.590951] [04:17:31.732] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  726.614329] [04:17:31.755] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  726.997007] [04:17:32.138] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  727.034914] [04:17:32.176] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  727.055592] [04:17:32.197] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  727.525145] [04:17:32.666] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  727.562942] [04:17:32.704] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  727.583579] [04:17:32.725] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  728.303166] [04:17:33.444] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  728.342890] [04:17:33.484] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  728.365061] [04:17:33.506] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  728.699317] [04:17:33.840] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  728.738995] [04:17:33.880] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  728.761135] [04:17:33.902] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  729.261810] [04:17:34.403] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  729.298917] [04:17:34.440] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  729.319543] [04:17:34.461] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  729.567188] [04:17:34.708] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  729.606925] [04:17:34.748] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  729.629603] [04:17:34.771] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  730.047315] [04:17:35.188] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  730.086905] [04:17:35.228] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  730.109665] [04:17:35.251] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  730.415449] [04:17:35.556] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  730.458933] [04:17:35.600] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  730.479821] [04:17:35.621] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  730.665470] [04:17:35.807] [NVT-ts] nvt_set_cur_value 4119: mode:1000, value:1, bTouchIsAwake:1
+[  730.702926] [04:17:35.844] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x01, value: 2
+[  730.723633] [04:17:35.865] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  731.575758] [04:17:36.717] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  731.614950] [04:17:36.756] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  731.637795] [04:17:36.779] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  731.873784] [04:17:37.015] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  731.910926] [04:17:37.052] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  731.931702] [04:17:37.073] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  732.123847] [04:17:37.265] [NVT-ts] nvt_set_cur_value 4119: mode:1000, value:1, bTouchIsAwake:1
+[  732.162979] [04:17:37.304] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x01, value: 2
+[  732.186407] [04:17:37.327] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  733.548999] [04:17:38.690] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  733.586962] [04:17:38.728] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  733.607705] [04:17:38.749] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  733.799003] [04:17:38.940] [NVT-ts] nvt_set_cur_value 4119: mode:1000, value:1, bTouchIsAwake:1
+[  733.838904] [04:17:38.980] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x01, value: 2
+[  733.860959] [04:17:39.002] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  734.466053] [04:17:39.607] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  734.502915] [04:17:39.644] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  734.523759] [04:17:39.665] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  734.890205] [04:17:40.031] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  734.926926] [04:17:40.068] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  734.947640] [04:17:40.089] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  735.140224] [04:17:40.281] [NVT-ts] nvt_set_cur_value 4119: mode:1000, value:1, bTouchIsAwake:1
+[  735.182907] [04:17:40.324] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x01, value: 2
+[  735.203684] [04:17:40.345] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  735.689030] [04:17:40.830] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  735.726971] [04:17:40.868] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  735.747652] [04:17:40.889] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  735.939035] [04:17:41.080] [NVT-ts] nvt_set_cur_value 4119: mode:1000, value:1, bTouchIsAwake:1
+[  735.978965] [04:17:41.120] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x01, value: 2
+[  736.001627] [04:17:41.143] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  736.522611] [04:17:41.664] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  736.559048] [04:17:41.700] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  736.579792] [04:17:41.721] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  736.995155] [04:17:42.136] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  737.034942] [04:17:42.176] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  737.057173] [04:17:42.198] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  737.300293] [04:17:42.441] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  737.338983] [04:17:42.480] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  737.359720] [04:17:42.501] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  737.550306] [04:17:42.691] [NVT-ts] nvt_set_cur_value 4119: mode:1000, value:1, bTouchIsAwake:1
+[  737.586951] [04:17:42.728] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x01, value: 2
+[  737.607703] [04:17:42.749] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  738.183222] [04:17:43.324] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  738.222975] [04:17:43.364] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  738.245380] [04:17:43.386] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  738.433266] [04:17:43.574] [NVT-ts] nvt_set_cur_value 4119: mode:1000, value:1, bTouchIsAwake:1
+[  738.470899] [04:17:43.612] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x01, value: 2
+[  738.491652] [04:17:43.633] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  739.065689] [04:17:44.207] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  739.103015] [04:17:44.244] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  739.123619] [04:17:44.265] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  739.315667] [04:17:44.457] [NVT-ts] nvt_set_cur_value 4119: mode:1000, value:1, bTouchIsAwake:1
+[  739.354944] [04:17:44.496] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x01, value: 2
+[  739.378280] [04:17:44.519] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  739.677135] [04:17:44.818] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  739.718930] [04:17:44.860] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  739.739639] [04:17:44.881] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  739.927119] [04:17:45.068] [NVT-ts] nvt_set_cur_value 4119: mode:1000, value:1, bTouchIsAwake:1
+[  739.966920] [04:17:45.108] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x01, value: 2
+[  739.989854] [04:17:45.131] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  740.802695] [04:17:45.944] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  740.838978] [04:17:45.980] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  740.859658] [04:17:46.001] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  741.052715] [04:17:46.194] [NVT-ts] nvt_set_cur_value 4119: mode:1000, value:1, bTouchIsAwake:1
+[  741.094922] [04:17:46.236] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x01, value: 2
+[  741.115714] [04:17:46.257] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  742.164633] [04:17:47.306] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  742.202932] [04:17:47.344] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  742.226445] [04:17:47.367] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  742.414655] [04:17:47.556] [NVT-ts] nvt_set_cur_value 4119: mode:1000, value:1, bTouchIsAwake:1
+[  742.450912] [04:17:47.592] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x01, value: 2
+[  742.471534] [04:17:47.613] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  742.789919] [04:17:47.931] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  742.826927] [04:17:47.968] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  742.847659] [04:17:47.989] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  743.512650] [04:17:48.654] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  743.554892] [04:17:48.696] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  743.575537] [04:17:48.717] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  744.242029] [04:17:49.383] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  744.278934] [04:17:49.420] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  744.299640] [04:17:49.441] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  745.200983] [04:17:50.342] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  745.238913] [04:17:50.380] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  745.259618] [04:17:50.401] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  745.638633] [04:17:50.780] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  745.675004] [04:17:50.816] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  745.695932] [04:17:50.837] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  746.007075] [04:17:51.148] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  746.046928] [04:17:51.188] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  746.068798] [04:17:51.210] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  746.729635] [04:17:51.871] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  746.770975] [04:17:51.912] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  746.791688] [04:17:51.933] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  747.111805] [04:17:52.253] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  747.150968] [04:17:52.292] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  747.173665] [04:17:52.315] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  747.757850] [04:17:52.899] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  747.798895] [04:17:52.940] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  747.820332] [04:17:52.961] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  748.119245] [04:17:53.260] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  748.158921] [04:17:53.300] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  748.181356] [04:17:53.322] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  748.515263] [04:17:53.656] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  748.554903] [04:17:53.696] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  748.577125] [04:17:53.718] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  748.827152] [04:17:53.968] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  748.866918] [04:17:54.008] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  748.889785] [04:17:54.031] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  749.515646] [04:17:54.657] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  749.554941] [04:17:54.696] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  749.578131] [04:17:54.719] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  750.092314] [04:17:55.233] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  750.131026] [04:17:55.272] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  750.154911] [04:17:55.296] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  750.745579] [04:17:55.887] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  750.782923] [04:17:55.924] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  750.803605] [04:17:55.945] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  751.169462] [04:17:56.311] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  751.206991] [04:17:56.348] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  751.227676] [04:17:56.369] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  751.579378] [04:17:56.720] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  751.622940] [04:17:56.764] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  751.643855] [04:17:56.785] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  751.829392] [04:17:56.970] [NVT-ts] nvt_set_cur_value 4119: mode:1000, value:1, bTouchIsAwake:1
+[  751.871042] [04:17:57.012] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x01, value: 2
+[  751.891904] [04:17:57.033] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  752.169815] [04:17:57.311] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  752.206918] [04:17:57.348] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  752.227489] [04:17:57.369] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  752.537534] [04:17:57.679] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  752.574910] [04:17:57.716] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  752.595564] [04:17:57.737] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  752.787474] [04:17:57.929] [NVT-ts] nvt_set_cur_value 4119: mode:1000, value:1, bTouchIsAwake:1
+[  752.826925] [04:17:57.968] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x01, value: 2
+[  752.850102] [04:17:57.991] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  753.399586] [04:17:58.541] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  753.438928] [04:17:58.580] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  753.461666] [04:17:58.603] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  754.573902] [04:17:59.715] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  754.610903] [04:17:59.752] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  754.631531] [04:17:59.773] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  755.435601] [04:18:00.577] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  755.474938] [04:18:00.616] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  755.497458] [04:18:00.639] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  755.928831] [04:18:01.070] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  755.966925] [04:18:01.108] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  755.987739] [04:18:01.129] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  756.588871] [04:18:01.730] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  756.626997] [04:18:01.768] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  756.650937] [04:18:01.792] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  757.103118] [04:18:02.244] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  757.142924] [04:18:02.284] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  757.165909] [04:18:02.307] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  757.589548] [04:18:02.731] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  757.626914] [04:18:02.768] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  757.647528] [04:18:02.789] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  758.096741] [04:18:03.238] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  758.134929] [04:18:03.276] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  758.155541] [04:18:03.297] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  758.541345] [04:18:03.682] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  758.582900] [04:18:03.724] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  758.603506] [04:18:03.745] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  759.048518] [04:18:04.190] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  759.090938] [04:18:04.232] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  759.111690] [04:18:04.253] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  759.625164] [04:18:04.766] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  759.662961] [04:18:04.804] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  759.683715] [04:18:04.825] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  759.875199] [04:18:05.016] [NVT-ts] nvt_set_cur_value 4119: mode:1000, value:1, bTouchIsAwake:1
+[  759.914929] [04:18:05.056] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x01, value: 2
+[  759.937795] [04:18:05.079] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  760.688259] [04:18:05.829] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  760.726906] [04:18:05.868] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  760.750798] [04:18:05.892] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  761.244129] [04:18:06.385] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  761.286917] [04:18:06.428] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  761.307565] [04:18:06.449] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  761.494171] [04:18:06.635] [NVT-ts] nvt_set_cur_value 4119: mode:1000, value:1, bTouchIsAwake:1
+[  761.530937] [04:18:06.672] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x01, value: 2
+[  761.551640] [04:18:06.693] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  762.209881] [04:18:07.351] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  762.246931] [04:18:07.388] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  762.267528] [04:18:07.409] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  762.744973] [04:18:07.886] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  762.782990] [04:18:07.924] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  762.803759] [04:18:07.945] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  763.571700] [04:18:08.713] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  763.610958] [04:18:08.752] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  763.634218] [04:18:08.775] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  764.176236] [04:18:09.317] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  764.214932] [04:18:09.356] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  764.238186] [04:18:09.379] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  764.426275] [04:18:09.567] [NVT-ts] nvt_set_cur_value 4119: mode:1000, value:1, bTouchIsAwake:1
+[  764.462947] [04:18:09.604] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x01, value: 2
+[  764.483701] [04:18:09.625] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  765.301806] [04:18:10.443] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  765.338961] [04:18:10.480] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  765.359664] [04:18:10.501] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  765.892517] [04:18:11.034] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  765.930986] [04:18:11.072] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  765.951815] [04:18:11.093] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  766.635885] [04:18:11.777] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  766.674964] [04:18:11.816] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  766.697734] [04:18:11.839] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  767.164051] [04:18:12.305] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  767.202965] [04:18:12.344] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  767.225949] [04:18:12.367] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  768.268613] [04:18:13.410] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  768.310915] [04:18:13.452] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  768.331641] [04:18:13.473] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  768.518616] [04:18:13.660] [NVT-ts] nvt_set_cur_value 4119: mode:1000, value:1, bTouchIsAwake:1
+[  768.558955] [04:18:13.700] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x01, value: 2
+[  768.580592] [04:18:13.722] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  769.345575] [04:18:14.487] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  769.382889] [04:18:14.524] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  769.403527] [04:18:14.545] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  769.678465] [04:18:14.820] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  769.714991] [04:18:14.856] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  769.735789] [04:18:14.877] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  770.186359] [04:18:15.327] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  770.222918] [04:18:15.364] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  770.243647] [04:18:15.385] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  770.526078] [04:18:15.667] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  770.562977] [04:18:15.704] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  770.583615] [04:18:15.725] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  770.776057] [04:18:15.917] [NVT-ts] nvt_set_cur_value 4119: mode:1000, value:1, bTouchIsAwake:1
+[  770.814938] [04:18:15.956] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x01, value: 2
+[  770.835633] [04:18:15.977] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  771.311904] [04:18:16.453] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  771.350922] [04:18:16.492] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  771.373858] [04:18:16.515] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  771.561957] [04:18:16.703] [NVT-ts] nvt_set_cur_value 4119: mode:1000, value:1, bTouchIsAwake:1
+[  771.602948] [04:18:16.744] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x01, value: 2
+[  771.624760] [04:18:16.766] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  772.097082] [04:18:17.238] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  772.134953] [04:18:17.276] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  772.155562] [04:18:17.297] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  772.347061] [04:18:17.488] [NVT-ts] nvt_set_cur_value 4119: mode:1000, value:1, bTouchIsAwake:1
+[  772.386930] [04:18:17.528] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x01, value: 2
+[  772.409159] [04:18:17.550] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  772.750298] [04:18:17.891] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  772.786954] [04:18:17.928] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  772.807756] [04:18:17.949] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  773.083113] [04:18:18.224] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  773.123010] [04:18:18.264] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  773.145835] [04:18:18.287] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  773.820192] [04:18:18.961] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  773.858905] [04:18:19.000] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  773.882321] [04:18:19.023] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  774.556646] [04:18:19.698] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  774.594933] [04:18:19.736] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  774.615771] [04:18:19.757] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  775.195909] [04:18:20.337] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  775.234925] [04:18:20.376] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  775.257914] [04:18:20.399] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  775.445916] [04:18:20.587] [NVT-ts] nvt_set_cur_value 4119: mode:1000, value:1, bTouchIsAwake:1
+[  775.483015] [04:18:20.624] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x01, value: 2
+[  775.503750] [04:18:20.645] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  779.809693] [04:18:24.951] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  779.846946] [04:18:24.988] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  779.867742] [04:18:25.009] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  780.059645] [04:18:25.201] [NVT-ts] nvt_set_cur_value 4119: mode:1000, value:1, bTouchIsAwake:1
+[  780.098964] [04:18:25.240] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x01, value: 2
+[  780.121731] [04:18:25.263] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  780.573874] [04:18:25.715] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  780.611037] [04:18:25.752] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  780.631821] [04:18:25.773] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  780.823874] [04:18:25.965] [NVT-ts] nvt_set_cur_value 4119: mode:1000, value:1, bTouchIsAwake:1
+[  780.863094] [04:18:26.004] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x01, value: 2
+[  780.886177] [04:18:26.027] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  785.493207] [04:18:30.634] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  785.531059] [04:18:30.672] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  785.555185] [04:18:30.696] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  788.550360] [04:18:33.691] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  788.587010] [04:18:33.728] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  788.607890] [04:18:33.749] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  788.800363] [04:18:33.941] [NVT-ts] nvt_set_cur_value 4119: mode:1000, value:1, bTouchIsAwake:1
+[  788.839070] [04:18:33.980] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x01, value: 2
+[  788.862975] [04:18:34.004] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  793.879615] [04:18:39.021] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  793.919103] [04:18:39.060] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  793.941555] [04:18:39.083] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  794.129553] [04:18:39.271] [NVT-ts] nvt_set_cur_value 4119: mode:1000, value:1, bTouchIsAwake:1
+[  794.167040] [04:18:39.308] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x01, value: 2
+[  794.188144] [04:18:39.329] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  795.943202] [04:18:41.084] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  795.982900] [04:18:41.124] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  796.005011] [04:18:41.146] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  796.193255] [04:18:41.334] [NVT-ts] nvt_set_cur_value 4119: mode:1000, value:1, bTouchIsAwake:1
+[  796.230951] [04:18:41.372] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x01, value: 2
+[  796.252029] [04:18:41.393] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  801.890801] [04:18:47.032] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  801.930950] [04:18:47.072] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  801.953148] [04:18:47.094] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  802.363276] [04:18:47.504] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  802.402907] [04:18:47.544] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  802.424988] [04:18:47.566] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  802.613245] [04:18:47.754] [NVT-ts] nvt_set_cur_value 4119: mode:1000, value:1, bTouchIsAwake:1
+[  802.651163] [04:18:47.792] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x01, value: 2
+[  802.675467] [04:18:47.817] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  804.357413] [04:18:49.498] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  804.395001] [04:18:49.536] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  804.416212] [04:18:49.557] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  804.607418] [04:18:49.748] [NVT-ts] nvt_set_cur_value 4119: mode:1000, value:1, bTouchIsAwake:1
+[  804.646978] [04:18:49.788] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x01, value: 2
+[  804.669616] [04:18:49.811] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  805.823283] [04:18:50.964] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  805.862924] [04:18:51.004] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  805.885286] [04:18:51.026] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  806.073286] [04:18:51.214] [NVT-ts] nvt_set_cur_value 4119: mode:1000, value:1, bTouchIsAwake:1
+[  806.110908] [04:18:51.252] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x01, value: 2
+[  806.131544] [04:18:51.273] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  806.448909] [04:18:51.590] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  806.486993] [04:18:51.628] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  806.511299] [04:18:51.652] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  806.851492] [04:18:51.993] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  806.894961] [04:18:52.036] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  806.915855] [04:18:52.057] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  807.365925] [04:18:52.507] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  807.403055] [04:18:52.544] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  807.424176] [04:18:52.565] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  807.615880] [04:18:52.757] [NVT-ts] nvt_set_cur_value 4119: mode:1000, value:1, bTouchIsAwake:1
+[  807.654911] [04:18:52.796] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x01, value: 2
+[  807.678005] [04:18:52.819] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  813.515059] [04:18:58.656] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  813.554986] [04:18:58.696] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  813.577051] [04:18:58.718] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  813.765071] [04:18:58.906] [NVT-ts] nvt_set_cur_value 4119: mode:1000, value:1, bTouchIsAwake:1
+[  813.803052] [04:18:58.944] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x01, value: 2
+[  813.827363] [04:18:58.968] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  815.196332] [04:19:00.337] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  815.235097] [04:19:00.376] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  815.258366] [04:19:00.399] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  815.446295] [04:19:00.587] [NVT-ts] nvt_set_cur_value 4119: mode:1000, value:1, bTouchIsAwake:1
+[  815.483078] [04:19:00.624] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x01, value: 2
+[  815.503988] [04:19:00.645] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  816.975023] [04:19:02.116] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  817.014988] [04:19:02.156] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  817.036843] [04:19:02.178] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  817.224975] [04:19:02.366] [NVT-ts] nvt_set_cur_value 4119: mode:1000, value:1, bTouchIsAwake:1
+[  817.263025] [04:19:02.404] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x01, value: 2
+[  817.284219] [04:19:02.425] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  882.704304] [04:20:07.845] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  882.743050] [04:20:07.884] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  882.766737] [04:20:07.908] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  967.492705] [04:21:32.634] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  967.531018] [04:21:32.672] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  967.553935] [04:21:32.695] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  967.742697] [04:21:32.884] [NVT-ts] nvt_set_cur_value 4119: mode:1000, value:1, bTouchIsAwake:1
+[  967.779166] [04:21:32.920] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x01, value: 2
+[  967.800193] [04:21:32.941] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  969.592093] type=1400 audit(1794025294.730:12218): avc:  denied  { write } for  comm="touch-m-Film" name="property_service" dev="tmpfs" ino=1148 scontext=u:r:vendor_sheng_touch_report:s0 tcontext=u:object_r:property_socket:s0 tclass=sock_file permissive=0
+[  970.278117] [04:21:35.419] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  970.315045] [04:21:35.456] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  970.335902] [04:21:35.477] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  970.528123] [04:21:35.669] [NVT-ts] nvt_set_cur_value 4119: mode:1000, value:1, bTouchIsAwake:1
+[  970.567009] [04:21:35.708] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x01, value: 2
+[  970.590368] [04:21:35.731] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  973.738055] [04:21:38.879] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[  973.774889] [04:21:38.916] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[  973.795502] [04:21:38.937] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  973.988060] [04:21:39.129] [NVT-ts] nvt_set_cur_value 4119: mode:1000, value:1, bTouchIsAwake:1
+[  974.026907] [04:21:39.168] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x01, value: 2
+[  974.050094] [04:21:39.191] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[  990.068610] [04:21:55.210] [NVT-ts] nvt_ts_suspend 6113: start, gesture_command:00
+[  990.068734] [04:21:55.210] [NVT-ts] nvt_irq_enable 702: enable=0, desc->depth=1
+[  990.069563] [04:21:55.211] [NVT-ts] nvt_enable_gesture_mode 3921: Enter deep sleep mode
+[  990.166984] [04:21:55.308] [NVT-ts] nvt_ts_suspend 6155: end
+[ 1748.667526] [04:34:33.809] [NVT-ts] nvt_fw_version_open 591: ++
+[ 1748.668459] [04:34:33.810] [NVT-ts] nvt_get_fw_info 2005: FW info is broken! fw_ver=0x00, ~fw_ver=0x00
+[ 1748.668882] [04:34:33.810] [NVT-ts] nvt_get_fw_info 2005: FW info is broken! fw_ver=0x00, ~fw_ver=0x00
+[ 1748.669183] [04:34:33.810] [NVT-ts] nvt_get_fw_info 2005: FW info is broken! fw_ver=0x00, ~fw_ver=0x00
+[ 1748.669647] [04:34:33.811] [NVT-ts] nvt_get_fw_info 2005: FW info is broken! fw_ver=0x00, ~fw_ver=0x00
+[ 1748.669659] [04:34:33.811] [NVT-ts] nvt_get_fw_info 2015: retry_count:3, Set default fw_ver=0, abs_x_max=2032, abs_y_max=3048, max_button_num=0!
+[ 1748.696432] [04:34:33.837] [NVT-ts] nvt_touch_vendor_read 4471: nvt_touch_vendor_read Get touch vendor: 4
+[ 1871.672800] [04:36:36.814] [NVT-ts] nvt_ts_resume 6186: start
+[ 1871.672840] [04:36:36.814] [NVT-ts] update_firmware_request 324: filename is novatek_nt36532_n81a_fw_csot.bin
+[ 1871.672939] NVT-ts spi0.0: Direct firmware load for novatek_nt36532_n81a_fw_csot.bin failed with error -2
+[ 1871.672950] NVT-ts spi0.0: Falling back to sysfs fallback for: novatek_nt36532_n81a_fw_csot.bin
+[ 1871.676577] [04:36:36.818] [NVT-ts] nvt_get_fw_need_write_size 55: fw_need_write_size = 245760(0x3c000), NVT end flag
+[ 1871.676594] [04:36:36.818] [NVT-ts] nvt_bin_header_parser 147: cascade_2nd_header_info = 1
+[ 1871.676603] [04:36:36.818] [NVT-ts] nvt_bin_header_parser 179: ovly_info = 0, ilm_dlm_num = 2, ovly_sec_num = 0, info_sec_num = 14, partition = 16
+[ 1871.685201] [04:36:36.826] [NVT-ts] nvt_bootloader_reset 1859: end
+[ 1871.686588] [04:36:36.828] [NVT-ts] nvt_tx_auto_copy_mode 1688: tx auto copy mode 2 enable
+[ 1871.780378] [04:36:36.921] [NVT-ts] nvt_update_firmware 861: Update firmware success! <103759 us>
+[ 1871.780697] [04:36:36.922] [NVT-ts] nvt_get_fw_info 2033: fw_ver=0x13, fw_type=0x01, PID=0x5981, abs_x_max=30480, abs_y_max=20320, max_button_num=0
+[ 1871.791417] [04:36:36.932] [NVT-ts] nvt_irq_enable 702: enable=1, desc->depth=0
+[ 1871.791496] [04:36:36.933] [NVT-ts] update_pen_status 3982: ++, enforce_send_cmd:1, bluetooth:0, charge:1, gamemode:0, enable_last_time:0
+[ 1871.830961] [04:36:36.972] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x04, value: 0
+[ 1871.895706] [04:36:37.037] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 2 times
+[ 1871.895746] [04:36:37.037] [NVT-ts] update_pen_status 4012: enable_last_time = 0, enable = 0, enforce_send_cmd = 1, skip notify surfaceflinger
+[ 1871.895759] [04:36:37.037] [NVT-ts] update_pen_status 4037: --
+[ 1871.895819] [04:36:37.037] [NVT-ts] nvt_ts_resume 6262: end
+[ 1871.896757] [04:36:37.038] [NVT-ts] nvt_power_supply_work 4447: Power_supply_event:1
+[ 1872.145766] [04:36:37.287] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[ 1872.182969] [04:36:37.324] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[ 1872.203877] [04:36:37.345] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[ 1872.395852] [04:36:37.537] [NVT-ts] nvt_set_cur_value 4119: mode:1000, value:1, bTouchIsAwake:1
+[ 1872.435197] [04:36:37.576] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x01, value: 2
+[ 1872.458324] [04:36:37.599] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[ 1876.511715] [04:36:41.653] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[ 1876.550968] [04:36:41.692] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[ 1876.572012] [04:36:41.713] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[ 1876.761657] [04:36:41.903] [NVT-ts] nvt_set_cur_value 4119: mode:1000, value:1, bTouchIsAwake:1
+[ 1876.799020] [04:36:41.940] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x01, value: 2
+[ 1876.822573] [04:36:41.964] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[ 1879.571295] [04:36:44.712] [NVT-ts] xm_htc_gesture_dbclk_proc_read 3571: ++
+[ 1879.573725] [04:36:44.715] [NVT-ts] nvt_xm_htc_get_gesture_dbclk 3549: ++
+[ 1879.611094] [04:36:44.752] [NVT-ts] nvt_get_extend_custom_cmd 1159: ++, cmd: 0xBF, sub_cmd: 0x11
+[ 1879.632767] [04:36:44.774] [NVT-ts] nvt_get_extend_custom_cmd 1203: send cmd success, tried 0 times
+[ 1879.632786] [04:36:44.774] [NVT-ts] nvt_get_extend_custom_cmd 1205: get value: 1
+[ 1879.632797] [04:36:44.774] [NVT-ts] nvt_get_extend_custom_cmd 1211: --
+[ 1879.632809] [04:36:44.774] [NVT-ts] nvt_xm_htc_get_gesture_dbclk 3556: get gesture_dbclk: 1
+[ 1879.632820] [04:36:44.774] [NVT-ts] nvt_xm_htc_get_gesture_dbclk 3559: --
+[ 1879.632901] [04:36:44.774] [NVT-ts] xm_htc_gesture_dbclk_proc_read 3605: --
+[ 1879.633475] [04:36:44.775] [NVT-ts] xm_htc_gesture_dbclk_proc_read 3571: ++
+[ 1879.633505] [04:36:44.775] [NVT-ts] xm_htc_gesture_dbclk_proc_read 3579: read END
+[ 1879.650679] [04:36:44.792] [NVT-ts] xm_htc_gesture_switch_proc_read 2012: ++
+[ 1879.650701] [04:36:44.792] [NVT-ts] nvt_xm_htc_get_gesture_switch 1995: ++
+[ 1879.650714] [04:36:44.792] [NVT-ts] nvt_xm_htc_get_gesture_switch 1999: --
+[ 1879.650731] [04:36:44.792] [NVT-ts] xm_htc_gesture_switch_proc_read 2035: --
+[ 1879.651240] [04:36:44.792] [NVT-ts] xm_htc_gesture_switch_proc_read 2012: ++
+[ 1879.651248] [04:36:44.792] [NVT-ts] xm_htc_gesture_switch_proc_read 2020: read END
+[ 1879.670441] [04:36:44.811] [NVT-ts] xm_htc_game_mode_proc_read 3267: ++
+[ 1879.670824] [04:36:44.812] [NVT-ts] nvt_xm_htc_get_game_mode 3245: ++
+[ 1879.710895] [04:36:44.852] [NVT-ts] nvt_get_extend_custom_cmd 1159: ++, cmd: 0xBF, sub_cmd: 0x0F
+[ 1879.732622] [04:36:44.874] [NVT-ts] nvt_get_extend_custom_cmd 1203: send cmd success, tried 0 times
+[ 1879.732634] [04:36:44.874] [NVT-ts] nvt_get_extend_custom_cmd 1205: get value: 0
+[ 1879.732644] [04:36:44.874] [NVT-ts] nvt_get_extend_custom_cmd 1211: --
+[ 1879.732652] [04:36:44.874] [NVT-ts] nvt_xm_htc_get_game_mode 3252: get game_mode: 0
+[ 1879.732662] [04:36:44.874] [NVT-ts] nvt_xm_htc_get_game_mode 3255: --
+[ 1879.732704] [04:36:44.874] [NVT-ts] xm_htc_game_mode_proc_read 3301: --
+[ 1879.733157] [04:36:44.874] [NVT-ts] xm_htc_game_mode_proc_read 3267: ++
+[ 1879.733182] [04:36:44.874] [NVT-ts] xm_htc_game_mode_proc_read 3275: read END
+[ 1881.937730] [04:36:47.079] [NVT-ts] nvt_ts_suspend 6113: start, gesture_command:00
+[ 1881.937800] [04:36:47.079] [NVT-ts] nvt_irq_enable 702: enable=0, desc->depth=1
+[ 1881.937999] [04:36:47.079] [NVT-ts] nvt_enable_gesture_mode 3921: Enter deep sleep mode
+[ 1882.030948] [04:36:47.172] [NVT-ts] nvt_ts_suspend 6155: end
+[ 1895.276233] [04:37:00.417] [NVT-ts] xm_htc_hand_scan_rate_proc_read 2643: ++
+[ 1895.276271] [04:37:00.417] [NVT-ts] nvt_xm_htc_get_hand_scan_rate 2621: ++
+[ 1895.315929] [04:37:00.457] [NVT-ts] nvt_get_extend_custom_cmd 1159: ++, cmd: 0xBF, sub_cmd: 0x0A
+[ 1895.340547] [04:37:00.482] [NVT-ts] nvt_get_extend_custom_cmd 1203: send cmd success, tried 0 times
+[ 1895.340575] [04:37:00.482] [NVT-ts] nvt_get_extend_custom_cmd 1205: get value: 0
+[ 1895.340590] [04:37:00.482] [NVT-ts] nvt_get_extend_custom_cmd 1211: --
+[ 1895.340602] [04:37:00.482] [NVT-ts] nvt_xm_htc_get_hand_scan_rate 2628: get hand_scan_rate: 0
+[ 1895.340614] [04:37:00.482] [NVT-ts] nvt_xm_htc_get_hand_scan_rate 2631: --
+[ 1895.340664] [04:37:00.482] [NVT-ts] xm_htc_hand_scan_rate_proc_read 2677: --
+[ 1895.340827] [04:37:00.482] [NVT-ts] xm_htc_hand_scan_rate_proc_read 2643: ++
+[ 1895.340839] [04:37:00.482] [NVT-ts] xm_htc_hand_scan_rate_proc_read 2651: read END
+[ 1895.361049] [04:37:00.502] [NVT-ts] xm_htc_op_mode_proc_read 1256: ++
+[ 1895.361076] [04:37:00.502] [NVT-ts] nvt_xm_htc_get_op_mode 1233: ++
+[ 1895.399987] [04:37:00.541] [NVT-ts] nvt_get_extend_custom_cmd 1159: ++, cmd: 0xBF, sub_cmd: 0x01
+[ 1895.424531] [04:37:00.566] [NVT-ts] nvt_get_extend_custom_cmd 1203: send cmd success, tried 0 times
+[ 1895.424561] [04:37:00.566] [NVT-ts] nvt_get_extend_custom_cmd 1205: get value: 0
+[ 1895.424576] [04:37:00.566] [NVT-ts] nvt_get_extend_custom_cmd 1211: --
+[ 1895.424589] [04:37:00.566] [NVT-ts] nvt_xm_htc_get_op_mode 1240: get op_mode: 0
+[ 1895.424601] [04:37:00.566] [NVT-ts] nvt_xm_htc_get_op_mode 1243: --
+[ 1895.424647] [04:37:00.566] [NVT-ts] xm_htc_op_mode_proc_read 1290: --
+[ 1895.424740] [04:37:00.566] [NVT-ts] xm_htc_op_mode_proc_read 1256: ++
+[ 1895.424751] [04:37:00.566] [NVT-ts] xm_htc_op_mode_proc_read 1264: read END
+[ 1895.444207] [04:37:00.585] [NVT-ts] xm_htc_report_coordinate_proc_read 4180: ++
+[ 1895.444235] [04:37:00.585] [NVT-ts] nvt_xm_htc_get_report_coordinate 4158: ++
+[ 1895.484088] [04:37:00.625] [NVT-ts] nvt_get_extend_custom_cmd 1159: ++, cmd: 0xBF, sub_cmd: 0x15
+[ 1895.508653] [04:37:00.650] [NVT-ts] nvt_get_extend_custom_cmd 1203: send cmd success, tried 0 times
+[ 1895.508699] [04:37:00.650] [NVT-ts] nvt_get_extend_custom_cmd 1205: get value: 0
+[ 1895.508723] [04:37:00.650] [NVT-ts] nvt_get_extend_custom_cmd 1211: --
+[ 1895.508746] [04:37:00.650] [NVT-ts] nvt_xm_htc_get_report_coordinate 4165: get report_coordinate: 0
+[ 1895.508769] [04:37:00.650] [NVT-ts] nvt_xm_htc_get_report_coordinate 4168: --
+[ 1895.508858] [04:37:00.650] [NVT-ts] xm_htc_report_coordinate_proc_read 4214: --
+[ 1895.509453] [04:37:00.650] [NVT-ts] xm_htc_report_coordinate_proc_read 4180: ++
+[ 1895.509480] [04:37:00.651] [NVT-ts] xm_htc_report_coordinate_proc_read 4188: read END
+[ 1895.530131] [04:37:00.671] [NVT-ts] xm_htc_filter_level_proc_read 4027: ++
+[ 1895.530160] [04:37:00.671] [NVT-ts] nvt_xm_htc_get_filter_level 4005: ++
+[ 1895.567934] [04:37:00.709] [NVT-ts] nvt_get_extend_custom_cmd 1159: ++, cmd: 0xBF, sub_cmd: 0x14
+[ 1895.591999] [04:37:00.733] [NVT-ts] nvt_get_extend_custom_cmd 1203: send cmd success, tried 0 times
+[ 1895.592061] [04:37:00.733] [NVT-ts] nvt_get_extend_custom_cmd 1205: get value: 0
+[ 1895.592087] [04:37:00.733] [NVT-ts] nvt_get_extend_custom_cmd 1211: --
+[ 1895.592112] [04:37:00.733] [NVT-ts] nvt_xm_htc_get_filter_level 4012: get filter_level: 0
+[ 1895.592138] [04:37:00.733] [NVT-ts] nvt_xm_htc_get_filter_level 4015: --
+[ 1895.592283] [04:37:00.733] [NVT-ts] xm_htc_filter_level_proc_read 4061: --
+[ 1895.592824] [04:37:00.734] [NVT-ts] xm_htc_filter_level_proc_read 4027: ++
+[ 1895.592876] [04:37:00.734] [NVT-ts] xm_htc_filter_level_proc_read 4035: read END
+[ 1895.617660] [04:37:00.759] [NVT-ts] xm_htc_idle_wake_th_proc_read 1411: ++
+[ 1895.617688] [04:37:00.759] [NVT-ts] nvt_xm_htc_get_idle_wake_th 1387: ++
+[ 1895.656002] [04:37:00.797] [NVT-ts] nvt_get_extend_custom_cmd 1159: ++, cmd: 0xBF, sub_cmd: 0x02
+[ 1895.679096] [04:37:00.820] [NVT-ts] nvt_get_extend_custom_cmd 1203: send cmd success, tried 0 times
+[ 1895.679126] [04:37:00.820] [NVT-ts] nvt_get_extend_custom_cmd 1205: get value: 0
+[ 1895.679142] [04:37:00.820] [NVT-ts] nvt_get_extend_custom_cmd 1211: --
+[ 1895.679155] [04:37:00.820] [NVT-ts] nvt_xm_htc_get_idle_wake_th 1394: get idle_wake_th: 0
+[ 1895.679167] [04:37:00.820] [NVT-ts] nvt_xm_htc_get_idle_wake_th 1397: --
+[ 1895.679238] [04:37:00.820] [NVT-ts] xm_htc_idle_wake_th_proc_read 1446: --
+[ 1895.679846] [04:37:00.821] [NVT-ts] xm_htc_idle_wake_th_proc_read 1411: ++
+[ 1895.679869] [04:37:00.821] [NVT-ts] xm_htc_idle_wake_th_proc_read 1419: read END
+[ 1895.701424] [04:37:00.842] [NVT-ts] xm_htc_int_state_proc_read 2963: ++
+[ 1895.701450] [04:37:00.842] [NVT-ts] nvt_xm_htc_get_int_state 2941: ++
+[ 1895.740122] [04:37:00.881] [NVT-ts] nvt_get_extend_custom_cmd 1159: ++, cmd: 0xBF, sub_cmd: 0x0D
+[ 1895.764216] [04:37:00.905] [NVT-ts] nvt_get_extend_custom_cmd 1203: send cmd success, tried 0 times
+[ 1895.764279] [04:37:00.905] [NVT-ts] nvt_get_extend_custom_cmd 1205: get value: 0
+[ 1895.764306] [04:37:00.905] [NVT-ts] nvt_get_extend_custom_cmd 1211: --
+[ 1895.764331] [04:37:00.905] [NVT-ts] nvt_xm_htc_get_int_state 2948: get int_state: 0
+[ 1895.764358] [04:37:00.905] [NVT-ts] nvt_xm_htc_get_int_state 2951: --
+[ 1895.764487] [04:37:00.906] [NVT-ts] xm_htc_int_state_proc_read 2997: --
+[ 1895.765770] [04:37:00.907] [NVT-ts] xm_htc_int_state_proc_read 2963: ++
+[ 1895.765805] [04:37:00.907] [NVT-ts] xm_htc_int_state_proc_read 2971: read END
+[ 1895.792070] [04:37:00.933] [NVT-ts] nvt_panel_display_read 4524: nvt_panel_display_read Get panel display: 54
+[ 1967.511825] [04:38:12.653] [NVT-ts] nvt_ts_resume 6186: start
+[ 1967.511863] [04:38:12.653] [NVT-ts] update_firmware_request 324: filename is novatek_nt36532_n81a_fw_csot.bin
+[ 1967.511948] NVT-ts spi0.0: Direct firmware load for novatek_nt36532_n81a_fw_csot.bin failed with error -2
+[ 1967.511958] NVT-ts spi0.0: Falling back to sysfs fallback for: novatek_nt36532_n81a_fw_csot.bin
+[ 1967.518938] [04:38:12.660] [NVT-ts] nvt_get_fw_need_write_size 55: fw_need_write_size = 245760(0x3c000), NVT end flag
+[ 1967.518955] [04:38:12.660] [NVT-ts] nvt_bin_header_parser 147: cascade_2nd_header_info = 1
+[ 1967.518964] [04:38:12.660] [NVT-ts] nvt_bin_header_parser 179: ovly_info = 0, ilm_dlm_num = 2, ovly_sec_num = 0, info_sec_num = 14, partition = 16
+[ 1967.524613] [04:38:12.666] [NVT-ts] nvt_bootloader_reset 1859: end
+[ 1967.525550] [04:38:12.667] [NVT-ts] nvt_tx_auto_copy_mode 1688: tx auto copy mode 2 enable
+[ 1967.619336] [04:38:12.760] [NVT-ts] nvt_update_firmware 861: Update firmware success! <100354 us>
+[ 1967.621363] [04:38:12.762] [NVT-ts] nvt_get_fw_info 2033: fw_ver=0x13, fw_type=0x01, PID=0x5981, abs_x_max=30480, abs_y_max=20320, max_button_num=0
+[ 1967.632636] [04:38:12.774] [NVT-ts] nvt_irq_enable 702: enable=1, desc->depth=0
+[ 1967.632851] [04:38:12.774] [NVT-ts] update_pen_status 3982: ++, enforce_send_cmd:1, bluetooth:0, charge:1, gamemode:0, enable_last_time:0
+[ 1967.670929] [04:38:12.812] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x04, value: 0
+[ 1967.736043] [04:38:12.877] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 2 times
+[ 1967.736077] [04:38:12.877] [NVT-ts] update_pen_status 4012: enable_last_time = 0, enable = 0, enforce_send_cmd = 1, skip notify surfaceflinger
+[ 1967.736091] [04:38:12.877] [NVT-ts] update_pen_status 4037: --
+[ 1967.736148] [04:38:12.877] [NVT-ts] nvt_ts_resume 6262: end
+[ 1967.737026] [04:38:12.878] [NVT-ts] nvt_power_supply_work 4447: Power_supply_event:1
+[ 1967.983668] [04:38:13.125] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[ 1968.027082] [04:38:13.168] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[ 1968.048317] [04:38:13.189] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[ 1968.233743] [04:38:13.375] [NVT-ts] nvt_set_cur_value 4119: mode:1000, value:1, bTouchIsAwake:1
+[ 1968.270963] [04:38:13.412] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x01, value: 2
+[ 1968.292004] [04:38:13.433] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[ 1973.390058] [04:38:18.531] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[ 1973.427076] [04:38:18.568] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[ 1973.448149] [04:38:18.589] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[ 1973.640072] [04:38:18.781] [NVT-ts] nvt_set_cur_value 4119: mode:1000, value:1, bTouchIsAwake:1
+[ 1973.678976] [04:38:18.820] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x01, value: 2
+[ 1973.702076] [04:38:18.843] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[ 1974.981250] [04:38:20.122] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[ 1975.018998] [04:38:20.160] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[ 1975.039758] [04:38:20.181] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[ 1975.231291] [04:38:20.372] [NVT-ts] nvt_set_cur_value 4119: mode:1000, value:1, bTouchIsAwake:1
+[ 1975.270931] [04:38:20.412] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x01, value: 2
+[ 1975.293354] [04:38:20.434] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[ 1976.078908] [04:38:21.220] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[ 1976.118960] [04:38:21.260] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[ 1976.141356] [04:38:21.282] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[ 1976.461277] [04:38:21.602] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[ 1976.499068] [04:38:21.640] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[ 1976.523405] [04:38:21.664] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[ 1976.982139] [04:38:22.123] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[ 1977.019084] [04:38:22.160] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[ 1977.039996] [04:38:22.181] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[ 1977.232165] [04:38:22.373] [NVT-ts] nvt_set_cur_value 4119: mode:1000, value:1, bTouchIsAwake:1
+[ 1977.271206] [04:38:22.412] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x01, value: 2
+[ 1977.294457] [04:38:22.435] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[ 1977.628193] [04:38:22.769] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[ 1977.666914] [04:38:22.808] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[ 1977.690087] [04:38:22.831] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[ 1977.996577] [04:38:23.138] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[ 1978.035066] [04:38:23.176] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[ 1978.059289] [04:38:23.200] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[ 1978.726041] [04:38:23.867] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[ 1978.762911] [04:38:23.904] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[ 1978.783630] [04:38:23.925] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[ 1979.393166] [04:38:24.534] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[ 1979.430961] [04:38:24.572] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[ 1979.451743] [04:38:24.593] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[ 1979.844050] type=1400 audit(1794026304.978:12278): avc:  denied  { write } for  comm="touch-m-Film" name="property_service" dev="tmpfs" ino=1148 scontext=u:r:vendor_sheng_touch_report:s0 tcontext=u:object_r:property_socket:s0 tclass=sock_file permissive=0
+[ 1980.101757] [04:38:25.243] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[ 1980.139027] [04:38:25.280] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[ 1980.159666] [04:38:25.301] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[ 1980.873028] [04:38:26.014] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[ 1980.914982] [04:38:26.056] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[ 1980.935685] [04:38:26.077] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[ 1981.123052] [04:38:26.264] [NVT-ts] nvt_set_cur_value 4119: mode:1000, value:1, bTouchIsAwake:1
+[ 1981.162996] [04:38:26.304] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x01, value: 2
+[ 1981.185642] [04:38:26.327] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[ 1981.463643] [04:38:26.605] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[ 1981.502952] [04:38:26.644] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[ 1981.525601] [04:38:26.667] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[ 1981.832039] [04:38:26.973] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[ 1981.870910] [04:38:27.012] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[ 1981.893868] [04:38:27.035] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[ 1982.082020] [04:38:27.223] [NVT-ts] nvt_set_cur_value 4119: mode:1000, value:1, bTouchIsAwake:1
+[ 1982.118937] [04:38:27.260] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x01, value: 2
+[ 1982.139725] [04:38:27.281] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[ 1982.477992] [04:38:27.619] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[ 1982.514920] [04:38:27.656] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[ 1982.535583] [04:38:27.677] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[ 1982.825536] [04:38:27.967] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[ 1982.862903] [04:38:28.004] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[ 1982.883627] [04:38:28.025] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[ 1983.325815] [04:38:28.467] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[ 1983.362992] [04:38:28.504] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[ 1983.383610] [04:38:28.525] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[ 1983.860753] [04:38:29.002] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[ 1983.902977] [04:38:29.044] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[ 1983.923651] [04:38:29.065] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[ 1984.263897] [04:38:29.405] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[ 1984.302949] [04:38:29.444] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[ 1984.325794] [04:38:29.467] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[ 1984.777852] [04:38:29.919] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[ 1984.814908] [04:38:29.956] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[ 1984.835507] [04:38:29.977] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[ 1985.027869] [04:38:30.169] [NVT-ts] nvt_set_cur_value 4119: mode:1000, value:1, bTouchIsAwake:1
+[ 1985.066927] [04:38:30.208] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x01, value: 2
+[ 1985.089884] [04:38:30.231] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[ 1999.982754] [04:38:45.124] [NVT-ts] nvt_ts_suspend 6113: start, gesture_command:00
+[ 1999.982823] [04:38:45.124] [NVT-ts] nvt_irq_enable 702: enable=0, desc->depth=1
+[ 1999.983543] [04:38:45.125] [NVT-ts] nvt_enable_gesture_mode 3921: Enter deep sleep mode
+[ 2000.078926] [04:38:45.220] [NVT-ts] nvt_ts_suspend 6155: end
+[ 2027.717603] [04:39:12.859] [NVT-ts] xm_htc_gesture_switch_proc_read 2012: ++
+[ 2027.717654] [04:39:12.859] [NVT-ts] nvt_xm_htc_get_gesture_switch 1995: ++
+[ 2027.717669] [04:39:12.859] [NVT-ts] nvt_xm_htc_get_gesture_switch 1999: --
+[ 2027.717690] [04:39:12.859] [NVT-ts] xm_htc_gesture_switch_proc_read 2035: --
+[ 2027.718402] [04:39:12.859] [NVT-ts] xm_htc_gesture_switch_proc_read 2012: ++
+[ 2027.718415] [04:39:12.859] [NVT-ts] xm_htc_gesture_switch_proc_read 2020: read END
+[ 2027.718446] [04:39:12.859] [NVT-ts] xm_htc_gesture_dbclk_proc_read 3571: ++
+[ 2027.718458] [04:39:12.860] [NVT-ts] nvt_xm_htc_get_gesture_dbclk 3549: ++
+[ 2027.756061] [04:39:12.897] [NVT-ts] nvt_get_extend_custom_cmd 1159: ++, cmd: 0xBF, sub_cmd: 0x11
+[ 2027.780609] [04:39:12.922] [NVT-ts] nvt_get_extend_custom_cmd 1203: send cmd success, tried 0 times
+[ 2027.780656] [04:39:12.922] [NVT-ts] nvt_get_extend_custom_cmd 1205: get value: 0
+[ 2027.780681] [04:39:12.922] [NVT-ts] nvt_get_extend_custom_cmd 1211: --
+[ 2027.780705] [04:39:12.922] [NVT-ts] nvt_xm_htc_get_gesture_dbclk 3556: get gesture_dbclk: 0
+[ 2027.780728] [04:39:12.922] [NVT-ts] nvt_xm_htc_get_gesture_dbclk 3559: --
+[ 2027.780756] [04:39:12.922] [NVT-ts] xm_htc_gesture_dbclk_proc_read 3605: --
+[ 2027.781193] [04:39:12.922] [NVT-ts] xm_htc_gesture_dbclk_proc_read 3571: ++
+[ 2027.781244] [04:39:12.922] [NVT-ts] xm_htc_gesture_dbclk_proc_read 3579: read END
+[ 2027.782265] [04:39:12.923] [NVT-ts] xm_htc_hand_scan_rate_proc_read 2643: ++
+[ 2027.782308] [04:39:12.923] [NVT-ts] nvt_xm_htc_get_hand_scan_rate 2621: ++
+[ 2027.819762] [04:39:12.961] [NVT-ts] nvt_get_extend_custom_cmd 1159: ++, cmd: 0xBF, sub_cmd: 0x0A
+[ 2027.842035] [04:39:12.983] [NVT-ts] nvt_get_extend_custom_cmd 1203: send cmd success, tried 0 times
+[ 2027.842078] [04:39:12.983] [NVT-ts] nvt_get_extend_custom_cmd 1205: get value: 0
+[ 2027.842102] [04:39:12.983] [NVT-ts] nvt_get_extend_custom_cmd 1211: --
+[ 2027.842127] [04:39:12.983] [NVT-ts] nvt_xm_htc_get_hand_scan_rate 2628: get hand_scan_rate: 0
+[ 2027.842151] [04:39:12.983] [NVT-ts] nvt_xm_htc_get_hand_scan_rate 2631: --
+[ 2027.842178] [04:39:12.983] [NVT-ts] xm_htc_hand_scan_rate_proc_read 2677: --
+[ 2027.843135] [04:39:12.984] [NVT-ts] xm_htc_hand_scan_rate_proc_read 2643: ++
+[ 2027.843170] [04:39:12.984] [NVT-ts] xm_htc_hand_scan_rate_proc_read 2651: read END
+[ 2027.843309] [04:39:12.984] [NVT-ts] xm_htc_game_mode_proc_read 3267: ++
+[ 2027.843338] [04:39:12.984] [NVT-ts] nvt_xm_htc_get_game_mode 3245: ++
+[ 2027.883194] [04:39:13.024] [NVT-ts] nvt_get_extend_custom_cmd 1159: ++, cmd: 0xBF, sub_cmd: 0x0F
+[ 2027.907058] [04:39:13.048] [NVT-ts] nvt_get_extend_custom_cmd 1203: send cmd success, tried 0 times
+[ 2027.907105] [04:39:13.048] [NVT-ts] nvt_get_extend_custom_cmd 1205: get value: 0
+[ 2027.907133] [04:39:13.048] [NVT-ts] nvt_get_extend_custom_cmd 1211: --
+[ 2027.907159] [04:39:13.048] [NVT-ts] nvt_xm_htc_get_game_mode 3252: get game_mode: 0
+[ 2027.907188] [04:39:13.048] [NVT-ts] nvt_xm_htc_get_game_mode 3255: --
+[ 2027.907218] [04:39:13.048] [NVT-ts] xm_htc_game_mode_proc_read 3301: --
+[ 2027.907349] [04:39:13.048] [NVT-ts] xm_htc_game_mode_proc_read 3267: ++
+[ 2027.907379] [04:39:13.048] [NVT-ts] xm_htc_game_mode_proc_read 3275: read END
+[ 2132.391939] [04:40:57.533] [NVT-ts] xm_htc_gesture_dbclk_proc_read 3571: ++
+[ 2132.391981] [04:40:57.533] [NVT-ts] nvt_xm_htc_get_gesture_dbclk 3549: ++
+[ 2132.432189] [04:40:57.573] [NVT-ts] nvt_get_extend_custom_cmd 1159: ++, cmd: 0xBF, sub_cmd: 0x11
+[ 2132.459790] [04:40:57.601] [NVT-ts] nvt_get_extend_custom_cmd 1203: send cmd success, tried 0 times
+[ 2132.459875] [04:40:57.601] [NVT-ts] nvt_get_extend_custom_cmd 1205: get value: 0
+[ 2132.459902] [04:40:57.601] [NVT-ts] nvt_get_extend_custom_cmd 1211: --
+[ 2132.459929] [04:40:57.601] [NVT-ts] nvt_xm_htc_get_gesture_dbclk 3556: get gesture_dbclk: 0
+[ 2132.459955] [04:40:57.601] [NVT-ts] nvt_xm_htc_get_gesture_dbclk 3559: --
+[ 2132.460082] [04:40:57.601] [NVT-ts] xm_htc_gesture_dbclk_proc_read 3605: --
+[ 2132.460312] [04:40:57.601] [NVT-ts] xm_htc_gesture_dbclk_proc_read 3571: ++
+[ 2132.460679] [04:40:57.602] [NVT-ts] xm_htc_gesture_dbclk_proc_read 3579: read END
+[ 2132.461101] [04:40:57.602] [NVT-ts] xm_htc_gesture_switch_proc_read 2012: ++
+[ 2132.461136] [04:40:57.602] [NVT-ts] nvt_xm_htc_get_gesture_switch 1995: ++
+[ 2132.461159] [04:40:57.602] [NVT-ts] nvt_xm_htc_get_gesture_switch 1999: --
+[ 2132.461183] [04:40:57.602] [NVT-ts] xm_htc_gesture_switch_proc_read 2035: --
+[ 2132.461297] [04:40:57.602] [NVT-ts] xm_htc_gesture_switch_proc_read 2012: ++
+[ 2132.461324] [04:40:57.602] [NVT-ts] xm_htc_gesture_switch_proc_read 2020: read END
+[ 2133.016052] [04:40:58.157] [NVT-ts] xm_htc_gesture_dbclk_proc_write 3616: ++
+[ 2133.016079] [04:40:58.157] [NVT-ts] xm_htc_gesture_dbclk_proc_write 3643: gesture_dbclk = 1
+[ 2133.016094] [04:40:58.157] [NVT-ts] nvt_xm_htc_set_gesture_dbclk 3531: ++
+[ 2133.016105] [04:40:58.157] [NVT-ts] nvt_xm_htc_set_gesture_dbclk 3533: set gesture_dbclk 1
+[ 2133.056256] [04:40:58.197] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x11, value: 1
+[ 2133.081488] [04:40:58.223] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[ 2133.081550] [04:40:58.223] [NVT-ts] nvt_xm_htc_set_gesture_dbclk 3541: --
+[ 2133.081581] [04:40:58.223] [NVT-ts] xm_htc_gesture_dbclk_proc_write 3662: --
+[ 2133.511936] [04:40:58.653] [NVT-ts] xm_htc_gesture_switch_proc_write 2046: ++
+[ 2133.511985] [04:40:58.653] [NVT-ts] xm_htc_gesture_switch_proc_write 2073: gesture_switch = 1
+[ 2133.512004] [04:40:58.653] [NVT-ts] nvt_xm_htc_set_gesture_switch 1979: ++
+[ 2133.512017] [04:40:58.653] [NVT-ts] nvt_xm_htc_set_gesture_switch 1981: set gesture_switch: 1
+[ 2133.512031] [04:40:58.653] [NVT-ts] nvt_xm_htc_set_gesture_switch 1984: ts->gesture = 1
+[ 2133.512045] [04:40:58.653] [NVT-ts] nvt_xm_htc_set_gesture_switch 1986: --
+[ 2133.512058] [04:40:58.653] [NVT-ts] xm_htc_gesture_switch_proc_write 2080: --
+[ 2133.879927] [04:40:59.021] [NVT-ts] xm_htc_gesture_dbclk_proc_read 3571: ++
+[ 2133.879961] [04:40:59.021] [NVT-ts] nvt_xm_htc_get_gesture_dbclk 3549: ++
+[ 2133.920182] [04:40:59.061] [NVT-ts] nvt_get_extend_custom_cmd 1159: ++, cmd: 0xBF, sub_cmd: 0x11
+[ 2133.947395] [04:40:59.088] [NVT-ts] nvt_get_extend_custom_cmd 1203: send cmd success, tried 0 times
+[ 2133.947473] [04:40:59.089] [NVT-ts] nvt_get_extend_custom_cmd 1205: get value: 0
+[ 2133.947500] [04:40:59.089] [NVT-ts] nvt_get_extend_custom_cmd 1211: --
+[ 2133.947525] [04:40:59.089] [NVT-ts] nvt_xm_htc_get_gesture_dbclk 3556: get gesture_dbclk: 0
+[ 2133.947550] [04:40:59.089] [NVT-ts] nvt_xm_htc_get_gesture_dbclk 3559: --
+[ 2133.947671] [04:40:59.089] [NVT-ts] xm_htc_gesture_dbclk_proc_read 3605: --
+[ 2133.947897] [04:40:59.089] [NVT-ts] xm_htc_gesture_dbclk_proc_read 3571: ++
+[ 2133.947926] [04:40:59.089] [NVT-ts] xm_htc_gesture_dbclk_proc_read 3579: read END
+[ 2133.948179] [04:40:59.089] [NVT-ts] xm_htc_gesture_switch_proc_read 2012: ++
+[ 2133.948210] [04:40:59.089] [NVT-ts] nvt_xm_htc_get_gesture_switch 1995: ++
+[ 2133.948233] [04:40:59.089] [NVT-ts] nvt_xm_htc_get_gesture_switch 1999: --
+[ 2133.948256] [04:40:59.089] [NVT-ts] xm_htc_gesture_switch_proc_read 2035: --
+[ 2133.948303] [04:40:59.089] [NVT-ts] xm_htc_gesture_switch_proc_read 2012: ++
+[ 2133.948325] [04:40:59.089] [NVT-ts] xm_htc_gesture_switch_proc_read 2020: read END
+[ 2163.589607] [04:41:28.731] [NVT-ts] nvt_ts_resume 6186: start
+[ 2163.589619] [04:41:28.731] [NVT-ts] update_firmware_request 324: filename is novatek_nt36532_n81a_fw_csot.bin
+[ 2163.589669] NVT-ts spi0.0: Direct firmware load for novatek_nt36532_n81a_fw_csot.bin failed with error -2
+[ 2163.589673] NVT-ts spi0.0: Falling back to sysfs fallback for: novatek_nt36532_n81a_fw_csot.bin
+[ 2163.593289] [04:41:28.734] [NVT-ts] nvt_get_fw_need_write_size 55: fw_need_write_size = 245760(0x3c000), NVT end flag
+[ 2163.593308] [04:41:28.734] [NVT-ts] nvt_bin_header_parser 147: cascade_2nd_header_info = 1
+[ 2163.593316] [04:41:28.734] [NVT-ts] nvt_bin_header_parser 179: ovly_info = 0, ilm_dlm_num = 2, ovly_sec_num = 0, info_sec_num = 14, partition = 16
+[ 2163.599016] [04:41:28.740] [NVT-ts] nvt_bootloader_reset 1859: end
+[ 2163.599990] [04:41:28.741] [NVT-ts] nvt_tx_auto_copy_mode 1688: tx auto copy mode 2 enable
+[ 2163.787758] [04:41:28.929] [NVT-ts] nvt_check_fw_reset_state 1972: error, retry=11, buf[1]=0x00, 0x00, 0x00, 0x00, 0x00
+[ 2163.787796] [04:41:28.929] [NVT-ts] nvt_download_firmware_hw_crc 718: nvt_check_fw_reset_state failed. (-1)
+[ 2163.793441] [04:41:28.934] [NVT-ts] nvt_bootloader_reset 1859: end
+[ 2163.795524] [04:41:28.937] [NVT-ts] nvt_tx_auto_copy_mode 1688: tx auto copy mode 2 enable
+[ 2163.811470] [04:41:28.953] [NVT-ts] xm_htc_gesture_dbclk_proc_write 3616: ++
+[ 2163.811492] [04:41:28.953] [NVT-ts] xm_htc_gesture_dbclk_proc_write 3643: gesture_dbclk = 1
+[ 2163.981352] [04:41:29.122] [NVT-ts] nvt_check_fw_reset_state 1972: error, retry=11, buf[1]=0x00, 0x00, 0x00, 0x00, 0x00
+[ 2163.981392] [04:41:29.122] [NVT-ts] nvt_download_firmware_hw_crc 718: nvt_check_fw_reset_state failed. (-1)
+[ 2163.986828] [04:41:29.128] [NVT-ts] nvt_bootloader_reset 1859: end
+[ 2163.988346] [04:41:29.129] [NVT-ts] nvt_tx_auto_copy_mode 1688: tx auto copy mode 2 enable
+[ 2164.175882] [04:41:29.317] [NVT-ts] nvt_check_fw_reset_state 1972: error, retry=11, buf[1]=0x00, 0x00, 0x00, 0x00, 0x00
+[ 2164.175918] [04:41:29.317] [NVT-ts] nvt_download_firmware_hw_crc 718: nvt_check_fw_reset_state failed. (-1)
+[ 2164.175928] [04:41:29.317] [NVT-ts] nvt_download_firmware_hw_crc 727: error, retry=3
+[ 2164.176315] [04:41:29.317] [NVT-ts] nvt_read_bld_hw_crc 615: crc_done = 0, ilm_crc_flag = 0, dlm_crc_flag = 0
+[ 2164.177061] [04:41:29.318] [NVT-ts] nvt_read_bld_hw_crc 637: ilm: bin crc = 0xA05A1C32, golden = 0x00000000, result = 0x00000000
+[ 2164.178674] [04:41:29.320] [NVT-ts] nvt_read_bld_hw_crc 659: dlm: bin crc = 0xD7204CEA, golden = 0x00000000, result = 0x00000000
+[ 2164.178688] [04:41:29.320] [NVT-ts] nvt_update_firmware 856: Download Firmware failed. (-1)
+[ 2164.178866] [04:41:29.320] [NVT-ts] nvt_ts_resume 6210: download firmware failed, ignore check fw state
+[ 2164.178947] [04:41:29.320] [NVT-ts] nvt_xm_htc_set_gesture_dbclk 3531: ++
+[ 2164.178960] [04:41:29.320] [NVT-ts] nvt_xm_htc_set_gesture_dbclk 3533: set gesture_dbclk 1
+[ 2164.178966] [04:41:29.320] [NVT-ts] update_pen_status 3982: ++, enforce_send_cmd:1, bluetooth:0, charge:1, gamemode:0, enable_last_time:0
+[ 2164.218906] [04:41:29.360] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x11, value: 1
+[ 2164.240470] [04:41:29.382] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[ 2164.240499] [04:41:29.382] [NVT-ts] nvt_xm_htc_set_gesture_dbclk 3541: --
+[ 2164.240509] [04:41:29.382] [NVT-ts] xm_htc_gesture_dbclk_proc_write 3662: --
+[ 2164.240535] [04:41:29.382] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x04, value: 0
+[ 2164.262562] [04:41:29.404] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[ 2164.262596] [04:41:29.404] [NVT-ts] update_pen_status 4012: enable_last_time = 0, enable = 0, enforce_send_cmd = 1, skip notify surfaceflinger
+[ 2164.262607] [04:41:29.404] [NVT-ts] update_pen_status 4037: --
+[ 2164.262634] [04:41:29.404] [NVT-ts] nvt_ts_resume 6262: end
+[ 2164.263335] [04:41:29.404] [NVT-ts] nvt_power_supply_work 4447: Power_supply_event:1
+[ 2164.656325] [04:41:29.797] [NVT-ts] xm_htc_gesture_dbclk_proc_read 3571: ++
+[ 2164.656354] [04:41:29.797] [NVT-ts] nvt_xm_htc_get_gesture_dbclk 3549: ++
+[ 2164.694891] [04:41:29.836] [NVT-ts] nvt_get_extend_custom_cmd 1159: ++, cmd: 0xBF, sub_cmd: 0x11
+[ 2164.716749] [04:41:29.858] [NVT-ts] nvt_get_extend_custom_cmd 1203: send cmd success, tried 0 times
+[ 2164.716773] [04:41:29.858] [NVT-ts] nvt_get_extend_custom_cmd 1205: get value: 0
+[ 2164.716787] [04:41:29.858] [NVT-ts] nvt_get_extend_custom_cmd 1211: --
+[ 2164.716800] [04:41:29.858] [NVT-ts] nvt_xm_htc_get_gesture_dbclk 3556: get gesture_dbclk: 0
+[ 2164.716811] [04:41:29.858] [NVT-ts] nvt_xm_htc_get_gesture_dbclk 3559: --
+[ 2164.716861] [04:41:29.858] [NVT-ts] xm_htc_gesture_dbclk_proc_read 3605: --
+[ 2164.716955] [04:41:29.858] [NVT-ts] xm_htc_gesture_dbclk_proc_read 3571: ++
+[ 2164.716965] [04:41:29.858] [NVT-ts] xm_htc_gesture_dbclk_proc_read 3579: read END
+[ 2164.717137] [04:41:29.858] [NVT-ts] xm_htc_gesture_switch_proc_read 2012: ++
+[ 2164.717149] [04:41:29.858] [NVT-ts] nvt_xm_htc_get_gesture_switch 1995: ++
+[ 2164.717160] [04:41:29.858] [NVT-ts] nvt_xm_htc_get_gesture_switch 1999: --
+[ 2164.717171] [04:41:29.858] [NVT-ts] xm_htc_gesture_switch_proc_read 2035: --
+[ 2164.717193] [04:41:29.858] [NVT-ts] xm_htc_gesture_switch_proc_read 2012: ++
+[ 2164.717204] [04:41:29.858] [NVT-ts] xm_htc_gesture_switch_proc_read 2020: read END
+[ 2173.850686] [04:41:38.992] [NVT-ts] nvt_ts_suspend 6113: start, gesture_command:01
+[ 2173.931252] [04:41:39.072] [NVT-ts] nvt_enable_gesture_mode 3900: Gesture mode on, Disable pen shorthand gesture, Enable touch wakeup gesture
+[ 2174.027116] [04:41:39.168] [NVT-ts] nvt_ts_suspend 6155: end
+[ 2178.229512] [04:41:43.371] [NVT-ts] nvt_ts_resume 6186: start
+[ 2178.229537] [04:41:43.371] [NVT-ts] update_firmware_request 324: filename is novatek_nt36532_n81a_fw_csot.bin
+[ 2178.229635] NVT-ts spi0.0: Direct firmware load for novatek_nt36532_n81a_fw_csot.bin failed with error -2
+[ 2178.229647] NVT-ts spi0.0: Falling back to sysfs fallback for: novatek_nt36532_n81a_fw_csot.bin
+[ 2178.243894] [04:41:43.385] [NVT-ts] nvt_get_fw_need_write_size 55: fw_need_write_size = 245760(0x3c000), NVT end flag
+[ 2178.243915] [04:41:43.385] [NVT-ts] nvt_bin_header_parser 147: cascade_2nd_header_info = 1
+[ 2178.243924] [04:41:43.385] [NVT-ts] nvt_bin_header_parser 179: ovly_info = 0, ilm_dlm_num = 2, ovly_sec_num = 0, info_sec_num = 14, partition = 16
+[ 2178.250174] [04:41:43.391] [NVT-ts] nvt_bootloader_reset 1859: end
+[ 2178.251758] [04:41:43.393] [NVT-ts] nvt_tx_auto_copy_mode 1688: tx auto copy mode 2 enable
+[ 2178.440772] [04:41:43.582] [NVT-ts] nvt_check_fw_reset_state 1972: error, retry=11, buf[1]=0x00, 0x00, 0x00, 0x00, 0x00
+[ 2178.440809] [04:41:43.582] [NVT-ts] nvt_download_firmware_hw_crc 718: nvt_check_fw_reset_state failed. (-1)
+[ 2178.446260] [04:41:43.587] [NVT-ts] nvt_bootloader_reset 1859: end
+[ 2178.448729] [04:41:43.590] [NVT-ts] nvt_tx_auto_copy_mode 1688: tx auto copy mode 2 enable
+[ 2178.641554] [04:41:43.783] [NVT-ts] nvt_check_fw_reset_state 1972: error, retry=11, buf[1]=0x00, 0x00, 0x00, 0x00, 0x00
+[ 2178.641689] [04:41:43.783] [NVT-ts] nvt_download_firmware_hw_crc 718: nvt_check_fw_reset_state failed. (-1)
+[ 2178.647136] [04:41:43.788] [NVT-ts] nvt_bootloader_reset 1859: end
+[ 2178.649039] [04:41:43.790] [NVT-ts] nvt_tx_auto_copy_mode 1688: tx auto copy mode 2 enable
+[ 2178.839505] [04:41:43.981] [NVT-ts] nvt_check_fw_reset_state 1972: error, retry=11, buf[1]=0x00, 0x00, 0x00, 0x00, 0x00
+[ 2178.839546] [04:41:43.981] [NVT-ts] nvt_download_firmware_hw_crc 718: nvt_check_fw_reset_state failed. (-1)
+[ 2178.839562] [04:41:43.981] [NVT-ts] nvt_download_firmware_hw_crc 727: error, retry=3
+[ 2178.840256] [04:41:43.981] [NVT-ts] nvt_read_bld_hw_crc 615: crc_done = 0, ilm_crc_flag = 0, dlm_crc_flag = 0
+[ 2178.841247] [04:41:43.982] [NVT-ts] nvt_read_bld_hw_crc 637: ilm: bin crc = 0xA05A1C32, golden = 0x00000000, result = 0x00000000
+[ 2178.842347] [04:41:43.983] [NVT-ts] nvt_read_bld_hw_crc 659: dlm: bin crc = 0xD7204CEA, golden = 0x00000000, result = 0x00000000
+[ 2178.842379] [04:41:43.983] [NVT-ts] nvt_update_firmware 856: Download Firmware failed. (-1)
+[ 2178.842476] [04:41:43.984] [NVT-ts] nvt_ts_resume 6210: download firmware failed, ignore check fw state
+[ 2178.842541] [04:41:43.984] [NVT-ts] update_pen_status 3982: ++, enforce_send_cmd:1, bluetooth:0, charge:1, gamemode:0, enable_last_time:0
+[ 2178.878916] [04:41:44.020] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x04, value: 0
+[ 2178.899913] [04:41:44.041] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[ 2178.899942] [04:41:44.041] [NVT-ts] update_pen_status 4012: enable_last_time = 0, enable = 0, enforce_send_cmd = 1, skip notify surfaceflinger
+[ 2178.899954] [04:41:44.041] [NVT-ts] update_pen_status 4037: --
+[ 2178.900009] [04:41:44.041] [NVT-ts] nvt_ts_resume 6262: end
+[ 2178.901487] [04:41:44.043] [NVT-ts] nvt_power_supply_work 4447: Power_supply_event:1
+[ 2184.103060] [04:41:49.244] [NVT-ts] nvt_ts_suspend 6113: start, gesture_command:01
+[ 2184.183377] [04:41:49.324] [NVT-ts] nvt_enable_gesture_mode 3900: Gesture mode on, Disable pen shorthand gesture, Enable touch wakeup gesture
+[ 2184.278944] [04:41:49.420] [NVT-ts] nvt_ts_suspend 6155: end
+[ 2184.721635] [04:41:49.863] [NVT-ts] nvt_ts_resume 6186: start
+[ 2184.721664] [04:41:49.863] [NVT-ts] update_firmware_request 324: filename is novatek_nt36532_n81a_fw_csot.bin
+[ 2184.721734] NVT-ts spi0.0: Direct firmware load for novatek_nt36532_n81a_fw_csot.bin failed with error -2
+[ 2184.721745] NVT-ts spi0.0: Falling back to sysfs fallback for: novatek_nt36532_n81a_fw_csot.bin
+[ 2184.732223] [04:41:49.873] [NVT-ts] nvt_get_fw_need_write_size 55: fw_need_write_size = 245760(0x3c000), NVT end flag
+[ 2184.732240] [04:41:49.873] [NVT-ts] nvt_bin_header_parser 147: cascade_2nd_header_info = 1
+[ 2184.732249] [04:41:49.873] [NVT-ts] nvt_bin_header_parser 179: ovly_info = 0, ilm_dlm_num = 2, ovly_sec_num = 0, info_sec_num = 14, partition = 16
+[ 2184.738721] [04:41:49.880] [NVT-ts] nvt_bootloader_reset 1859: end
+[ 2184.741502] [04:41:49.883] [NVT-ts] nvt_tx_auto_copy_mode 1688: tx auto copy mode 2 enable
+[ 2184.929086] [04:41:50.070] [NVT-ts] nvt_check_fw_reset_state 1972: error, retry=11, buf[1]=0x00, 0x00, 0x00, 0x00, 0x00
+[ 2184.929131] [04:41:50.070] [NVT-ts] nvt_download_firmware_hw_crc 718: nvt_check_fw_reset_state failed. (-1)
+[ 2184.934572] [04:41:50.076] [NVT-ts] nvt_bootloader_reset 1859: end
+[ 2184.936624] [04:41:50.078] [NVT-ts] nvt_tx_auto_copy_mode 1688: tx auto copy mode 2 enable
+[ 2185.123800] [04:41:50.265] [NVT-ts] nvt_check_fw_reset_state 1972: error, retry=11, buf[1]=0x00, 0x00, 0x00, 0x00, 0x00
+[ 2185.123856] [04:41:50.265] [NVT-ts] nvt_download_firmware_hw_crc 718: nvt_check_fw_reset_state failed. (-1)
+[ 2185.129515] [04:41:50.271] [NVT-ts] nvt_bootloader_reset 1859: end
+[ 2185.132344] [04:41:50.273] [NVT-ts] nvt_tx_auto_copy_mode 1688: tx auto copy mode 2 enable
+[ 2185.322152] [04:41:50.463] [NVT-ts] nvt_check_fw_reset_state 1972: error, retry=11, buf[1]=0x00, 0x00, 0x00, 0x00, 0x00
+[ 2185.322205] [04:41:50.463] [NVT-ts] nvt_download_firmware_hw_crc 718: nvt_check_fw_reset_state failed. (-1)
+[ 2185.322222] [04:41:50.463] [NVT-ts] nvt_download_firmware_hw_crc 727: error, retry=3
+[ 2185.322667] [04:41:50.464] [NVT-ts] nvt_read_bld_hw_crc 615: crc_done = 0, ilm_crc_flag = 0, dlm_crc_flag = 0
+[ 2185.326330] [04:41:50.467] [NVT-ts] nvt_read_bld_hw_crc 637: ilm: bin crc = 0xA05A1C32, golden = 0x00000000, result = 0x00000000
+[ 2185.327438] [04:41:50.468] [NVT-ts] nvt_read_bld_hw_crc 659: dlm: bin crc = 0xD7204CEA, golden = 0x00000000, result = 0x00000000
+[ 2185.327465] [04:41:50.469] [NVT-ts] nvt_update_firmware 856: Download Firmware failed. (-1)
+[ 2185.327573] [04:41:50.469] [NVT-ts] nvt_ts_resume 6210: download firmware failed, ignore check fw state
+[ 2185.327800] [04:41:50.469] [NVT-ts] update_pen_status 3982: ++, enforce_send_cmd:1, bluetooth:0, charge:1, gamemode:0, enable_last_time:0
+[ 2185.367167] [04:41:50.508] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x04, value: 0
+[ 2185.389536] [04:41:50.531] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[ 2185.389566] [04:41:50.531] [NVT-ts] update_pen_status 4012: enable_last_time = 0, enable = 0, enforce_send_cmd = 1, skip notify surfaceflinger
+[ 2185.389578] [04:41:50.531] [NVT-ts] update_pen_status 4037: --
+[ 2185.389652] [04:41:50.531] [NVT-ts] nvt_ts_resume 6262: end
+[ 2185.390493] [04:41:50.532] [NVT-ts] nvt_power_supply_work 4447: Power_supply_event:1
+[ 2194.701420] [04:41:59.842] [NVT-ts] nvt_ts_suspend 6113: start, gesture_command:01
+[ 2194.779505] [04:41:59.921] [NVT-ts] nvt_enable_gesture_mode 3900: Gesture mode on, Disable pen shorthand gesture, Enable touch wakeup gesture
+[ 2194.875118] [04:42:00.016] [NVT-ts] nvt_ts_suspend 6155: end
+[ 2198.972635] [04:42:04.114] [NVT-ts] nvt_ts_resume 6186: start
+[ 2198.972653] [04:42:04.114] [NVT-ts] update_firmware_request 324: filename is novatek_nt36532_n81a_fw_csot.bin
+[ 2198.972709] NVT-ts spi0.0: Direct firmware load for novatek_nt36532_n81a_fw_csot.bin failed with error -2
+[ 2198.972716] NVT-ts spi0.0: Falling back to sysfs fallback for: novatek_nt36532_n81a_fw_csot.bin
+[ 2198.979132] [04:42:04.120] [NVT-ts] nvt_get_fw_need_write_size 55: fw_need_write_size = 245760(0x3c000), NVT end flag
+[ 2198.979154] [04:42:04.120] [NVT-ts] nvt_bin_header_parser 147: cascade_2nd_header_info = 1
+[ 2198.979163] [04:42:04.120] [NVT-ts] nvt_bin_header_parser 179: ovly_info = 0, ilm_dlm_num = 2, ovly_sec_num = 0, info_sec_num = 14, partition = 16
+[ 2198.986309] [04:42:04.127] [NVT-ts] nvt_bootloader_reset 1859: end
+[ 2198.987954] [04:42:04.129] [NVT-ts] nvt_tx_auto_copy_mode 1688: tx auto copy mode 2 enable
+[ 2199.174710] [04:42:04.316] [NVT-ts] nvt_check_fw_reset_state 1972: error, retry=11, buf[1]=0x00, 0x00, 0x00, 0x00, 0x00
+[ 2199.174747] [04:42:04.316] [NVT-ts] nvt_download_firmware_hw_crc 718: nvt_check_fw_reset_state failed. (-1)
+[ 2199.180419] [04:42:04.321] [NVT-ts] nvt_bootloader_reset 1859: end
+[ 2199.182314] [04:42:04.323] [NVT-ts] nvt_tx_auto_copy_mode 1688: tx auto copy mode 2 enable
+[ 2199.370087] [04:42:04.511] [NVT-ts] nvt_check_fw_reset_state 1972: error, retry=11, buf[1]=0x00, 0x00, 0x00, 0x00, 0x00
+[ 2199.370137] [04:42:04.511] [NVT-ts] nvt_download_firmware_hw_crc 718: nvt_check_fw_reset_state failed. (-1)
+[ 2199.375888] [04:42:04.517] [NVT-ts] nvt_bootloader_reset 1859: end
+[ 2199.377771] [04:42:04.519] [NVT-ts] nvt_tx_auto_copy_mode 1688: tx auto copy mode 2 enable
+[ 2199.567412] [04:42:04.708] [NVT-ts] nvt_check_fw_reset_state 1972: error, retry=11, buf[1]=0x00, 0x00, 0x00, 0x00, 0x00
+[ 2199.567460] [04:42:04.709] [NVT-ts] nvt_download_firmware_hw_crc 718: nvt_check_fw_reset_state failed. (-1)
+[ 2199.567476] [04:42:04.709] [NVT-ts] nvt_download_firmware_hw_crc 727: error, retry=3
+[ 2199.567991] [04:42:04.709] [NVT-ts] nvt_read_bld_hw_crc 615: crc_done = 0, ilm_crc_flag = 0, dlm_crc_flag = 0
+[ 2199.570275] [04:42:04.711] [NVT-ts] nvt_read_bld_hw_crc 637: ilm: bin crc = 0xA05A1C32, golden = 0x00000000, result = 0x00000000
+[ 2199.571578] [04:42:04.713] [NVT-ts] nvt_read_bld_hw_crc 659: dlm: bin crc = 0xD7204CEA, golden = 0x00000000, result = 0x00000000
+[ 2199.571601] [04:42:04.713] [NVT-ts] nvt_update_firmware 856: Download Firmware failed. (-1)
+[ 2199.571680] [04:42:04.713] [NVT-ts] nvt_ts_resume 6210: download firmware failed, ignore check fw state
+[ 2199.571757] [04:42:04.713] [NVT-ts] update_pen_status 3982: ++, enforce_send_cmd:1, bluetooth:0, charge:1, gamemode:0, enable_last_time:0
+[ 2199.611276] [04:42:04.752] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x04, value: 0
+[ 2199.633324] [04:42:04.774] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[ 2199.633348] [04:42:04.774] [NVT-ts] update_pen_status 4012: enable_last_time = 0, enable = 0, enforce_send_cmd = 1, skip notify surfaceflinger
+[ 2199.633361] [04:42:04.774] [NVT-ts] update_pen_status 4037: --
+[ 2199.633621] [04:42:04.775] [NVT-ts] nvt_ts_resume 6262: end
+[ 2199.634492] [04:42:04.776] [NVT-ts] nvt_power_supply_work 4447: Power_supply_event:1
+[ 2209.266314] [04:42:14.407] [NVT-ts] nvt_ts_suspend 6113: start, gesture_command:01
+[ 2209.343316] [04:42:14.484] [NVT-ts] nvt_enable_gesture_mode 3900: Gesture mode on, Disable pen shorthand gesture, Enable touch wakeup gesture
+[ 2209.439151] [04:42:14.580] [NVT-ts] nvt_ts_suspend 6155: end
+[ 2209.957142] [04:42:15.098] [NVT-ts] nvt_ts_resume 6186: start
+[ 2209.957168] [04:42:15.098] [NVT-ts] update_firmware_request 324: filename is novatek_nt36532_n81a_fw_csot.bin
+[ 2209.957237] NVT-ts spi0.0: Direct firmware load for novatek_nt36532_n81a_fw_csot.bin failed with error -2
+[ 2209.957247] NVT-ts spi0.0: Falling back to sysfs fallback for: novatek_nt36532_n81a_fw_csot.bin
+[ 2209.970228] [04:42:15.111] [NVT-ts] nvt_get_fw_need_write_size 55: fw_need_write_size = 245760(0x3c000), NVT end flag
+[ 2209.970249] [04:42:15.111] [NVT-ts] nvt_bin_header_parser 147: cascade_2nd_header_info = 1
+[ 2209.970259] [04:42:15.111] [NVT-ts] nvt_bin_header_parser 179: ovly_info = 0, ilm_dlm_num = 2, ovly_sec_num = 0, info_sec_num = 14, partition = 16
+[ 2209.976286] [04:42:15.117] [NVT-ts] nvt_bootloader_reset 1859: end
+[ 2209.977814] [04:42:15.119] [NVT-ts] nvt_tx_auto_copy_mode 1688: tx auto copy mode 2 enable
+[ 2210.165232] [04:42:15.306] [NVT-ts] nvt_check_fw_reset_state 1972: error, retry=11, buf[1]=0x00, 0x00, 0x00, 0x00, 0x00
+[ 2210.165281] [04:42:15.306] [NVT-ts] nvt_download_firmware_hw_crc 718: nvt_check_fw_reset_state failed. (-1)
+[ 2210.170992] [04:42:15.312] [NVT-ts] nvt_bootloader_reset 1859: end
+[ 2210.172473] [04:42:15.314] [NVT-ts] nvt_tx_auto_copy_mode 1688: tx auto copy mode 2 enable
+[ 2210.361761] [04:42:15.503] [NVT-ts] nvt_check_fw_reset_state 1972: error, retry=11, buf[1]=0x00, 0x00, 0x00, 0x00, 0x00
+[ 2210.361809] [04:42:15.503] [NVT-ts] nvt_download_firmware_hw_crc 718: nvt_check_fw_reset_state failed. (-1)
+[ 2210.367396] [04:42:15.508] [NVT-ts] nvt_bootloader_reset 1859: end
+[ 2210.369234] [04:42:15.510] [NVT-ts] nvt_tx_auto_copy_mode 1688: tx auto copy mode 2 enable
+[ 2210.557804] [04:42:15.699] [NVT-ts] nvt_check_fw_reset_state 1972: error, retry=11, buf[1]=0x00, 0x00, 0x00, 0x00, 0x00
+[ 2210.557858] [04:42:15.699] [NVT-ts] nvt_download_firmware_hw_crc 718: nvt_check_fw_reset_state failed. (-1)
+[ 2210.557874] [04:42:15.699] [NVT-ts] nvt_download_firmware_hw_crc 727: error, retry=3
+[ 2210.558651] [04:42:15.700] [NVT-ts] nvt_read_bld_hw_crc 615: crc_done = 0, ilm_crc_flag = 0, dlm_crc_flag = 0
+[ 2210.560267] [04:42:15.701] [NVT-ts] nvt_read_bld_hw_crc 637: ilm: bin crc = 0xA05A1C32, golden = 0x00000000, result = 0x00000000
+[ 2210.561460] [04:42:15.703] [NVT-ts] nvt_read_bld_hw_crc 659: dlm: bin crc = 0xD7204CEA, golden = 0x00000000, result = 0x00000000
+[ 2210.561484] [04:42:15.703] [NVT-ts] nvt_update_firmware 856: Download Firmware failed. (-1)
+[ 2210.561584] [04:42:15.703] [NVT-ts] nvt_ts_resume 6210: download firmware failed, ignore check fw state
+[ 2210.561658] [04:42:15.703] [NVT-ts] update_pen_status 3982: ++, enforce_send_cmd:1, bluetooth:0, charge:1, gamemode:0, enable_last_time:0
+[ 2210.598954] [04:42:15.740] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x04, value: 0
+[ 2210.621100] [04:42:15.762] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[ 2210.621186] [04:42:15.762] [NVT-ts] update_pen_status 4012: enable_last_time = 0, enable = 0, enforce_send_cmd = 1, skip notify surfaceflinger
+[ 2210.621201] [04:42:15.762] [NVT-ts] update_pen_status 4037: --
+[ 2210.621939] [04:42:15.763] [NVT-ts] nvt_ts_resume 6262: end
+[ 2210.623181] [04:42:15.764] [NVT-ts] nvt_power_supply_work 4447: Power_supply_event:1
+[ 2213.079215] [04:42:18.220] [NVT-ts] nvt_ts_suspend 6113: start, gesture_command:01
+[ 2213.159275] [04:42:18.300] [NVT-ts] nvt_enable_gesture_mode 3900: Gesture mode on, Disable pen shorthand gesture, Enable touch wakeup gesture
+[ 2213.254940] [04:42:18.396] [NVT-ts] nvt_ts_suspend 6155: end
+[ 2213.697672] [04:42:18.839] [NVT-ts] nvt_ts_resume 6186: start
+[ 2213.697700] [04:42:18.839] [NVT-ts] update_firmware_request 324: filename is novatek_nt36532_n81a_fw_csot.bin
+[ 2213.697775] NVT-ts spi0.0: Direct firmware load for novatek_nt36532_n81a_fw_csot.bin failed with error -2
+[ 2213.697785] NVT-ts spi0.0: Falling back to sysfs fallback for: novatek_nt36532_n81a_fw_csot.bin
+[ 2213.709998] [04:42:18.851] [NVT-ts] nvt_get_fw_need_write_size 55: fw_need_write_size = 245760(0x3c000), NVT end flag
+[ 2213.710018] [04:42:18.851] [NVT-ts] nvt_bin_header_parser 147: cascade_2nd_header_info = 1
+[ 2213.710028] [04:42:18.851] [NVT-ts] nvt_bin_header_parser 179: ovly_info = 0, ilm_dlm_num = 2, ovly_sec_num = 0, info_sec_num = 14, partition = 16
+[ 2213.716001] [04:42:18.857] [NVT-ts] nvt_bootloader_reset 1859: end
+[ 2213.717833] [04:42:18.859] [NVT-ts] nvt_tx_auto_copy_mode 1688: tx auto copy mode 2 enable
+[ 2213.905171] [04:42:19.046] [NVT-ts] nvt_check_fw_reset_state 1972: error, retry=11, buf[1]=0x00, 0x00, 0x00, 0x00, 0x00
+[ 2213.905234] [04:42:19.046] [NVT-ts] nvt_download_firmware_hw_crc 718: nvt_check_fw_reset_state failed. (-1)
+[ 2213.911051] [04:42:19.052] [NVT-ts] nvt_bootloader_reset 1859: end
+[ 2213.913621] [04:42:19.055] [NVT-ts] nvt_tx_auto_copy_mode 1688: tx auto copy mode 2 enable
+[ 2214.102278] [04:42:19.243] [NVT-ts] nvt_check_fw_reset_state 1972: error, retry=11, buf[1]=0x00, 0x00, 0x00, 0x00, 0x00
+[ 2214.102313] [04:42:19.243] [NVT-ts] nvt_download_firmware_hw_crc 718: nvt_check_fw_reset_state failed. (-1)
+[ 2214.107911] [04:42:19.249] [NVT-ts] nvt_bootloader_reset 1859: end
+[ 2214.110350] [04:42:19.251] [NVT-ts] nvt_tx_auto_copy_mode 1688: tx auto copy mode 2 enable
+[ 2214.301836] [04:42:19.443] [NVT-ts] nvt_check_fw_reset_state 1972: error, retry=11, buf[1]=0x00, 0x00, 0x00, 0x00, 0x00
+[ 2214.301866] [04:42:19.443] [NVT-ts] nvt_download_firmware_hw_crc 718: nvt_check_fw_reset_state failed. (-1)
+[ 2214.301879] [04:42:19.443] [NVT-ts] nvt_download_firmware_hw_crc 727: error, retry=3
+[ 2214.302418] [04:42:19.443] [NVT-ts] nvt_read_bld_hw_crc 615: crc_done = 0, ilm_crc_flag = 0, dlm_crc_flag = 0
+[ 2214.303486] [04:42:19.445] [NVT-ts] nvt_read_bld_hw_crc 637: ilm: bin crc = 0xA05A1C32, golden = 0x00000000, result = 0x00000000
+[ 2214.304435] [04:42:19.445] [NVT-ts] nvt_read_bld_hw_crc 659: dlm: bin crc = 0xD7204CEA, golden = 0x00000000, result = 0x00000000
+[ 2214.304457] [04:42:19.445] [NVT-ts] nvt_update_firmware 856: Download Firmware failed. (-1)
+[ 2214.304652] [04:42:19.446] [NVT-ts] nvt_ts_resume 6210: download firmware failed, ignore check fw state
+[ 2214.304852] [04:42:19.446] [NVT-ts] update_pen_status 3982: ++, enforce_send_cmd:1, bluetooth:0, charge:1, gamemode:0, enable_last_time:0
+[ 2214.343371] [04:42:19.484] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x04, value: 0
+[ 2214.365496] [04:42:19.507] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[ 2214.365528] [04:42:19.507] [NVT-ts] update_pen_status 4012: enable_last_time = 0, enable = 0, enforce_send_cmd = 1, skip notify surfaceflinger
+[ 2214.365542] [04:42:19.507] [NVT-ts] update_pen_status 4037: --
+[ 2214.365624] [04:42:19.507] [NVT-ts] nvt_ts_resume 6262: end
+[ 2214.366631] [04:42:19.508] [NVT-ts] nvt_power_supply_work 4447: Power_supply_event:1
+[ 2272.571848] [04:43:17.713] [NVT-ts] xm_htc_gesture_switch_proc_write 2046: ++
+[ 2272.571865] [04:43:17.713] [NVT-ts] xm_htc_gesture_switch_proc_write 2073: gesture_switch = 0
+[ 2272.571871] [04:43:17.713] [NVT-ts] nvt_xm_htc_set_gesture_switch 1979: ++
+[ 2272.571875] [04:43:17.713] [NVT-ts] nvt_xm_htc_set_gesture_switch 1981: set gesture_switch: 0
+[ 2272.571880] [04:43:17.713] [NVT-ts] nvt_xm_htc_set_gesture_switch 1984: ts->gesture = 0
+[ 2272.571884] [04:43:17.713] [NVT-ts] nvt_xm_htc_set_gesture_switch 1986: --
+[ 2272.571887] [04:43:17.713] [NVT-ts] xm_htc_gesture_switch_proc_write 2080: --
+[ 2272.571902] [04:43:17.713] [NVT-ts] xm_htc_gesture_dbclk_proc_write 3616: ++
+[ 2272.571906] [04:43:17.713] [NVT-ts] xm_htc_gesture_dbclk_proc_write 3643: gesture_dbclk = 0
+[ 2272.571909] [04:43:17.713] [NVT-ts] nvt_xm_htc_set_gesture_dbclk 3531: ++
+[ 2272.571912] [04:43:17.713] [NVT-ts] nvt_xm_htc_set_gesture_dbclk 3533: set gesture_dbclk 0
+[ 2272.614889] [04:43:17.756] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x11, value: 0
+[ 2272.637079] [04:43:17.778] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[ 2272.637106] [04:43:17.778] [NVT-ts] nvt_xm_htc_set_gesture_dbclk 3541: --
+[ 2272.637116] [04:43:17.778] [NVT-ts] xm_htc_gesture_dbclk_proc_write 3662: --
+[ 2273.727235] [04:43:18.868] [NVT-ts] xm_htc_gesture_switch_proc_read 2012: ++
+[ 2273.727262] [04:43:18.868] [NVT-ts] nvt_xm_htc_get_gesture_switch 1995: ++
+[ 2273.727270] [04:43:18.868] [NVT-ts] nvt_xm_htc_get_gesture_switch 1999: --
+[ 2273.727282] [04:43:18.868] [NVT-ts] xm_htc_gesture_switch_proc_read 2035: --
+[ 2273.727505] [04:43:18.869] [NVT-ts] xm_htc_gesture_switch_proc_read 2012: ++
+[ 2273.727518] [04:43:18.869] [NVT-ts] xm_htc_gesture_switch_proc_read 2020: read END
+[ 2273.739257] [04:43:18.880] [NVT-ts] xm_htc_gesture_dbclk_proc_read 3571: ++
+[ 2273.739270] [04:43:18.880] [NVT-ts] nvt_xm_htc_get_gesture_dbclk 3549: ++
+[ 2273.778924] [04:43:18.920] [NVT-ts] nvt_get_extend_custom_cmd 1159: ++, cmd: 0xBF, sub_cmd: 0x11
+[ 2273.801125] [04:43:18.942] [NVT-ts] nvt_get_extend_custom_cmd 1203: send cmd success, tried 0 times
+[ 2273.801150] [04:43:18.942] [NVT-ts] nvt_get_extend_custom_cmd 1205: get value: 0
+[ 2273.801159] [04:43:18.942] [NVT-ts] nvt_get_extend_custom_cmd 1211: --
+[ 2273.801168] [04:43:18.942] [NVT-ts] nvt_xm_htc_get_gesture_dbclk 3556: get gesture_dbclk: 0
+[ 2273.801178] [04:43:18.942] [NVT-ts] nvt_xm_htc_get_gesture_dbclk 3559: --
+[ 2273.801223] [04:43:18.942] [NVT-ts] xm_htc_gesture_dbclk_proc_read 3605: --
+[ 2273.801642] [04:43:18.943] [NVT-ts] xm_htc_gesture_dbclk_proc_read 3571: ++
+[ 2273.801662] [04:43:18.943] [NVT-ts] xm_htc_gesture_dbclk_proc_read 3579: read END
+[ 2288.121332] [04:43:33.262] [NVT-ts] nvt_ts_suspend 6113: start, gesture_command:00
+[ 2288.121368] [04:43:33.262] [NVT-ts] nvt_irq_enable 702: enable=0, desc->depth=1
+[ 2288.122022] [04:43:33.263] [NVT-ts] nvt_enable_gesture_mode 3921: Enter deep sleep mode
+[ 2288.215025] [04:43:33.356] [NVT-ts] nvt_ts_suspend 6155: end
+[ 2288.649704] [04:43:33.791] [NVT-ts] nvt_ts_resume 6186: start
+[ 2288.649745] [04:43:33.791] [NVT-ts] update_firmware_request 324: filename is novatek_nt36532_n81a_fw_csot.bin
+[ 2288.649844] NVT-ts spi0.0: Direct firmware load for novatek_nt36532_n81a_fw_csot.bin failed with error -2
+[ 2288.649854] NVT-ts spi0.0: Falling back to sysfs fallback for: novatek_nt36532_n81a_fw_csot.bin
+[ 2288.662540] [04:43:33.804] [NVT-ts] nvt_get_fw_need_write_size 55: fw_need_write_size = 245760(0x3c000), NVT end flag
+[ 2288.662565] [04:43:33.804] [NVT-ts] nvt_bin_header_parser 147: cascade_2nd_header_info = 1
+[ 2288.662575] [04:43:33.804] [NVT-ts] nvt_bin_header_parser 179: ovly_info = 0, ilm_dlm_num = 2, ovly_sec_num = 0, info_sec_num = 14, partition = 16
+[ 2288.668275] [04:43:33.809] [NVT-ts] nvt_bootloader_reset 1859: end
+[ 2288.669351] [04:43:33.810] [NVT-ts] nvt_tx_auto_copy_mode 1688: tx auto copy mode 2 enable
+[ 2288.763939] [04:43:33.905] [NVT-ts] nvt_update_firmware 861: Update firmware success! <101345 us>
+[ 2288.764511] [04:43:33.906] [NVT-ts] nvt_get_fw_info 2033: fw_ver=0x13, fw_type=0x01, PID=0x5981, abs_x_max=30480, abs_y_max=20320, max_button_num=0
+[ 2288.775416] [04:43:33.916] [NVT-ts] nvt_irq_enable 702: enable=1, desc->depth=0
+[ 2288.775563] [04:43:33.917] [NVT-ts] update_pen_status 3982: ++, enforce_send_cmd:1, bluetooth:0, charge:1, gamemode:0, enable_last_time:0
+[ 2288.815002] [04:43:33.956] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x04, value: 0
+[ 2288.879938] [04:43:34.021] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 2 times
+[ 2288.879982] [04:43:34.021] [NVT-ts] update_pen_status 4012: enable_last_time = 0, enable = 0, enforce_send_cmd = 1, skip notify surfaceflinger
+[ 2288.879995] [04:43:34.021] [NVT-ts] update_pen_status 4037: --
+[ 2288.880054] [04:43:34.021] [NVT-ts] nvt_ts_resume 6262: end
+[ 2288.880530] [04:43:34.022] [NVT-ts] nvt_power_supply_work 4447: Power_supply_event:1
+[ 2289.422243] [04:43:34.563] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[ 2289.458934] [04:43:34.600] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[ 2289.479886] [04:43:34.621] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[ 2289.672300] [04:43:34.813] [NVT-ts] nvt_set_cur_value 4119: mode:1000, value:1, bTouchIsAwake:1
+[ 2289.711015] [04:43:34.852] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x01, value: 2
+[ 2289.734341] [04:43:34.875] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[ 2290.832757] [04:43:35.974] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[ 2290.870974] [04:43:36.012] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[ 2290.891938] [04:43:36.033] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[ 2291.082722] [04:43:36.224] [NVT-ts] nvt_set_cur_value 4119: mode:1000, value:1, bTouchIsAwake:1
+[ 2291.118938] [04:43:36.260] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x01, value: 2
+[ 2291.139981] [04:43:36.281] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[ 2293.285797] [04:43:38.427] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[ 2293.323182] [04:43:38.464] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[ 2293.347499] [04:43:38.489] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[ 2293.535707] [04:43:38.677] [NVT-ts] nvt_set_cur_value 4119: mode:1000, value:1, bTouchIsAwake:1
+[ 2293.575040] [04:43:38.716] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x01, value: 2
+[ 2293.597882] [04:43:38.739] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[ 2294.209635] [04:43:39.351] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[ 2294.247078] [04:43:39.388] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[ 2294.268017] [04:43:39.409] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[ 2294.459594] [04:43:39.601] [NVT-ts] nvt_set_cur_value 4119: mode:1000, value:1, bTouchIsAwake:1
+[ 2294.499031] [04:43:39.640] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x01, value: 2
+[ 2294.521788] [04:43:39.663] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[ 2295.300174] [04:43:40.441] [NVT-ts] nvt_set_cur_value 4119: mode:1071, value:1, bTouchIsAwake:1
+[ 2295.338887] [04:43:40.480] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x19, value: 1
+[ 2295.362066] [04:43:40.503] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[ 2295.550181] [04:43:40.691] [NVT-ts] nvt_set_cur_value 4119: mode:1000, value:1, bTouchIsAwake:1
+[ 2295.586922] [04:43:40.728] [NVT-ts] nvt_set_extend_custom_cmd 1094: ++, cmd: 0xBF, sub_cmd: 0x01, value: 2
+[ 2295.607536] [04:43:40.749] [NVT-ts] nvt_set_extend_custom_cmd 1134: -- send cmd success, tried 0 times
+[ 2310.484862] [04:43:55.626] [NVT-ts] nvt_ts_suspend 6113: start, gesture_command:00
+[ 2310.484920] [04:43:55.626] [NVT-ts] nvt_irq_enable 702: enable=0, desc->depth=1
+[ 2310.485543] [04:43:55.627] [NVT-ts] nvt_enable_gesture_mode 3921: Enter deep sleep mode
+[ 2310.582892] [04:43:55.724] [NVT-ts] nvt_ts_suspend 6155: end

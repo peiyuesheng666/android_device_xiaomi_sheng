@@ -8,10 +8,12 @@
 void sheng_bootlog_fault_pause(void);
 bool sheng_bootlog_test_mode(void);
 void sheng_bootlog_panic_pause(void);
+void sheng_bootlog_before_restart(const char *cmd);
 #else
 static inline void sheng_bootlog_fault_pause(void) { }
 static inline bool sheng_bootlog_test_mode(void) { return false; }
 static inline void sheng_bootlog_panic_pause(void) { }
+static inline void sheng_bootlog_before_restart(const char *cmd) { }
 #endif
 
 #endif

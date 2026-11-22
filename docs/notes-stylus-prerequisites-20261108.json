@@ -1,0 +1,89 @@
+{
+  "date": "2026-11-08",
+  "scope": "Read-only Notes/stylus prerequisites; no device or product changes",
+  "repositories": {
+    "reference-piano-seventeen": {
+      "commit": "3f10fc25273b42d18d0bd533551a0a5c3dda0094",
+      "remote": "https://github.com/xiaomi-pad-8-pro-development/android_device_xiaomi_piano.git",
+      "reviewed_git_blob_sha256": {
+        "device.mk": "04f2432878a65504cd5497e722b051e7954927ac348aeaecb5a8aaa3daaecf27"
+      }
+    },
+    "reference-piano-xiaomi-parts": {
+      "commit": "bdfeb0e4e4a128d31011f680a681680e8712b631",
+      "remote": "https://github.com/xiaomi-pad-8-pro-development/android_device_xiaomi_piano-xiaomi-parts.git",
+      "reviewed_git_blob_sha256": {
+        "XiaomiStylus/src/org/lineageos/xiaomistylus/TouchFeature.java": "297d2d6404cedeb48843d071b87055ea346373815a1e17ea2988e38733a2bf4f",
+        "XiaomiStylus/src/org/lineageos/xiaomistylus/PenTouchClient.java": "b842e1b91bfe62d8b3f9372c5e4d2050bbdddadcfb1fa99d335b04a78953fcea",
+        "XiaomiStylus/src/org/lineageos/xiaomistylus/pencilengine/PencilEngineBinder.java": "8795f74749cad0ab41de3175844deb67b7e1e7b8799f3491d98c7e9c1d44a12b",
+        "pencilengine-service/Android.bp": "23087a025eb32cb6eef266d0718e18c1df37e7561486dc0ddf8820741a013397"
+      }
+    },
+    "reference-piano-xiaomi-notes": {
+      "commit": "70317bd642e1ba886628e5d42b86f2036cd53db3",
+      "remote": "https://github.com/xiaomi-pad-8-pro-development/android_vendor_xiaomi_piano-xiaomi-notes.git",
+      "reviewed_git_blob_sha256": {
+        "Android.bp.in": "e5ae6ecd6dbd5f79f644bbd3831288efd7f2848798fda88ad4098ee0098973f5",
+        "stage-originals.py": "05c6521e1baaf4cd1b632d36e3991e08e1246f566821995480ee871048b3fa2f",
+        "compat/src/miui/os/Build.java": "712ac4fbdda776e39487d0d485185d4bd3eb114bc3d56801726a40d1509d49da",
+        "compat/src/miui/util/FeatureParser.java": "13b0d6c0a9d59bc4d3cc0d735aaa9ff06a5d5ea143920a336dc03f8494e1a560",
+        "compat/device_features/piano.xml": "22f2f00ad81f499354a02e313955ae47a72fad34d14d9de83d762f7782501931"
+      }
+    }
+  },
+  "original_notes": {
+    "path": "/root/sheng-lineage/firmware-dump/partitions/product/data-app/MIUINotes/MIUINotes.apk",
+    "bytes": 240313422,
+    "sha256": "129b1e1634e96a4f0ac4b7e286971a3cdb6b421416f3c85a5566924f60b76f47",
+    "version": "2.3.5.2",
+    "version_code": 2352,
+    "min_sdk": 29,
+    "target_sdk": 35,
+    "miui_build_references": [
+      "DEVICE",
+      "IS_ALPHA_BUILD",
+      "IS_DEVELOPMENT_VERSION",
+      "IS_GLOBAL_BUILD",
+      "IS_INTERNATIONAL_BUILD",
+      "IS_MIPAD",
+      "IS_STABLE_VERSION",
+      "IS_TABLET",
+      "TAGS"
+    ],
+    "miui_compat_methods": [
+      "Lmiui/accounts/ExtraAccountManager;->getXiaomiAccount",
+      "Lmiui/os/Build;->getRegion"
+    ],
+    "defines_miui_build": false
+  },
+  "stock_features": {
+    "path": "/root/sheng-lineage/firmware-dump/partitions/product/etc/device_features/sheng.xml",
+    "sha256": "f410f857beb89cae89fdf01c6e773d545fd9e0c2743a63d9f08c5838979b38b9"
+  },
+  "stock_touch_manifest": {
+    "path": "/root/sheng-lineage/firmware-dump/partitions/odm/etc/vintf/manifest/vendor.xiaomi.hw.touchfeature@1.0-service.xml",
+    "sha256": "cac527d4be1db7671fbadcc07952a64a581849b52529d8a7c4f3506d5b7f02f5",
+    "service": "vendor.xiaomi.hw.touchfeature@1.0::ITouchFeature/default",
+    "transport": "hwbinder"
+  },
+  "installed_compat_source": {
+    "path": "interfaces/compat/tablet/src/miui/os/Build.java",
+    "sha256": "97645312d2a7223e6f4214629621074c82d032dc914e9db0ced39741e65f90e9",
+    "fields": [
+      "IS_TABLET"
+    ],
+    "extends_android_build": false
+  },
+  "findings": [
+    "Reference Notes transformations pin 3.2.2.8 and a different original hash; the sheng 2.3.5.2 APK requires its own analysis.",
+    "Reference FeatureParser only loads assets for DEVICE=piano; use original sheng metadata without changing device identity.",
+    "Installed boot-classpath miui.os.Build only supplies IS_TABLET; original Notes DEX references additional missing fields and getRegion. App-local compatibility must account for parent-first class loading.",
+    "Reference stylus uses an AIDL Binder service; original sheng declares HIDL 1.0. Transactions cannot be interchanged.",
+    "Inspected reference PencilEngineBinder accepts UID-owning preinstalled Notes as well as platform-signed callers; platform-only documentation is stale.",
+    "Reference framework/SystemUI patches cannot be applied under the user constraint. Device-owned extension paths need separate verification."
+  ],
+  "implementation_changed": false,
+  "apk_installed": false,
+  "hardware_verified": false,
+  "other_device_operated": false
+}

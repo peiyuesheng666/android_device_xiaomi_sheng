@@ -1,0 +1,129 @@
+--- a/k618/sheng-ports/keyboard/sheng_nanosic.c
++++ b/k618/sheng-ports/keyboard/sheng_nanosic.c
+@@ -26,6 +26,8 @@
+ #include <linux/soc/qcom/panel_event_notifier.h>
+ #include <linux/workqueue.h>
+ 
++#include "sheng_nanosic_caps.h"
++
+ #define WN8030_HEADER_ADDR 0x7FC0
+ #define WN8030_CODE_ADDR 0x8000
+ 
+@@ -57,6 +59,7 @@
+ 	struct regmap *regmap;
+ 	struct mutex conn_mutex;
+ 	bool wake_irq_armed;
++	struct sheng_nano_caps caps;
+ 
+ 	bool suspended;
+ 	bool keyboard_attached;
+@@ -314,6 +317,8 @@
+ 	}
+ }
+ 
++static int sheng_nano_flush_caps_locked(struct nanosic_wn8030 *nano);
++
+ static void sheng_nano_panel_worker(struct work_struct *work)
+ {
+ 	struct nanosic_wn8030 *nano = container_of(work, struct nanosic_wn8030,
+@@ -321,6 +326,7 @@
+ 
+ 	mutex_lock(&nano->io_lock);
+ 	sheng_nano_sync_panel_locked(nano);
++	sheng_nano_flush_caps_locked(nano);
+ 	mutex_unlock(&nano->io_lock);
+ }
+ 
+@@ -365,6 +371,23 @@
+ 	return regmap_bulk_write(nanosic->regmap, 0x5c, buf, sizeof(buf));
+ }
+ 
++static int sheng_nano_flush_caps_locked(struct nanosic_wn8030 *nano)
++{
++ bool on = READ_ONCE(nano->panel_state) == SHENG_NANO_PANEL_ON &&
++           nano->panel_state_sent == SHENG_NANO_PANEL_ON;
++ bool sent;
++ int ret;
++ lockdep_assert_held(&nano->io_lock);
++ if (!sheng_nano_caps_pending(&nano->caps, on,
++       nano->ready && !nano->suspended && !nano->removing))
++  return 0;
++ sent = nano->caps.desired;
++ ret = nanosic_wn8030_set_caps_led(nano, sent);
++ if (!ret)
++  sheng_nano_caps_commit(&nano->caps, sent);
++ return ret;
++}
++
+ static int nanosic_wn8030_output_report(struct hid_device *hid, u8 *buf, size_t count)
+ {
+ 	struct nanosic_wn8030 *nanosic = hid->driver_data;
+@@ -375,8 +398,12 @@
+ 	if (hid->product != 0x00a3)
+ 		return -EOPNOTSUPP;
+ 	mutex_lock(&nanosic->io_lock);
+-	ret = nanosic->removing ? -ENODEV : !nanosic->ready ? -EAGAIN :
+-		nanosic_wn8030_set_caps_led(nanosic, buf[1]);
++	if (nanosic->removing) {
++		ret = -ENODEV;
++	} else {
++		sheng_nano_caps_request(&nanosic->caps, buf[1] != 0);
++		ret = sheng_nano_flush_caps_locked(nanosic);
++	}
+ 	mutex_unlock(&nanosic->io_lock);
+ 	return ret ? ret : count;
+ }
+@@ -404,6 +431,8 @@
+ 			hid_destroy_device(hid);
+ 	}
+ 	nano->keyboard_attached = false;
++	nano->caps.known = false;
++	sheng_nano_caps_reset(&nano->caps);
+ }
+ 
+ static int sheng_nano_create_hid(struct nanosic_wn8030 *nano,
+@@ -842,6 +871,7 @@
+ 		nano->ready = true;
+ 		/* Original HAL discovery/authentication restores feature state after boot. */
+ 		enable_irq(nano->client->irq);
++		sheng_nano_caps_reset(&nano->caps);
+ 		nano->panel_state_sent = SHENG_NANO_PANEL_UNKNOWN;
+ 		if (READ_ONCE(nano->panel_state) != SHENG_NANO_PANEL_UNKNOWN)
+ 			queue_work(system_freezable_wq, &nano->panel_worker);
+--- /dev/null
++++ b/k618/sheng-ports/keyboard/sheng_nanosic_caps.h
+@@ -0,0 +1,34 @@
++/* SPDX-License-Identifier: GPL-2.0-only */
++#ifndef SHENG_NANOSIC_CAPS_H
++#define SHENG_NANOSIC_CAPS_H
++
++/* Protected by the transport io_lock. Only successful writes advance applied. */
++struct sheng_nano_caps {
++	bool known, desired, valid, applied;
++};
++
++static inline void sheng_nano_caps_request(struct sheng_nano_caps *caps, bool on)
++{
++	caps->known = true;
++	caps->desired = on;
++}
++
++static inline bool sheng_nano_caps_pending(const struct sheng_nano_caps *caps,
++					 bool panel_on, bool usable)
++{
++	return panel_on && usable && caps->known &&
++		(!caps->valid || caps->desired != caps->applied);
++}
++
++static inline void sheng_nano_caps_commit(struct sheng_nano_caps *caps, bool sent)
++{
++	caps->applied = sent;
++	caps->valid = true;
++}
++
++static inline void sheng_nano_caps_reset(struct sheng_nano_caps *caps)
++{
++	/* Firmware reset loses hardware state, not the requested lock state. */
++	caps->valid = false;
++}
++#endif

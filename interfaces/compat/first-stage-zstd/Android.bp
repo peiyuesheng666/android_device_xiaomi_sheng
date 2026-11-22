@@ -1,0 +1,27 @@
+// Original zstd implementation, flags and local header layout.
+package {
+    default_applicable_licenses: ["sheng_first_stage_zstd_license"],
+}
+license {
+    name: "sheng_first_stage_zstd_license",
+    visibility: [":__subpackages__"],
+    license_kinds: [
+        "SPDX-license-identifier-BSD", "SPDX-license-identifier-CC0-1.0",
+        "SPDX-license-identifier-GPL", "SPDX-license-identifier-GPL-2.0",
+        "SPDX-license-identifier-GPL-3.0", "SPDX-license-identifier-LGPL",
+        "SPDX-license-identifier-MIT", "SPDX-license-identifier-Zlib",
+        "legacy_unencumbered",
+    ],
+    license_text: ["COPYING", "LICENSE"],
+}
+cc_library_static {
+    name: "libsheng_zstd_first_stage",
+    defaults: ["zstd_defaults"],
+    ramdisk_available: true,
+    recovery_available: true,
+    vendor_ramdisk_available: true,
+    compile_multilib: "first",
+    srcs: ["lib/*/*.c"],
+    local_include_dirs: ["lib/common"],
+    export_include_dirs: ["lib"],
+}

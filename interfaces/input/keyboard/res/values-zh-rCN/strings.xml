@@ -1,0 +1,9 @@
+<resources>
+    <string name="sheng_keyboard_backlight_title">键盘背光</string>
+    <string name="sheng_keyboard_backlight_value">亮度：%1$d%%</string>
+    <string name="sheng_keyboard_backlight_off">亮度：关闭</string>
+    <string name="sheng_keyboard_backlight_hint">连接支持背光的小米键盘后，在键盘唤醒时应用。</string>
+    <string name="sheng_keyboard_backlight_unset">亮度：未设置</string>
+    <string name="sheng_keyboard_backlight_failed">无法保存键盘亮度。</string>
+</resources>
+

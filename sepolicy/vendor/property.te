@@ -1,4 +1,7 @@
 vendor_public_prop(vendor_camera_p3enable_prop)
+# Recovery is a core domain, so this cross-partition property cannot be vendor
+# internal/restricted. The only device-specific setter is Recovery (see usb TE).
+vendor_public_prop(vendor_sheng_recovery_usb_ready_prop)
 vendor_public_prop(vendor_camera_sensor_prop)
 vendor_public_prop(vendor_fp_prop)
 vendor_public_prop(vendor_thermal_normal_prop)

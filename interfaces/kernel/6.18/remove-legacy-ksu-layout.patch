@@ -1,0 +1,166 @@
+--- a/k618/ws/common/arch/arm64/include/asm/thread_info.h
++++ b/k618/ws/common/arch/arm64/include/asm/thread_info.h
+@@ -17,6 +17,7 @@
+ #include <asm/memory.h>
+ #include <asm/stack_pointer.h>
+ #include <asm/types.h>
++#include <linux/android_kabi.h>
+ 
+ /*
+  * low level task data that entry.S needs immediate access to.
+@@ -43,6 +44,9 @@
+ 	void			*scs_sp;
+ #endif
+ 	u32			cpu;
++
++	ANDROID_KABI_RESERVE(1);
++	ANDROID_KABI_RESERVE(2);
+ };
+ 
+ #define thread_saved_pc(tsk)	\
+--- a/k618/ws/common/include/linux/mm_types.h
++++ b/k618/ws/common/include/linux/mm_types.h
+@@ -1263,13 +1263,16 @@
+ 
+ 		struct task_dma_buf_info *dmabuf_info;
+ 
++		ANDROID_KABI_RESERVE(1);
++
+ #ifdef CONFIG_PTSHARE
+-		ANDROID_KABI_USE(1, struct ptshare_desc __rcu *ptshare_desc);
+-		ANDROID_BACKPORT_USE(1, refcount_t ptshare_vmas);
++		ANDROID_BACKPORT_USE(1, struct ptshare_desc __rcu *ptshare_desc);
++		ANDROID_BACKPORT_USE(2, refcount_t ptshare_vmas);
+ #else
+-		ANDROID_KABI_RESERVE(1);
+ 		ANDROID_BACKPORT_RESERVE(1);
+-#endif
++		ANDROID_BACKPORT_RESERVE(2);
++#endif
++		ANDROID_BACKPORT_RESERVE(3);
+ 		ANDROID_VENDOR_DATA(1);
+ 	} __randomize_layout;
+ 
+--- a/k618/ws/common/include/linux/sched.h
++++ b/k618/ws/common/include/linux/sched.h
+@@ -593,15 +593,10 @@
+ 	u64				sum_exec_runtime;
+ 	u64				prev_sum_exec_runtime;
+ 	u64				vruntime;
+-	union {
+-		/*
+-		 * When !@on_rq this field is vlag.
+-		 * When cfs_rq->curr == se (which implies @on_rq)
+-		 * this field is vprot. See protect_slice().
+-		 */
+-		s64                     vlag;
+-		u64                     vprot;
+-	};
++	/* Approximated virtual lag: */
++	s64				vlag;
++	/* 'Protected' deadline, to give out minimum quantums: */
++	u64				vprot;
+ 	u64				slice;
+ 
+ 	u64				nr_migrations;
+@@ -1042,6 +1037,9 @@
+ 	unsigned			sched_rt_mutex:1;
+ #endif
+ 
++	/* Save user-dumpable when mm goes away */
++	unsigned			user_dumpable:1;
++
+ 	/* Bit to tell TOMOYO we're in execve(): */
+ 	unsigned			in_execve:1;
+ 	unsigned			in_iowait:1;
+@@ -1289,7 +1287,6 @@
+ 	struct blocked_on_lock		blocked_on;	/* lock we're blocked on */
+ 	raw_spinlock_t			blocked_lock;
+ #ifdef CONFIG_SCHED_PROXY_EXEC
+-	struct list_head		migration_node;
+ 	struct list_head		blocked_head;  /* tasks blocked on this task */
+ 	struct list_head		blocked_node;  /* our entry on someone elses blocked_head */
+ 	/* Node for list of tasks to process blocked_head list for blocked entitiy activations */
+@@ -1668,6 +1665,10 @@
+ 	unsigned long			prev_lowest_stack;
+ #endif
+ 
++#ifdef CONFIG_RANDOMIZE_KSTACK_OFFSET
++	u32				kstack_offset;
++#endif
++
+ #ifdef CONFIG_X86_MCE
+ 	void __user			*mce_vaddr;
+ 	__u64				mce_kflags;
+@@ -1697,22 +1698,10 @@
+ 	 */
+ 	struct callback_head		l1d_flush_kill;
+ #endif
+-	ANDROID_KABI_USE(1, struct {
+-		/* Save user-dumpable when mm goes away */
+-		unsigned	user_dumpable:1;
+-		});
+-
+-#ifdef CONFIG_RANDOMIZE_KSTACK_OFFSET
+-	ANDROID_KABI_USE(2, u32 kstack_offset);
+-#else
++	ANDROID_KABI_RESERVE(1);
+ 	ANDROID_KABI_RESERVE(2);
+-#endif
+ 	ANDROID_KABI_RESERVE(3);
+ 	ANDROID_KABI_RESERVE(4);
+-	ANDROID_KABI_RESERVE(5);
+-	ANDROID_KABI_RESERVE(6);
+-	ANDROID_KABI_RESERVE(7);
+-	ANDROID_KABI_RESERVE(8);
+ 
+ #ifdef CONFIG_RV
+ 	/*
+--- a/k618/ws/common/kernel/sched/fair.c
++++ b/k618/ws/common/kernel/sched/fair.c
+@@ -4005,8 +4005,7 @@
+ 	 *	   = V  - vl * w / w'
+ 	 *	   = V  - vl'
+ 	 */
+-	if (!se->on_rq)
+-		se->vlag = div64_long(se->vlag * old_weight, weight);
++	se->vlag = div64_long(se->vlag * old_weight, weight);
+ 
+ 	/*
+ 	 * DEADLINE
+@@ -4033,15 +4032,12 @@
+ 	bool curr = cfs_rq->curr == se;
+ 	bool rel_vprot = false;
+ 	u64 avruntime = 0;
+-	s64 vlag = 0;
+-	unsigned long old_weight;
+ 
+ 	if (se->on_rq) {
+ 		/* commit outstanding execution time */
+ 		update_curr(cfs_rq);
+ 		avruntime = avg_vruntime(cfs_rq);
+-		vlag = entity_lag(cfs_rq, se, avruntime);
+-
++		se->vlag = entity_lag(cfs_rq, se, avruntime);
+ 		se->deadline -= avruntime;
+ 		se->rel_deadline = 1;
+ 		if (curr && protect_slice(se)) {
+@@ -4058,7 +4054,6 @@
+ 
+ 	trace_android_vh_reweight_entity(se, &weight);
+ 
+-	old_weight = se->load.weight;
+ 	rescale_entity(se, weight, rel_vprot);
+ 
+ 	update_load_set(&se->load, weight);
+@@ -4074,9 +4069,7 @@
+ 			se->vprot += avruntime;
+ 		se->deadline += avruntime;
+ 		se->rel_deadline = 0;
+-		/* scale local vlag here because rescale_entity() didn't */
+-		vlag = div64_long(vlag * old_weight, weight);
+-		se->vruntime = avruntime - vlag;
++		se->vruntime = avruntime - se->vlag;
+ 
+ 		update_load_add(&cfs_rq->load, se->load.weight);
+ 		if (!curr)

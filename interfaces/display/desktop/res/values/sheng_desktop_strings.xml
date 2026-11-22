@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="sheng_desktop_title">Desktop mode</string>
+    <string name="sheng_desktop_enable">Enable desktop mode</string>
+    <string name="sheng_desktop_enable_summary">Use resizable windows on the tablet</string>
+    <string name="sheng_desktop_failed">Couldn’t change desktop mode. Please try again.</string>
+</resources>

@@ -1,0 +1,159 @@
+--- a/vendor/qcom/opensource/display-drivers/msm/dp/dp_pll.h
++++ b/vendor/qcom/opensource/display-drivers/msm/dp/dp_pll.h
+@@ -136,6 +136,8 @@
+ 
+ 	bool ssc_en;
+ 	bool bonding_en;
++	bool legacy_owner;
++	bool clock_provider_registered;
+ 
+ 	void *priv;
+ 	struct dp_pll_db pll_db;
+--- a/vendor/qcom/opensource/display-drivers/msm/dp/dp_pll.c
++++ b/vendor/qcom/opensource/display-drivers/msm/dp/dp_pll.c
+@@ -130,6 +130,46 @@
+ 	return rc;
+ }
+ 
++static struct dp_pll *dp_pll_get_sheng_legacy(struct dp_pll_in *in)
++{
++	struct device_node *node = in->pdev->dev.of_node;
++	struct dp_pll *pll;
++	const char *revision;
++	int rc;
++
++	/* Shipping sheng DT embeds the PLL clocks in the display node. */
++	if (!of_root || of_property_match_string(of_root, "model",
++			"Qualcomm Technologies, Inc. 8550 sheng") < 0 ||
++			of_property_read_string(node, "qcom,pll-revision", &revision) ||
++			strcmp(revision, "4nm-v1.1") ||
++			!of_property_present(node, "#clock-cells"))
++		return ERR_PTR(-EINVAL);
++
++	pll = kzalloc(sizeof(*pll), GFP_KERNEL);
++	if (!pll)
++		return ERR_PTR(-ENOMEM);
++	pll->pdev = in->pdev;
++	pll->parser = in->parser;
++	pll->aux = in->aux;
++	pll->dp_core_revision = in->dp_core_revision;
++	pll->revision = DP_PLL_4NM_V1_1;
++	pll->name = "dp0";
++	pll->legacy_owner = true;
++	pll->ssc_en = of_property_read_bool(node, "qcom,ssc-feature-enable");
++	pll->bonding_en = of_property_read_bool(node, "qcom,bonding-feature-enable");
++	rc = dp_pll_fill_io(pll);
++	if (rc)
++		goto error;
++	rc = dp_pll_clock_register_4nm(pll);
++	if (rc)
++		goto error;
++	DP_INFO("sheng legacy DP PLL 4nm-v1.1 clocks registered\n");
++	return pll;
++error:
++	kfree(pll);
++	return ERR_PTR(rc);
++}
++
+ struct dp_pll *dp_pll_get(struct dp_pll_in *in)
+ {
+ 	struct dp_pll *pll;
+@@ -143,21 +183,21 @@
+ 	}
+ 
+ 	node = of_parse_phandle(in->pdev->dev.of_node, "qcom,dp-pll", 0);
+-	if (!node) {
+-		DP_ERR("couldn't find dp-pll node\n");
+-		return ERR_PTR(-EINVAL);
+-	}
++	if (!node)
++		return dp_pll_get_sheng_legacy(in);
+ 
+ 	pdev = of_find_device_by_node(node);
++	of_node_put(node);
+ 	if (!pdev) {
+ 		DP_ERR("couldn't find dp-pll device\n");
+-		return ERR_PTR(-ENODEV);
++		return ERR_PTR(-EPROBE_DEFER);
+ 	}
+ 
+ 	pll = platform_get_drvdata(pdev);
++	put_device(&pdev->dev);
+ 	if (!pll) {
+ 		DP_ERR("couldn't find pll\n");
+-		return ERR_PTR(-ENODEV);
++		return ERR_PTR(-EPROBE_DEFER);
+ 	}
+ 
+ 	pll->parser = in->parser;
+@@ -172,6 +212,10 @@
+ 
+ void dp_pll_put(struct dp_pll *pll)
+ {
++	if (!IS_ERR_OR_NULL(pll) && pll->legacy_owner) {
++		dp_pll_clock_unregister_4nm(pll);
++		kfree(pll);
++	}
+ }
+ 
+ static const struct dp_pll_ver_spec_info dp_pll_5nm_v1 = {
+--- a/vendor/qcom/opensource/display-drivers/msm/dp/dp_pll_4nm.c
++++ b/vendor/qcom/opensource/display-drivers/msm/dp/dp_pll_4nm.c
+@@ -877,6 +877,7 @@
+ 		goto clk_reg_fail;
+ 	}
+ 
++	pll->clock_provider_registered = true;
+ 	DP_DEBUG("success\n");
+ 	return rc;
+ 
+@@ -887,6 +888,18 @@
+ 
+ void dp_pll_clock_unregister_4nm(struct dp_pll *pll)
+ {
++	int i;
++
++	if (!pll->clk_data)
++		return;
++	if (pll->clock_provider_registered) {
++		of_clk_del_provider(pll->pdev->dev.of_node);
++		pll->clock_provider_registered = false;
++	}
++	for (i = DP_PLL_NUM_CLKS - 1; i >= 0; i--)
++		if (!IS_ERR_OR_NULL(pll->clk_data->clks[i]))
++			clk_unregister(pll->clk_data->clks[i]);
+ 	kfree(pll->clk_data->clks);
+ 	kfree(pll->clk_data);
+-}
++	pll->clk_data = NULL;
++}
+--- a/soc/drivers/usb/phy/phy-msm-ssusb-qmp.c
++++ b/soc/drivers/usb/phy/phy-msm-ssusb-qmp.c
+@@ -881,6 +881,11 @@
+  * Parent index 1 belongs to the fixed gcc-kalama parent_data_13, not a
+  * hardware selector value. Do not alter other boards or clock topologies.
+  */
++static void sheng_ssphy_put_pipe_xo(void *clock)
++{
++	clk_put(clock);
++}
++
+ static int sheng_ssphy_qmp_get_pipe_xo(struct msm_ssphy_qmp *phy,
+ 		struct device *dev)
+ {
+@@ -904,12 +909,13 @@
+ 	xo = clk_hw_get_parent_by_index(mux, 1);
+ 	if (!xo)
+ 		return dev_err_probe(dev, -EPROBE_DEFER, "GCC pipe XO parent not ready\n");
+-	phy->pipe_clk_xo = devm_clk_hw_get_clk(dev, xo, "pipe_clk_xo");
++	/* XO belongs to GCC, so manage this consumer reference explicitly. */
++	phy->pipe_clk_xo = clk_hw_get_clk(xo, "pipe_clk_xo");
+ 	if (IS_ERR(phy->pipe_clk_xo))
+ 		return dev_err_probe(dev, PTR_ERR(phy->pipe_clk_xo),
+ 				"failed to get GCC pipe XO parent\n");
+ 	dev_info(dev, "sheng pipe suspend parent: %s\n", clk_hw_get_name(xo));
+-	return 0;
++	return devm_add_action_or_reset(dev, sheng_ssphy_put_pipe_xo, phy->pipe_clk_xo);
+ }
+ 
+ static int msm_ssphy_qmp_get_clks(struct msm_ssphy_qmp *phy, struct device *dev)

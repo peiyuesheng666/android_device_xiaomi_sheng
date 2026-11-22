@@ -1,0 +1,25 @@
+{
+  "date": "2026-11-23",
+  "full_build": "out-sheng-full-clean-20261122; completed successfully",
+  "incremental_images": [
+    "vendor",
+    "product",
+    "vbmeta_system",
+    "vbmeta"
+  ],
+  "user_acceptance": {
+    "four_direction_rotation": true,
+    "keyboard_switch_palette": true,
+    "keyboard_backlight": true
+  },
+  "sensor_change": "DEVICE_ORIENTATION event mapping (value+3)%4; physical vectors unchanged",
+  "persist_written": false,
+  "custom_pystore_node": false,
+  "native_pstore_retained": true,
+  "debug_rawdump_boot_logging_retained": true,
+  "automatic_reboot_timeout": false,
+  "remaining": [
+    "stylus palm rejection optimization",
+    "DP arbitrary-mode green-tint root cause; accepted automatic-mode policy retained"
+  ]
+}

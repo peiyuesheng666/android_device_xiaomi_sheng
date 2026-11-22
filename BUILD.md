@@ -69,7 +69,10 @@ export OUT_DIR=out-sheng-pixelos
 export USE_CCACHE=1 CCACHE_EXEC=/usr/bin/ccache
 source build/envsetup.sh
 lunch custom_sheng-cp2a-userdebug
-m -j4 bacon
+python3 device/xiaomi/sheng/tools/prepare_sheng_desktop_shell.py --rom "$PWD"
+python3 device/xiaomi/sheng/tools/prepare_sheng_desktop_settings.py --rom "$PWD"
+SHENG_LUNCH=custom_sheng-cp2a-userdebug SHENG_BUILD_JOBS=4 \
+    bash device/xiaomi/sheng/tools/build_hardware.sh --full
 ```
 
 LineageOS 保留 `lineage_sheng-cp2a-userdebug` 产品入口，使用独立源码和输出目录。
@@ -77,3 +80,16 @@ LineageOS 保留 `lineage_sheng-cp2a-userdebug` 产品入口，使用独立源�
 
 完整 OTA 包及 boot、init_boot、vendor_boot、recovery 位于
 `$OUT_DIR/target/product/sheng/`。内核及外置驱动由正常 ROM 构建规则编译。
+
+
+## 2026-11-23 发布状态
+
+2026-11-22 完整构建成功；随后按原构建图定向编译传感器 HAL 和配件应用，
+重建 vendor、product、vbmeta_system、vbmeta，AVB 链校验通过并刷入实机。
+用户已确认四方向旋转和键盘开关配色均正常。完整发布包由这套镜像生成。
+不修改 persist 或传感器校准；原厂备份保持只读。
+USB、Magisk、KernelSU 保留此前已验收版本，不重复测试。
+保留原生 pstore，debug 保留启动 rawdump 日志；无自定义 pystore 节点或自动重启超时。
+DP 采用最高可用刷新率优先、同刷新率选最大分辨率的已验收策略；
+不宣称任意分辨率切换绿色画面的底层问题已根治。手写笔掌拒仍待优化。
+公共仓库版本见 patches/rom-manifest.xml；设备专属修复保留在设备树及内核树。

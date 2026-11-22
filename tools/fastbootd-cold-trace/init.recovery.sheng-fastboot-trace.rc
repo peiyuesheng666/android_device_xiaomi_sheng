@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: Apache-2.0
+# Diagnostic candidate only: not included in PRODUCT_COPY_FILES.
+# Start before Recovery's boot/class_start actions can select fastbootd.
+on post-fs && property:ro.boot.sheng_fastboot_trace=1
+    start sheng-fastboot-cold-trace
+
+service sheng-fastboot-cold-trace /system/bin/timeout 180 /system/bin/sh /system/bin/sheng-fastboot-cold-trace
+    disabled
+    oneshot
+    user root
+    group root system
+    seclabel u:r:recovery:s0

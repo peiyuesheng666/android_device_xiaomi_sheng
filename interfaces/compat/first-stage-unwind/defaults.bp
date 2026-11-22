@@ -1,0 +1,87 @@
+libunwindstack_common_src_files = [
+    "AndroidUnwinder.cpp",
+    "ArmExidx.cpp",
+    "Demangle.cpp",
+    "DexFiles.cpp",
+    "DwarfCfa.cpp",
+    "DwarfEhFrameWithHdr.cpp",
+    "DwarfMemory.cpp",
+    "DwarfOp.cpp",
+    "DwarfSection.cpp",
+    "Elf.cpp",
+    "ElfInterface.cpp",
+    "ElfInterfaceArm.cpp",
+    "Global.cpp",
+    "JitDebug.cpp",
+    "MapInfo.cpp",
+    "Maps.cpp",
+    "Memory.cpp",
+    "MemoryMte.cpp",
+    "MemoryXz.cpp",
+    "Regs.cpp",
+    "RegsArm.cpp",
+    "RegsArm64.cpp",
+    "RegsX86.cpp",
+    "RegsX86_64.cpp",
+    "RegsRiscv64.cpp",
+    "Symbols.cpp",
+    "ThreadEntry.cpp",
+    "ThreadUnwinder.cpp",
+    "Unwinder.cpp",
+]
+
+cc_defaults {
+    name: "sheng_first_stage_libunwindstack_defaults",
+    defaults: ["libunwindstack_flags"],
+    export_include_dirs: ["include"],
+
+    srcs: libunwindstack_common_src_files,
+
+    cflags: [
+        "-Wexit-time-destructors",
+        "-fno-c++-static-destructors",
+    ],
+
+    target: {
+        host: {
+            // Always disable optimizations for host to make it easier to debug.
+            cflags: [
+                "-O0",
+                "-g",
+            ],
+        },
+        bionic: {
+            header_libs: ["libsheng_bionic_platform_headers"],
+            whole_static_libs: ["libasync_safe"],
+        },
+    },
+
+    arch: {
+        x86: {
+            srcs: ["AsmGetRegsX86.S"],
+        },
+        x86_64: {
+            srcs: ["AsmGetRegsX86_64.S"],
+        },
+    },
+
+    static: {
+        cflags: ["-DUNWINDSTACK_STATIC"],
+    },
+
+    static_libs: [
+        "libprocinfo",
+    ],
+
+    whole_static_libs: [
+        "librustc_demangle_static",
+        "libsheng_zstd_first_stage",
+    ],
+
+    shared_libs: [
+        "libbase",
+        "liblog",
+        "liblzma",
+        "libz",
+    ],
+}

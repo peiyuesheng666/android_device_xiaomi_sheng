@@ -16,6 +16,7 @@
 
 #include "HalProxyCallback.h"
 #include "ShengCctSample.h"
+#include "ShengOrientationSample.h"
 
 #include <cinttypes>
 
@@ -83,9 +84,15 @@ std::vector<V2_1::Event> HalProxyCallbackBase::processEvents(const std::vector<V
             continue;
         }
 
-        // ODM's IMU/magnetometer axis maps establish the landscape frame in
-        // SSC, before fusion and direct reporting. Keep every event in that
-        // frame here, including the discrete device-orientation event.
+        // Stock sheng orientation codes use a portrait reference; this panel's
+        // natural orientation is landscape. Convert only discrete orientation
+        // events, never physical sensor vectors or persistent calibration.
+        if (event.sensorType == V2_1::SensorType::DEVICE_ORIENTATION &&
+            sensor.type == V2_1::SensorType::DEVICE_ORIENTATION) {
+            event.u.scalar = sheng::MapDeviceOrientation(
+                    true, static_cast<int32_t>(event.sensorType),
+                    static_cast<int32_t>(sensor.type), event.u.scalar);
+        }
 
         if (sensor.type == V2_1::SensorType::PICK_UP_GESTURE && event.u.scalar != 1) {
             continue;

@@ -105,7 +105,7 @@
 +if [ "$SHENG_BUILD_MODE" = debug ]; then
 +  "$ack/scripts/config" --file "$output/.config" --enable SHENG_BOOTLOG --set-val LOG_BUF_SHIFT 22
 +else
-+  "$ack/scripts/config" --file "$output/.config" --disable SHENG_BOOTLOG
++  "$ack/scripts/config" --file "$output/.config" --enable SHENG_BOOTLOG --set-val LOG_BUF_SHIFT 22
 +fi
 +run kernel-config "${make_cmd[@]}" olddefconfig
 +for option in SYSVIPC POSIX_MQUEUE IPC_NS PID_NS DEVTMPFS USER_NS NETFILTER_XT_MATCH_ADDRTYPE; do
@@ -123,7 +123,7 @@
 +if [ "$SHENG_BUILD_MODE" = debug ]; then
 +  grep -qx 'CONFIG_SHENG_BOOTLOG=y' "$output/.config" || { echo 'Missing debug rawdump logger'; exit 1; }
 +else
-+  grep -qx '# CONFIG_SHENG_BOOTLOG is not set' "$output/.config" || { echo 'Release logger must be disabled'; exit 1; }
++  grep -qx 'CONFIG_SHENG_BOOTLOG=y' "$output/.config" || { echo 'Release pystore logger must be built in'; exit 1; }
 +fi
 +for option in IP6_NF_NAT IP6_NF_TARGET_MASQUERADE NETFILTER_XT_NAT NETFILTER_XT_TARGET_MASQUERADE IP6_NF_IPTABLES_LEGACY NF_NAT; do
 +  grep -qx "CONFIG_${option}=y" "$output/.config" || { echo "Missing IPv6 NAT option: $option"; exit 1; }

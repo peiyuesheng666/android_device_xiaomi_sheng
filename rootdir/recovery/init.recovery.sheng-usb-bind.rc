@@ -1,0 +1,19 @@
+# SPDX-License-Identifier: Apache-2.0
+# Common Recovery may attempt its one-shot configfs bind before DWC3 has a
+# peripheral UDC. Reconcile only after BOTH role publication and FunctionFS
+# readiness; never toggle FFS readiness, cycle the role or restart a daemon.
+on property:vendor.sheng.recovery.usb_role_ready=1 && property:sys.usb.config=adb && property:sys.usb.ffs.ready=1 && property:sys.usb.configfs=1
+    start sheng-recovery-usb-bind
+
+on property:vendor.sheng.recovery.usb_role_ready=1 && property:sys.usb.config=sideload && property:sys.usb.ffs.ready=1 && property:sys.usb.configfs=1
+    start sheng-recovery-usb-bind
+
+on property:vendor.sheng.recovery.usb_role_ready=1 && property:sys.usb.config=fastboot && property:sys.usb.ffs.ready=1 && property:sys.usb.configfs=1
+    start sheng-recovery-usb-bind
+
+service sheng-recovery-usb-bind /system/bin/sh /system/bin/sheng-recovery-usb-bind
+    disabled
+    oneshot
+    user root
+    group root system
+    seclabel u:r:recovery:s0

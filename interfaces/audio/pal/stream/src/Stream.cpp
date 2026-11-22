@@ -1451,6 +1451,19 @@ int32_t Stream::switchDevice(Stream* streamHandle, uint32_t numDev, struct pal_d
 
     streamHandle->getStreamAttributes(&strAttr);
 
+    // A NONE request releases the old SCO route; it is not permission to
+    // play queued music on the speaker while the next route is negotiated.
+    if (numDev == 1 && newDevices[0].id == PAL_DEVICE_NONE &&
+        strAttr.type == PAL_STREAM_DEEP_BUFFER && mDevices.size() == 1 &&
+        mDevices.front()->getSndDeviceId() == PAL_DEVICE_OUT_BLUETOOTH_SCO &&
+        !rm->isDeviceReady(PAL_DEVICE_OUT_BLUETOOTH_SCO)) {
+        PAL_INFO(LOG_TAG, "sheng: release stale SCO media route without speaker fallback");
+        streamDevDisconnect.emplace_back(streamHandle, PAL_DEVICE_OUT_BLUETOOTH_SCO);
+        mStreamMutex.unlock();
+        rm->unlockActiveStream();
+        return rm->streamDevSwitch(streamDevDisconnect, StreamDevConnect);
+    }
+
     for (int i = 0; i < mDevices.size(); i++) {
         pal_device_id_t curDevId = (pal_device_id_t)mDevices[i]->getSndDeviceId();
 

@@ -1,0 +1,28 @@
+// SPDX-License-Identifier: Apache-2.0
+package {
+    default_applicable_licenses: ["sheng_usb_power_license"],
+}
+license {
+    name: "sheng_usb_power_license",
+    license_kinds: ["SPDX-license-identifier-Apache-2.0"],
+    license_text: ["LICENSE"],
+}
+
+android_app {
+    name: "ShengUsbPower",
+    manifest: "AndroidManifest.xml",
+    srcs: ["src/**/*.java"],
+    resource_dirs: ["res"],
+    platform_apis: true,
+    certificate: "platform",
+    product_specific: true,
+    required: ["default-permissions-sheng-usb-power.xml"],
+    optimize: { enabled: false },
+}
+
+prebuilt_etc {
+    name: "default-permissions-sheng-usb-power.xml",
+    product_specific: true,
+    sub_dir: "default-permissions",
+    src: "default-permissions-sheng-usb-power.xml",
+}

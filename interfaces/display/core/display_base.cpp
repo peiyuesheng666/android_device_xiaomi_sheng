@@ -1977,9 +1977,29 @@ DisplayError DisplayBase::SetActiveConfig(uint32_t index) {
     return kErrorNone;
   }
 
+  // A pluggable modeset can temporarily disable the CRTC's vblank counter.
+  // Do not let the event thread rearm its one-shot subscription in that window:
+  // an EINVAL would leave it polling forever with no event queued. Resume via
+  // HandlePendingVSyncEnable after the new mode's commit/fence, not a timer.
+  const bool resume_vsync = display_type_ == kPluggable && vsync_enable_;
+  if (resume_vsync) {
+    error = SetVSyncStateLocked(false);
+    if (error != kErrorNone) {
+      return error;
+    }
+  }
+
   error = hw_intf_->SetDisplayAttributes(index);
   if (error != kErrorNone) {
+    if (resume_vsync) {
+      // No new mode was accepted; restore the previous subscription.
+      SetVSyncStateLocked(true);
+    }
     return error;
+  }
+
+  if (resume_vsync) {
+    vsync_enable_pending_ = true;
   }
 
   avoid_qsync_mode_change_ = true;

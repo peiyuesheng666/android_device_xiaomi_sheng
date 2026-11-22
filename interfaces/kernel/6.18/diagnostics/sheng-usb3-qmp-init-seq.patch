@@ -1,0 +1,27 @@
+--- a/soc/drivers/usb/phy/phy-msm-ssusb-qmp.c
++++ b/soc/drivers/usb/phy/phy-msm-ssusb-qmp.c
+@@ -391,7 +391,7 @@
+ 		return -EINVAL;
+ 	}
+ 
+-	for (i = 0; i < phy->init_seq_len/2; i++) {
++	for (i = 0; i < phy->init_seq_len; i++) {
+ 		writel_relaxed(reg->val, phy->base + reg->offset);
+ 		reg++;
+ 	}
+@@ -1191,10 +1191,12 @@
+ 			return -ENOMEM;
+ 
+ 		phy->init_seq_len = (size / sizeof(*phy->qmp_phy_init_seq));
+-		of_property_read_u32_array(dev->of_node,
++		/* init_seq_len counts register/value pairs; OF counts u32 cells. */
++		ret = of_property_read_u32_array(dev->of_node,
+ 				"qcom,qmp-phy-init-seq",
+-				phy->qmp_phy_init_seq,
+-				phy->init_seq_len);
++				(u32 *)phy->qmp_phy_init_seq, size / sizeof(u32));
++		if (ret)
++			return dev_err_probe(dev, ret, "invalid QMP PHY init sequence\n");
+ 	} else {
+ 		dev_err(dev, "error need qmp-phy-init-seq\n");
+ 		return -EINVAL;

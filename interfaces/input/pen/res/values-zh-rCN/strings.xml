@@ -32,4 +32,22 @@
     <string name="manage_connection">管理蓝牙连接</string>
     <string name="refresh">刷新状态</string>
     <string name="unsupported_platform">此设备或 Android 版本暂不支持读取 Focus Pen 信息。</string>
+    <string name="accessories_title">手写笔与键盘</string>
+    <string name="accessories_summary">手写笔与键盘设置</string>
+    <string name="accessories_keyboard">键盘</string>
+    <string name="accessories_keyboard_summary">调节键盘背光</string>
+    <string name="accessories_keyboard_unavailable">键盘设置不可用</string>
+    <string name="accessories_pen">手写笔</string>
+    <string name="keyboard_brightness">键盘背光</string>
+    <string name="keyboard_level">键盘亮度：%1$d%%</string>
+    <string name="keyboard_level_unset">键盘亮度：尚未设置</string>
+    <string name="keyboard_auto">自动背光</string>
+    <string name="keyboard_auto_hint">连接并展开键盘时，根据环境光调节背光。关闭自动背光后恢复手动亮度。</string>
+    <string name="keyboard_auto_unavailable">未检测到可用的环境光传感器。</string>
+    <string name="keyboard_controls_hint">背光需要支持此功能的键盘。翻折键盘后关闭背光；保存设置不代表硬件已执行。</string>
+    <string name="keyboard_write_failed">键盘设置保存失败</string>
+    <string name="keyboard_system_settings">键盘布局与辅助功能</string>
+    <string name="keyboard_pointer_speed">触控板指针速度</string>
+    <string name="keyboard_pointer_speed_value">触控板指针速度：%1$+d</string>
+    <string name="keyboard_natural_scroll">自然滚动</string>
 </resources>

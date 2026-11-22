@@ -1,0 +1,37 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="org.lineageos.sheng.usbpower" android:versionCode="3" android:versionName="1.2">
+    <uses-sdk android:minSdkVersion="33" android:targetSdkVersion="37" />
+    <uses-permission android:name="android.permission.MANAGE_USB" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <application android:label="@string/app_name" android:allowBackup="false"
+        android:theme="@android:style/Theme.DeviceDefault.DayNight">
+        <provider android:name=".UsbPowerProvider" android:exported="true"
+            android:authorities="org.lineageos.sheng.usbpower.settings"
+            android:permission="android.permission.MANAGE_USB">
+            <intent-filter>
+                <action android:name="com.android.settings.action.EXTRA_SETTINGS" />
+            </intent-filter>
+            <meta-data android:name="com.android.settings.category"
+                android:value="com.android.settings.category.ia.battery" />
+        </provider>
+        <receiver android:name=".UsbPowerReceiver" android:exported="true"
+            android:permission="android.permission.MANAGE_USB">
+            <intent-filter>
+                <action android:name="android.hardware.usb.action.USB_PORT_CHANGED" />
+                <action android:name="android.intent.action.ACTION_POWER_CONNECTED" />
+                <action android:name="android.intent.action.ACTION_POWER_DISCONNECTED" />
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+        <service android:name=".UsbPowerTileService" android:exported="true"
+            android:label="@string/app_name" android:icon="@drawable/ic_usb_power"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+            <meta-data android:name="android.service.quicksettings.TOGGLEABLE_TILE" android:value="true" />
+        </service>
+    </application>
+</manifest>

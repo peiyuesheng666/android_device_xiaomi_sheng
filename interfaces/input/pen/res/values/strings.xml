@@ -32,4 +32,22 @@
     <string name="manage_connection">Manage Bluetooth connection</string>
     <string name="refresh">Refresh status</string>
     <string name="unsupported_platform">Focus Pen information is unavailable on this device or Android version.</string>
+    <string name="accessories_title">Stylus and keyboard</string>
+    <string name="accessories_summary">Stylus and keyboard settings</string>
+    <string name="accessories_keyboard">Keyboard</string>
+    <string name="accessories_keyboard_summary">Adjust keyboard backlight</string>
+    <string name="accessories_keyboard_unavailable">Keyboard settings unavailable</string>
+    <string name="accessories_pen">Stylus</string>
+    <string name="keyboard_brightness">Keyboard backlight</string>
+    <string name="keyboard_level">Keyboard brightness: %1$d%%</string>
+    <string name="keyboard_level_unset">Keyboard brightness: not set</string>
+    <string name="keyboard_auto">Automatic backlight</string>
+    <string name="keyboard_auto_hint">Adjusts the keyboard light with ambient light while attached and unfolded. Manual brightness is kept for when automatic mode is off.</string>
+    <string name="keyboard_auto_unavailable">No ambient light sensor is available.</string>
+    <string name="keyboard_controls_hint">Backlight requires a compatible connected keyboard. Folding the cover turns the light off. Changes are requests, not hardware acknowledgements.</string>
+    <string name="keyboard_write_failed">Could not save the keyboard setting</string>
+    <string name="keyboard_system_settings">Keyboard layouts and accessibility</string>
+    <string name="keyboard_pointer_speed">Touchpad pointer speed</string>
+    <string name="keyboard_pointer_speed_value">Touchpad pointer speed: %1$+d</string>
+    <string name="keyboard_natural_scroll">Natural scrolling</string>
 </resources>

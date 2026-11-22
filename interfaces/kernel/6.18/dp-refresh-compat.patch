@@ -1,0 +1,86 @@
+--- a/vendor/qcom/opensource/display-drivers/msm/dp/dp_catalog_v420.c
++++ b/vendor/qcom/opensource/display-drivers/msm/dp/dp_catalog_v420.c
+@@ -44,6 +44,48 @@
+ 	{0x1A, 0x1F, 0xFF, 0xFF}, /* sw1, 0.8 v */
+ 	{0xFF, 0xFF, 0xFF, 0xFF}  /* sw1, 1.2 v, optional */
+ };
++
++/* SPDX-License-Identifier: GPL-2.0-only */
++/* sheng's shipping PHY 6.0 tables, retained from its original display driver. */
++#include <linux/of.h>
++
++static bool sheng_dp_legacy_lt_values(u32 version, u32 phy_version,
++		u8 v_level, u8 p_level, bool high, u8 *swing, u8 *pre_emp)
++{
++	static const u8 swing_high[4][4] = {
++		{0x02, 0x12, 0x16, 0x1a},
++		{0x09, 0x19, 0x1f, 0xff},
++		{0x10, 0x1f, 0xff, 0xff},
++		{0x1f, 0xff, 0xff, 0xff},
++	};
++	static const u8 emp_high[4][4] = {
++		{0x00, 0x0c, 0x15, 0x1b},
++		{0x02, 0x0e, 0x16, 0xff},
++		{0x02, 0x11, 0xff, 0xff},
++		{0x04, 0xff, 0xff, 0xff},
++	};
++	static const u8 swing_low[4][4] = {
++		{0x08, 0x0f, 0x16, 0x1f},
++		{0x11, 0x1e, 0x1f, 0xff},
++		{0x16, 0x1f, 0xff, 0xff},
++		{0x1f, 0xff, 0xff, 0xff},
++	};
++	static const u8 emp_low[4][4] = {
++		{0x00, 0x0d, 0x14, 0x1a},
++		{0x00, 0x0e, 0x15, 0xff},
++		{0x00, 0x0e, 0xff, 0xff},
++		{0x02, 0xff, 0xff, 0xff},
++	};
++
++	if (version < 0x10020003 || phy_version < 0x60000000 ||
++			phy_version >= 0x70000000 || v_level >= 4 || p_level >= 4 ||
++			!of_root || of_property_match_string(of_root, "model",
++			"Qualcomm Technologies, Inc. 8550 sheng") < 0)
++		return false;
++	*swing = high ? swing_high[v_level][p_level] : swing_low[v_level][p_level];
++	*pre_emp = high ? emp_high[v_level][p_level] : emp_low[v_level][p_level];
++	return true;
++}
+ 
+ struct dp_catalog_private_v420 {
+ 	struct device *dev;
+@@ -243,6 +285,9 @@
+ 			value0 = ctrl->swing_hbr_rbr[idx];
+ 			value1 = ctrl->pre_emp_hbr_rbr[idx];
+ 		}
++	} else if (sheng_dp_legacy_lt_values(version, phy_version,
++			v_level, p_level, high, &value0, &value1)) {
++		/* Keep shipping PHY tuning when the legacy DT has no tables. */
+ 	} else {
+ 		value0 = vm_voltage_swing[v_level][p_level];
+ 		value1 = vm_pre_emphasis[v_level][p_level];
+--- a/vendor/qcom/opensource/display-drivers/msm/dp/dp_ctrl.c
++++ b/vendor/qcom/opensource/display-drivers/msm/dp/dp_ctrl.c
+@@ -269,7 +269,8 @@
+ {
+ 	int ret = 0, len;
+ 
+-	len = drm_dp_dpcd_read_link_status(ctrl->aux->drm_aux, link_status);
++	len = drm_dp_dpcd_read(ctrl->aux->drm_aux, DP_LANE0_1_STATUS,
++			link_status, DP_LINK_STATUS_SIZE);
+ 	if (len != DP_LINK_STATUS_SIZE) {
+ 		DP_ERR("DP link status read failed, err: %d\n", len);
+ 		ret = len;
+--- a/vendor/qcom/opensource/display-drivers/msm/dp/dp_link.c
++++ b/vendor/qcom/opensource/display-drivers/msm/dp/dp_link.c
+@@ -899,8 +899,8 @@
+ 	link->prev_sink_count = link->dp_link.sink_count.count;
+ 	dp_link_parse_sink_count(&link->dp_link);
+ 
+-	len = drm_dp_dpcd_read_link_status(link->aux->drm_aux,
+-		link->link_status);
++	len = drm_dp_dpcd_read(link->aux->drm_aux, DP_LANE0_1_STATUS,
++		link->link_status, DP_LINK_STATUS_SIZE);
+ 	if (len < DP_LINK_STATUS_SIZE)
+ 		DP_ERR("DP link status read failed\n");
+ 	dp_link_parse_request(link);

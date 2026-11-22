@@ -1,0 +1,24 @@
+// SPDX-License-Identifier: Apache-2.0
+// No snapshot implementation change: preserve its upstream source filegroup,
+// defaults and flags, but do not reintroduce stock fs_mgr transitively into init.
+package {
+    default_applicable_licenses: ["Android-Apache-2.0"],
+}
+
+cc_library_static {
+    name: "libsheng_snapshot_init",
+    native_coverage: true,
+    defaults: ["libsnapshot_defaults"],
+    // These first-stage sources use android-base, not Chrome's base API.
+    // The inherited libchrome dependency is unused and private to the public
+    // snapshot package. Do not broaden its visibility for this owned variant.
+    exclude_shared_libs: ["libchrome"],
+    srcs: [":libsnapshot_sources"],
+    ramdisk_available: true,
+    recovery_available: true,
+    cflags: ["-DLIBSNAPSHOT_NO_COW_WRITE"],
+    static_libs: [
+        "libsheng_fs_mgr_first_stage",
+        "libselinux",
+    ],
+}

@@ -1,0 +1,55 @@
+--- a/k618/sheng-ports/keyboard/sheng_nanosic.c
++++ b/k618/sheng-ports/keyboard/sheng_nanosic.c
+@@ -722,11 +722,6 @@
+ 	 * Resume reuses this cache without entering the firmware fallback. */
+ 	firmware = nanosic->ram_firmware;
+-	ret = firmware ? 0 : request_firmware(&firmware, "MCU_Upgrade.bin", nanosic->dev);
+-	if (!ret && !nanosic->ram_firmware)
+-		nanosic->ram_firmware = firmware;
+-	if (ret) {
+-		dev_err(nanosic->dev, "failed to load MCU firmware\n");
+-		return ret;
+-	}
++	if (!firmware)
++		return -ENOENT;
+ 
+ 	if (firmware->size < 0xA000) {
+@@ -855,9 +850,7 @@
+ 	    nano->plugin_retries < 30)
+ 		mod_delayed_work(system_wq, &nano->plugin_worker, ret ? HZ : 0);
++	if (ret && (ret != -EPROBE_DEFER || nano->plugin_retries >= 30))
++		dev_warn_ratelimited(nano->dev, "Keyboard charger event %d failed: %d\n", wanted, ret);
+ 	mutex_unlock(&nano->conn_mutex);
+-	if (!ret)
+-		do { } while (0);
+-	else
+-		dev_warn_ratelimited(nano->dev, "Keyboard charger event %d failed: %d\n", wanted, ret);
+ }
+ 
+@@ -874,4 +867,11 @@
+ 	}
+ 	nano->fw_attempts++;
++	/* Let ueventd resolve stock ODM firmware before resetting the MCU. */
++	if (!nano->ram_firmware) {
++		ret = firmware_request_nowarn(&nano->ram_firmware,
++					      "MCU_Upgrade.bin", nano->dev);
++		if (ret)
++			goto firmware_result;
++	}
+ 	/* Firmware is volatile; resetting the MCU does not flash its storage. */
+ 	gpiod_set_value_cansleep(nano->reset_gpio, 1);
+@@ -888,4 +888,5 @@
+ 	if (!ret)
+ 		ret = nanosic_wn8030_load_fw(nano);
++firmware_result:
+ 	if (!ret) {
+ 		WRITE_ONCE(nano->firmware_generation, nano->firmware_generation + 1);
+--- a/k618/soc/drivers/power/supply/sheng_qti_pogo_api.h
++++ b/k618/soc/drivers/power/supply/sheng_qti_pogo_api.h
+@@ -112,4 +112,5 @@
+ 	mutex_lock(&sheng_keyboard_charger_lock);
+ 	ret = sheng_keyboard_bcdev ? sheng_pogo_transfer(sheng_keyboard_bcdev,
+-			&request, value, result) : -ENODEV;
++			&request, value, result) :
++		(property == SHENG_POGO_KEYBOARD ? -EPROBE_DEFER : -ENODEV);
+ 	mutex_unlock(&sheng_keyboard_charger_lock);

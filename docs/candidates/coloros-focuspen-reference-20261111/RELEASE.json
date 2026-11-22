@@ -1,0 +1,55 @@
+{
+  "version": "1.1.0",
+  "date": "2026-11-02",
+  "service_variants": 1,
+  "services": [
+    {
+      "path": "build/out/penbridge_all.dex",
+      "target": "/system/penfix/dex/penbridge_all.dex",
+      "mode": "0644",
+      "sha256": "e2c7d13fa9666551072e2a68f61e13f17b75ef98a36d3ff2c898ce8bcc4bc831",
+      "systems": [
+        "C16",
+        "C17"
+      ]
+    },
+    {
+      "path": "build/out/focuspen_guard",
+      "target": "/system/penfix/bin/focuspen_guard",
+      "mode": "0755",
+      "sha256": "bbddf3ffc67d88d54682b462b8f2f23ae05150188d766a06254c4e15baf0a275",
+      "systems": [
+        "C16",
+        "C17"
+      ]
+    },
+    {
+      "path": "build/out/pressure_bridge",
+      "target": "/system/penfix/bin/pressure_bridge",
+      "mode": "0755",
+      "sha256": "e8b44f7172048eec3bd487582d95dc658353470a82e507dd103293c9db7e1a8b",
+      "systems": [
+        "C16",
+        "C17"
+      ]
+    }
+  ],
+  "apk": [
+    {
+      "system": "C16",
+      "path": "apk/C16/IPeManager.apk",
+      "sha256": "08548dfe110ea1c61842c56cf77c2b56822a7c1f42f04ced264f12a64ede56ff",
+      "signatures": [],
+      "protected": false,
+      "runtime_scope": "C17 Device Space confirmed; C16 new increment statically validated"
+    },
+    {
+      "system": "C17",
+      "path": "apk/C17/IPeManager.apk",
+      "sha256": "0da7e067183739398d4f23c686c3ef9864a68a5ea493ec736e61c137e7b05b73",
+      "signatures": [],
+      "protected": false,
+      "runtime_scope": "C17 Device Space confirmed; C16 new increment statically validated"
+    }
+  ]
+}

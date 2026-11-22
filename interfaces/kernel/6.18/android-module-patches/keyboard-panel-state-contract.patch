@@ -1,0 +1,19 @@
+--- a/scripts/android_source_contract.py
++++ b/scripts/android_source_contract.py
+@@ -8,4 +8,16 @@
+ 
++# Device-owned accepted keyboard panel-state overlay: retain every original
++# source check and pinning the panel and boot-readiness inputs.
++EXPECTED.update({
++    'k618/sheng-ports/keyboard/sheng_nanosic_caps.h': '21c2408db90b606a1db0735cb3c3aec88eef40a79ef17ec08b9d9d31bef18f0b',
++    'k618/sheng-ports/keyboard/sheng_nanosic.c': '0fac51d8d5a01eb914bcbf6d57d253430c6293f8d63c98ce5627ea257a73ce87',
++    'k618/soc/drivers/power/supply/sheng_qti_pogo_api.h': '5ad8ea058bea97b2b087ef99267974f952405aa42b70381ed5f5b191b97e6ae0',
++    'k618/sheng-ports/keyboard/sheng_nanosic_panel.h': '4c76631fda07aa6c9833228d7c139bf06f1cd87014b3da851f7640e18285bafd',
++    'k618/sheng-ports/keyboard/Kbuild': '30899274aa652c7ad768bce99169f119abc2370a0957ccef8914c07591a01b6f',
++    'k618/soc/drivers/soc/qcom/panel_event_notifier.c': '3c96a7a0dc5554c7269b41e763e1c3c5967166dfe7beeb90882cf6ed93d9e713',
++    'k618/soc/include/linux/soc/qcom/panel_event_notifier.h': '6961844702ee5f44bff3a3eaf7c3468869cfb406e1b7775e85ba24e423e054fa',
++})
++
+ def android_interface_matches(name, got):
+     from android_lts_contract import android_lts_matches
+     if android_lts_matches(name, got):

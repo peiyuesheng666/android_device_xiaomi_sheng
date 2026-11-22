@@ -59,6 +59,7 @@ public final class PresenceApplication extends Application
         HandlerThread worker = new HandlerThread("sheng-keyboard-presence");
         worker.start();
         handler = new Handler(worker.getLooper());
+        KeyboardPointerReceiver.register(this, handler);
         manager.registerInputDeviceListener(this, handler);
         handler.post(poll);
     }
@@ -174,7 +175,9 @@ public final class PresenceApplication extends Application
             }
             int tabletMode = input.tabletMode();
             controller.update(state, tabletMode == 0 && Settings.System.getInt(
-                    getContentResolver(), "touchpad_enabled", 1) != 0);
+                    getContentResolver(), "touchpad_enabled", 1) != 0,
+                    Settings.Secure.getInt(getContentResolver(), KeyboardBacklight.SETTING, -1),
+                    tabletMode);
             Boolean usable = state != null && !state || tabletMode == 1 ? Boolean.FALSE
                     : Boolean.TRUE.equals(state) && tabletMode == 0 ? Boolean.TRUE : null;
             if (usable == null) {

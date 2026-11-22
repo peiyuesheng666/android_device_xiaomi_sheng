@@ -1,0 +1,30 @@
+{
+  "scope": "Optional source-matched LKM, not built-in root; same native kernel also used by Magisk",
+  "source_repository": "tiann/KernelSU",
+  "source_tag": "v3.3.1",
+  "source_commit": "0c0fdb960178fa12d80d6cbcfdcb6ad8be6a865d",
+  "source_archive_sha256": "7986fa26b3a52c11d490f40547db6429462bc312c77f42303c5b9063bdb48a6a",
+  "ksu_version": 32680,
+  "ksu_git_version": 2680,
+  "manager_version_work_authorized": false,
+  "manager_upgrade_required_or_performed": false,
+  "device_source_patches": [
+    {
+      "path": "ksu-android-gki-namespace-import.patch",
+      "sha256": "d2e14dd5ee958ffe30559b864b55de260a42496988944e39de562fd35d675a5e"
+    }
+  ],
+  "obsolete_probe_patch_not_selected": "ksu-policydb-extensions-compat.patch",
+  "policydb_fix": "Already upstream in selected source for Linux >=6.18",
+  "requirements": [
+    "Compile against exact native-layout kernel output and matching module family",
+    "Retain genuine exported symbol CRCs including module_layout",
+    "Validate every private prelink reference against exact vmlinux",
+    "Use stock ksuinit prelink+init_module without force-load flags",
+    "Do not broaden kernel export table or alter core layout to fit generic binary",
+    "Test KSU and Magisk separately on same kernel/module family"
+  ],
+  "module_built": false,
+  "runtime_verified": false,
+  "flashed": false
+}

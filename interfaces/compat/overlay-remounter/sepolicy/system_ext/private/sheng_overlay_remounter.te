@@ -1,0 +1,18 @@
+# SPDX-License-Identifier: Apache-2.0
+# Private tmpfs holders; never relabel the original Magisk bind-mounted inode.
+type sheng_overlay_staging_file, file_type;
+
+userdebug_or_eng(`
+  # Early Magisk file bind mounts (e.g. init.zygote32.rc) retain the
+  # tmpfs inode label at this handoff. Stage()/Identity() must stat those
+  # inodes before and after MS_MOVE. Grant metadata inspection only: no
+  # payload read/write, relabel, execution, or mounton of generic tmpfs files.
+  allow overlay_remounter tmpfs:file getattr;
+
+  # The fixed-name root is created only by the normal remounter domain.
+  type_transition overlay_remounter tmpfs:dir sheng_overlay_staging_file "sheng-remount";
+  type_transition overlay_remounter sheng_overlay_staging_file:{ dir file } sheng_overlay_staging_file;
+  allow overlay_remounter tmpfs:dir { add_name remove_name write };
+  allow overlay_remounter sheng_overlay_staging_file:dir { create_dir_perms mounton };
+  allow overlay_remounter sheng_overlay_staging_file:file { create open write getattr unlink mounton };
+')

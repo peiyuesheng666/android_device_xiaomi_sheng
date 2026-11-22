@@ -13,6 +13,7 @@ type vendor_sysfs_displayfeature, fs_type, sysfs_type;
 type sysfs_fingerprint_sheng, fs_type, sysfs_type;
 type vendor_proc_sheng_touch, fs_type, proc_type;
 type vendor_sysfs_sheng_hid, fs_type, sysfs_type;
+type vendor_sysfs_sheng_boot_complete, fs_type, sysfs_type;
 recovery_only(`
 type vendor_sysfs_sheng_firmware_path, fs_type, sysfs_type;
 ')

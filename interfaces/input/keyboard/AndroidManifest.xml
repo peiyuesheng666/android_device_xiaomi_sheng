@@ -1,10 +1,21 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="org.lineageos.sheng.keyboard" android:versionCode="1" android:versionName="1.0">
+    package="org.lineageos.sheng.keyboard" android:versionCode="3" android:versionName="1.2">
+    <uses-sdk android:minSdkVersion="37" android:targetSdkVersion="37" />
     <uses-permission android:name="android.permission.DISABLE_INPUT_DEVICE" />
     <uses-permission android:name="android.permission.TABLET_MODE" />
+    <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS" />
     <queries><package android:name="com.xiaomi.devauth" /></queries>
     <application android:name=".PresenceApplication"
         android:label="Keyboard connection service"
         android:persistent="true" android:directBootAware="true"
-        android:allowBackup="false" />
+        android:allowBackup="false">
+        <activity android:name=".KeyboardBacklightActivity"
+            android:label="@string/sheng_keyboard_backlight_title" android:theme="@style/ShengKeyboardSettings"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="org.lineageos.settings.device.ADVANCED_KEYBOARD_SETTINGS" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+    </application>
 </manifest>

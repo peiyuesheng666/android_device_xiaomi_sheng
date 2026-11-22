@@ -284,6 +284,7 @@ PRODUCT_COPY_FILES += \
 
 PRODUCT_PACKAGES += \
     FrameworkResOverlaySheng \
+    NetworkStackResOverlaySheng \
     SystemUIResOverlaySheng \
     SettingsProviderResOverlaySheng \
     SettingsResOverlaySheng \
@@ -315,6 +316,9 @@ PRODUCT_PACKAGES += \
 # Recovery starts the optional oops logger after storage coldboot.
 PRODUCT_COPY_FILES += \
     $(LOCAL_PATH)/rootdir/recovery/hardware.sh:recovery/root/system/bin/sheng-recovery-hardware \
+    $(LOCAL_PATH)/rootdir/recovery/usb-readiness.sh:recovery/root/system/bin/sheng-recovery-usb-readiness \
+    $(LOCAL_PATH)/rootdir/recovery/usb-bind.sh:recovery/root/system/bin/sheng-recovery-usb-bind \
+    $(LOCAL_PATH)/rootdir/recovery/init.recovery.sheng-usb-bind.rc:recovery/root/system/etc/init/init.recovery.sheng-usb-bind.rc \
     $(LOCAL_PATH)/rootdir/recovery/init.recovery.sheng-late-modules.rc:recovery/root/system/etc/init/init.recovery.sheng-late-modules.rc \
     $(LOCAL_PATH)/rootdir/recovery/late-modules.sh:recovery/root/system/bin/sheng-recovery-late-modules
 
@@ -409,15 +413,6 @@ PRODUCT_COPY_FILES += \
 # Vendor configurations
 $(call inherit-product, vendor/xiaomi/sheng/sheng-vendor.mk)
 
-# Establish the natural landscape frame inside SSC, including direct reports
-# and fused sensors. Replace only these stock orientation configurations.
-PRODUCT_COPY_FILES := $(filter-out \
-    %:$(TARGET_COPY_OUT_ODM)/etc/sensors/config/sm8550_icm4x6xx_0.json \
-    %:$(TARGET_COPY_OUT_ODM)/etc/sensors/config/sm8550_qmc6308_0.json,$(PRODUCT_COPY_FILES))
-PRODUCT_COPY_FILES += \
-    device/xiaomi/sheng/configs/sensors/sm8550_icm4x6xx_0.json:$(TARGET_COPY_OUT_ODM)/etc/sensors/config/sm8550_icm4x6xx_0.json \
-    device/xiaomi/sheng/configs/sensors/sm8550_qmc6308_0.json:$(TARGET_COPY_OUT_ODM)/etc/sensors/config/sm8550_qmc6308_0.json
-
 # Vendor service manager
 PRODUCT_PACKAGES += \
     vndservicemanager
@@ -492,6 +487,10 @@ PRODUCT_COPY_FILES += \
 # Device-specific HALs, input, audio and overlays are populated from the
 # read-only stock extraction during bring-up; see docs/BRINGUP.md.
 
+# Preserve real child mounts when debug overlayfs is recreated by init.
+$(call inherit-product, $(LOCAL_PATH)/interfaces/compat/overlay-remounter/product.mk)
+$(call inherit-product, $(LOCAL_PATH)/interfaces/compat/first-stage-init/product.mk)
+
 PRODUCT_COPY_FILES += \
     $(LOCAL_PATH)/configs/idc/NVTCapacitivePenM80p.idc:$(TARGET_COPY_OUT_VENDOR)/usr/idc/NVTCapacitivePenM80p.idc \
     $(LOCAL_PATH)/configs/idc/NVTCapacitivePenP81c.idc:$(TARGET_COPY_OUT_VENDOR)/usr/idc/NVTCapacitivePenP81c.idc \
@@ -512,6 +511,9 @@ PRODUCT_PACKAGES += \
 
 # Populate missing per-user min/peak refresh settings without replacing choices.
 PRODUCT_PACKAGES += ShengDisplayDefaults
+
+# Manual USB power-role tile; platform signature grants MANAGE_USB.
+PRODUCT_PACKAGES += ShengUsbPower
 
 # Synchronize Android's double-tap switch through the stock sheng THP V2 ABI.
 PRODUCT_PACKAGES += ShengTouch sheng-touchctl

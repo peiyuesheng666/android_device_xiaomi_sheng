@@ -1,0 +1,43 @@
+Focus Pen unified service v1.1.0 — 2026-11-02 (Asia/Shanghai)
+
+Real-device baseline: Xiaomi Pad 6S Pro / sheng, Focus Pen Pro.
+C16: true pressure, system pen service connection and HID noise fix confirmed in the earlier session.
+C17: after replacing the old packaged service files, user confirmed system pen settings enabled and Bluetooth icon hidden.
+After Device Space integration, user confirmed “卡片、连接状态、电量都正常”.
+
+Device Space evidence from C17:
+MyDevices.SDK.DeviceInfoManager: notifyCardConnectionAdded.
+MyDevices.SDK.DeviceInfoManager: notifyCardUpdated.
+Real hardware model at the time: bus=0005 / VID=0022 / PID=5081.
+Card identity and device ID derive from the real MAC, not a fixed sample address.
+Connection reported CONNECTED; battery sample was 100, obtained from the normal acquisition path.
+The value 100 is an observed sample, not a constant supplied by the patch.
+
+Soft restart:
+The standalone init bridge originally survived system_server restart with dead Bluetooth handles.
+The new bridge links to system-server death, exits, and is restarted by init with fresh handles.
+Bridge PID changed automatically after the user-triggered soft restart and restored real HID state=2.
+Unknown Bluetooth names and empty magnetic MAC are recovered from matching real input devices.
+
+Final incremental battery changes:
+Each provider update carries focuspen_mac, validates the source still belongs to the current pen,
+and updates only that device's SDK battery list. Cross-pen old values are not reused.
+Undocked battery refresh uses the Bluetooth stack's measured level; no extra GATT connection is held open.
+Invalid/unknown levels are omitted rather than replaced with a made-up value.
+Actual percentage depletion / swapping a second physical pen was not forced during this session.
+
+Static checks:
+C16 original classes2: 42,788 method streams checked; only the listed 12 adaptation methods differ.
+C17 original classes2: 36,825 method streams checked; only the listed 13 adaptation methods differ.
+Original manifest, resource table, unrelated DEX and native-library entry bytes are preserved.
+Both APKs have no V1 signature entries or V2/V3 signing block, no new wrapper/protection, and pass ZIP CRC / 16 KB alignment checks.
+Java hardware identity tests and NVT EOF / screen gating tests pass; native ID boundary tests passed for the unchanged native binaries.
+C16's newest APK Device Space/battery increment was not flashed for a fresh C16 device test this round.
+No new multi-hour standby test or full ROM cold-flash acceptance was performed.
+
+Test environment:
+APK runtime verification used root temporary overlays after the system had scanned the stock APK.
+Unsigned APK boot acceptance is handled by the user's ROM policy; the package does not change that policy or sign APKs.
+A later full reboot restored installed old partition files and left user 0 RUNNING_LOCKED.
+Final files were staged again; OEM service startup after that reboot requires the normal first user unlock.
+No lock credentials were requested, read or bypassed.

@@ -1,0 +1,63 @@
+// SPDX-License-Identifier: Apache-2.0
+// Sources and headers are pinned copies; materialize_source_variants.py verifies
+// upstream identity before copying. Public init and fs_mgr are never patched.
+package {
+    default_applicable_licenses: ["sheng_first_stage_init_upstream_license"],
+}
+
+license {
+    name: "sheng_first_stage_init_upstream_license",
+    visibility: [":__subpackages__"],
+    license_kinds: ["SPDX-license-identifier-Apache-2.0"],
+    license_text: ["NOTICE"],
+}
+
+cc_binary {
+    name: "sheng_init_first_stage",
+    defaults: ["init_first_stage_defaults"],
+    // Compile with the original ramdisk ABI/flags, but use the supported root
+    // installer below. Only upstream's named init binary may install in root
+    // directly; do not weaken Soong's install_in_root neverallow.
+    install_in_root: false,
+    installable: false,
+    srcs: [
+        "first_stage_mount_android.cpp",
+        "snapuserd_transition.cpp",
+    ],
+    // Keep the public first-stage defaults, but replace only its fs_mgr dependency.
+    exclude_static_libs: ["libfs_mgr", "libcrypto_static", "libunwindstack_no_dex"],
+    static_libs: [
+        "libsheng_fs_mgr_first_stage",
+        "libsheng_crypto_first_stage",
+        "libsheng_unwind_first_stage",
+        "libgsi",
+        "liblp",
+        "liblz4",
+        "libprotobuf-cpp-lite",
+        "libsnapshot_cow",
+        "libsheng_snapshot_init",
+        "libsheng_zstd_first_stage",
+        "update_metadata-protos",
+    ],
+}
+
+// The input is this build's compiled/stripped executable, not a checked-in
+// opaque binary. The original module name keeps the existing root neverallow
+// contract; prefer hides its public source provider before install generation.
+cc_prebuilt_binary {
+    name: "init_first_stage",
+    srcs: [":sheng_init_first_stage"],
+    stem: "init",
+    prefer: true,
+    enabled: select(soong_config_variable("sheng", "first_stage_rootfix"), {
+        "true": true,
+        default: false,
+    }),
+    ramdisk: true,
+    install_in_root: true,
+    static_executable: true,
+    system_shared_libs: [],
+    stl: "none",
+    strip: { none: true },
+    required: ["adb_debug.prop"],
+}
