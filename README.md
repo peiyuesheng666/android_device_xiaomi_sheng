@@ -2,7 +2,7 @@
 
 小米平板 6S Pro 12.4 设备树，支持 PixelOS / LineageOS 产品入口。
 
-![Xiaomi Pad 6S Pro 12.4](https://i02.appmifile.com/mi-com-product/fly-birds/xiaomi-pad-6s-pro-124/pc/e22707982190cc2587fde3afa3d54567.jpg)
+![Xiaomi Pad 6S Pro 12.4]([https://i02.appmifile.com/mi-com-product/fly-birds/xiaomi-pad-6s-pro-124/pc/e22707982190cc2587fde3afa3d54567.jpg](https://tse1.mm.bing.net/th/id/OIP.P4mW2PycwP7l4kSOcC0m8AHaFB?r=0&rs=1&pid=ImgDetMain&o=7&rm=3))
 
 ## 硬件规格
 
