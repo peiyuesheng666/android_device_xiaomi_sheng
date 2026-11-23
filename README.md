@@ -30,7 +30,7 @@
 ## 源码布局
 
 设备树放在 `device/xiaomi/sheng`，厂商文件放在 `vendor/xiaomi/sheng`。
-当前内核为 Android 17 Linux 6.18.39，源码项目放在 `kernel/xiaomi/sheng-build`；
+当前内核为 ACK 6.18.39-Android 17，源码项目放在 `kernel/xiaomi/sheng-build`；
 `kernel/xiaomi/sheng` 链接到该项目的 `sources/k618/ws/common`。
 
 完整构建步骤见交付包根目录的 `BUILD.md`。
